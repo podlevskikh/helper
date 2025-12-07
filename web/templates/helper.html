@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Helper Schedule</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>My Schedule</h1>
+            <nav>
+                <button onclick="showSection('schedule')" class="nav-btn active">Schedule</button>
+                <button onclick="showSection('shopping')" class="nav-btn">Shopping List</button>
+            </nav>
+        </header>
+
+        <!-- Schedule Section -->
+        <section id="schedule-section" class="content-section">
+            <div class="schedule-nav">
+                <button onclick="showScheduleView('today')" class="schedule-nav-btn active" id="today-btn">Today</button>
+                <button onclick="showScheduleView('thisweek')" class="schedule-nav-btn" id="thisweek-btn">This Week</button>
+                <button onclick="showScheduleView('nextweek')" class="schedule-nav-btn" id="nextweek-btn">Next Week</button>
+            </div>
+
+            <!-- Today View -->
+            <div id="today-view" class="schedule-view">
+                <h2>Today's Tasks - <span id="today-date"></span></h2>
+                <div id="today-schedule" class="schedule-container"></div>
+            </div>
+
+            <!-- This Week View -->
+            <div id="thisweek-view" class="schedule-view" style="display:none;">
+                <h2>This Week</h2>
+                <div id="thisweek-calendar" class="calendar-grid"></div>
+            </div>
+
+            <!-- Next Week View -->
+            <div id="nextweek-view" class="schedule-view" style="display:none;">
+                <h2>Next Week</h2>
+                <div id="nextweek-calendar" class="calendar-grid"></div>
+            </div>
+        </section>
+
+        <!-- Shopping List Section -->
+        <section id="shopping-section" class="content-section" style="display:none;">
+            <h2>Shopping List</h2>
+            <button onclick="showShoppingForm()" class="btn btn-primary">Add Item</button>
+            
+            <div id="shopping-form" class="form-container" style="display:none;">
+                <h3>Add Shopping Item</h3>
+                <form id="shoppingForm">
+                    <div class="form-group">
+                        <label>Item:</label>
+                        <input type="text" id="shopping-item" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantity:</label>
+                        <input type="text" id="shopping-quantity" placeholder="e.g., 2 kg, 1 bottle">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Add</button>
+                        <button type="button" onclick="hideShoppingForm()" class="btn">Cancel</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="shopping-list" class="list-container"></div>
+        </section>
+
+        <!-- Recipe Modal -->
+        <div id="recipe-modal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <span class="close" onclick="closeRecipeModal()">&times;</span>
+                <div id="recipe-details"></div>
+            </div>
+        </div>
+
+        <!-- Cleaning Zone Modal -->
+        <div id="zone-modal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <span class="close" onclick="closeZoneModal()">&times;</span>
+                <div id="zone-details"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/helper.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,482 @@
+2025/12/06 23:34:19 Database connection established
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.142ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type='table' AND name="recipes"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.195ms] [34;1m[rows:1][0m SELECT sql FROM sqlite_master WHERE type IN ("table","index") AND tbl_name = "recipes" AND sql IS NOT NULL order by type = "table" desc
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.053ms] [34;1m[rows:-][0m SELECT * FROM `recipes` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.028ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type='table' AND name="meal_times"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.096ms] [34;1m[rows:1][0m SELECT sql FROM sqlite_master WHERE type IN ("table","index") AND tbl_name = "meal_times" AND sql IS NOT NULL order by type = "table" desc
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.027ms] [34;1m[rows:-][0m SELECT * FROM `meal_times` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.063ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type='table' AND name="cleaning_zones"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.210ms] [34;1m[rows:1][0m SELECT sql FROM sqlite_master WHERE type IN ("table","index") AND tbl_name = "cleaning_zones" AND sql IS NOT NULL order by type = "table" desc
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.031ms] [34;1m[rows:-][0m SELECT * FROM `cleaning_zones` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.036ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type='table' AND name="childcare_schedules"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.129ms] [34;1m[rows:2][0m SELECT sql FROM sqlite_master WHERE type IN ("table","index") AND tbl_name = "childcare_schedules" AND sql IS NOT NULL order by type = "table" desc
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.030ms] [34;1m[rows:-][0m SELECT * FROM `childcare_schedules` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.022ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "index" AND tbl_name = "childcare_schedules" AND name = "idx_childcare_schedules_date"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.021ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type='table' AND name="daily_schedules"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.096ms] [34;1m[rows:2][0m SELECT sql FROM sqlite_master WHERE type IN ("table","index") AND tbl_name = "daily_schedules" AND sql IS NOT NULL order by type = "table" desc
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.022ms] [34;1m[rows:-][0m SELECT * FROM `daily_schedules` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.024ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "index" AND tbl_name = "daily_schedules" AND name = "idx_daily_schedules_date"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.018ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type='table' AND name="schedule_tasks"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.074ms] [34;1m[rows:2][0m SELECT sql FROM sqlite_master WHERE type IN ("table","index") AND tbl_name = "schedule_tasks" AND sql IS NOT NULL order by type = "table" desc
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.025ms] [34;1m[rows:-][0m SELECT * FROM `schedule_tasks` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.062ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "table" AND tbl_name = "schedule_tasks" AND (sql LIKE "%CONSTRAINT ""fk_schedule_tasks_recipe"" %" OR sql LIKE "%CONSTRAINT fk_schedule_tasks_recipe %" OR sql LIKE "%CONSTRAINT `fk_schedule_tasks_recipe`%" OR sql LIKE "%CONSTRAINT [fk_schedule_tasks_recipe]%" OR sql LIKE "%CONSTRAINT 	fk_schedule_tasks_recipe	%")
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.027ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "table" AND tbl_name = "schedule_tasks" AND (sql LIKE "%CONSTRAINT ""fk_schedule_tasks_zone"" %" OR sql LIKE "%CONSTRAINT fk_schedule_tasks_zone %" OR sql LIKE "%CONSTRAINT `fk_schedule_tasks_zone`%" OR sql LIKE "%CONSTRAINT [fk_schedule_tasks_zone]%" OR sql LIKE "%CONSTRAINT 	fk_schedule_tasks_zone	%")
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.027ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "table" AND tbl_name = "schedule_tasks" AND (sql LIKE "%CONSTRAINT ""fk_daily_schedules_tasks"" %" OR sql LIKE "%CONSTRAINT fk_daily_schedules_tasks %" OR sql LIKE "%CONSTRAINT `fk_daily_schedules_tasks`%" OR sql LIKE "%CONSTRAINT [fk_daily_schedules_tasks]%" OR sql LIKE "%CONSTRAINT 	fk_daily_schedules_tasks	%")
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.039ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "index" AND tbl_name = "schedule_tasks" AND name = "idx_schedule_tasks_schedule_id"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.025ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type='table' AND name="shopping_list_items"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.078ms] [34;1m[rows:1][0m SELECT sql FROM sqlite_master WHERE type IN ("table","index") AND tbl_name = "shopping_list_items" AND sql IS NOT NULL order by type = "table" desc
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.025ms] [34;1m[rows:-][0m SELECT * FROM `shopping_list_items` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.026ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type='table' AND name="settings"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.168ms] [34;1m[rows:2][0m SELECT sql FROM sqlite_master WHERE type IN ("table","index") AND tbl_name = "settings" AND sql IS NOT NULL order by type = "table" desc
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.072ms] [34;1m[rows:-][0m SELECT * FROM `settings` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.047ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type = "index" AND tbl_name = "settings" AND name = "idx_settings_key"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.037ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type='table' AND name="holidays"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.167ms] [34;1m[rows:1][0m SELECT sql FROM sqlite_master WHERE type IN ("table","index") AND tbl_name = "holidays" AND sql IS NOT NULL order by type = "table" desc
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.073ms] [34;1m[rows:-][0m SELECT * FROM `holidays` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.048ms] [34;1m[rows:-][0m SELECT count(*) FROM sqlite_master WHERE type='table' AND name="recipe_comments"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.186ms] [34;1m[rows:1][0m SELECT sql FROM sqlite_master WHERE type IN ("table","index") AND tbl_name = "recipe_comments" AND sql IS NOT NULL order by type = "table" desc
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:30
+[0m[33m[0.047ms] [34;1m[rows:-][0m SELECT * FROM `recipe_comments` LIMIT 1
+2025/12/06 23:34:19 Database migrations completed
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:71
+[0m[33m[1.533ms] [34;1m[rows:1][0m SELECT * FROM `settings` WHERE key = "schedule_days_ahead" ORDER BY `settings`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/database/database.go:71
+[0m[33m[0.313ms] [34;1m[rows:1][0m SELECT * FROM `settings` WHERE key = "auto_generate_schedule" ORDER BY `settings`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.788ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "New Year's Day" AND date = "2025-01-01 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.221ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Epiphany" AND date = "2025-01-06 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.132ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Green Monday" AND date = "2025-03-03 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.124ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Greek Independence Day" AND date = "2025-03-25 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.129ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Cyprus National Day" AND date = "2025-04-01 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.150ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Good Friday" AND date = "2025-04-18 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.117ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Easter Saturday" AND date = "2025-04-19 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.117ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Easter Sunday" AND date = "2025-04-20 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.111ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Easter Monday" AND date = "2025-04-21 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.104ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Labour Day" AND date = "2025-05-01 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.161ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Orthodox Pentecost Monday" AND date = "2025-06-09 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.119ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Assumption of Mary" AND date = "2025-08-15 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.083ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Cyprus Independence Day" AND date = "2025-10-01 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.075ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Greek National Day (Ochi Day)" AND date = "2025-10-28 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.076ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Christmas Day" AND date = "2025-12-25 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:33
+[0m[33m[0.102ms] [34;1m[rows:1][0m SELECT * FROM `holidays` WHERE name = "Boxing Day" AND date = "2025-12-26 00:00:00" ORDER BY `holidays`.`id` LIMIT 1
+2025/12/06 23:34:19 Cyprus holidays initialized
+2025/12/06 23:34:19 Generating initial schedules...
+2025/12/06 23:34:19 Generating schedule for date: 2025-12-06
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:59
+[0m[33m[0.140ms] [34;1m[rows:1][0m SELECT count(*) FROM `holidays` WHERE (is_recurring = true AND strftime('%m', date) = "12" AND strftime('%d', date) = "06") OR date = "2025-12-06"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/scheduler/scheduler.go:37
+[0m[33m[0.731ms] [34;1m[rows:1][0m SELECT * FROM `daily_schedules` WHERE date = "2025-12-06 00:00:00" ORDER BY `daily_schedules`.`id` LIMIT 1
+2025/12/06 23:34:19 Schedule already exists for 2025-12-06, skipping
+2025/12/06 23:34:19 Generating schedule for date: 2025-12-07
+2025/12/06 23:34:19 Date 2025-12-07 is a holiday or Sunday, skipping schedule generation
+2025/12/06 23:34:19 Generating schedule for date: 2025-12-08
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:59
+[0m[33m[0.136ms] [34;1m[rows:1][0m SELECT count(*) FROM `holidays` WHERE (is_recurring = true AND strftime('%m', date) = "12" AND strftime('%d', date) = "08") OR date = "2025-12-08"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/scheduler/scheduler.go:37
+[0m[33m[0.096ms] [34;1m[rows:1][0m SELECT * FROM `daily_schedules` WHERE date = "2025-12-08 00:00:00" ORDER BY `daily_schedules`.`id` LIMIT 1
+2025/12/06 23:34:19 Schedule already exists for 2025-12-08, skipping
+2025/12/06 23:34:19 Generating schedule for date: 2025-12-09
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:59
+[0m[33m[0.080ms] [34;1m[rows:1][0m SELECT count(*) FROM `holidays` WHERE (is_recurring = true AND strftime('%m', date) = "12" AND strftime('%d', date) = "09") OR date = "2025-12-09"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/scheduler/scheduler.go:37
+[0m[33m[0.073ms] [34;1m[rows:1][0m SELECT * FROM `daily_schedules` WHERE date = "2025-12-09 00:00:00" ORDER BY `daily_schedules`.`id` LIMIT 1
+2025/12/06 23:34:19 Schedule already exists for 2025-12-09, skipping
+2025/12/06 23:34:19 Generating schedule for date: 2025-12-10
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:59
+[0m[33m[0.076ms] [34;1m[rows:1][0m SELECT count(*) FROM `holidays` WHERE (is_recurring = true AND strftime('%m', date) = "12" AND strftime('%d', date) = "10") OR date = "2025-12-10"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/scheduler/scheduler.go:37
+[0m[33m[0.070ms] [34;1m[rows:1][0m SELECT * FROM `daily_schedules` WHERE date = "2025-12-10 00:00:00" ORDER BY `daily_schedules`.`id` LIMIT 1
+2025/12/06 23:34:19 Schedule already exists for 2025-12-10, skipping
+2025/12/06 23:34:19 Generating schedule for date: 2025-12-11
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:59
+[0m[33m[0.138ms] [34;1m[rows:1][0m SELECT count(*) FROM `holidays` WHERE (is_recurring = true AND strftime('%m', date) = "12" AND strftime('%d', date) = "11") OR date = "2025-12-11"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/scheduler/scheduler.go:37
+[0m[33m[0.126ms] [34;1m[rows:1][0m SELECT * FROM `daily_schedules` WHERE date = "2025-12-11 00:00:00" ORDER BY `daily_schedules`.`id` LIMIT 1
+2025/12/06 23:34:19 Schedule already exists for 2025-12-11, skipping
+2025/12/06 23:34:19 Generating schedule for date: 2025-12-12
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/data/holidays.go:59
+[0m[33m[0.162ms] [34;1m[rows:1][0m SELECT count(*) FROM `holidays` WHERE (is_recurring = true AND strftime('%m', date) = "12" AND strftime('%d', date) = "12") OR date = "2025-12-12"
+
+2025/12/06 23:34:19 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/scheduler/scheduler.go:37
+[0m[33m[0.234ms] [34;1m[rows:1][0m SELECT * FROM `daily_schedules` WHERE date = "2025-12-12 00:00:00" ORDER BY `daily_schedules`.`id` LIMIT 1
+2025/12/06 23:34:19 Schedule already exists for 2025-12-12, skipping
+[GIN-debug] [WARNING] Creating an Engine instance with the Logger and Recovery middleware already attached.
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] Loaded HTML Templates (3): 
+	- 
+	- admin.html
+	- helper.html
+
+[GIN-debug] GET    /static/*filepath         --> github.com/gin-gonic/gin.(*RouterGroup).createStaticHandler.func1 (3 handlers)
+[GIN-debug] HEAD   /static/*filepath         --> github.com/gin-gonic/gin.(*RouterGroup).createStaticHandler.func1 (3 handlers)
+[GIN-debug] GET    /admin/                   --> main.main.func2 (3 handlers)
+[GIN-debug] GET    /admin/api/recipes        --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).GetRecipes-fm (3 handlers)
+[GIN-debug] GET    /admin/api/recipes/:id    --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).GetRecipe-fm (3 handlers)
+[GIN-debug] POST   /admin/api/recipes        --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).CreateRecipe-fm (3 handlers)
+[GIN-debug] PUT    /admin/api/recipes/:id    --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).UpdateRecipe-fm (3 handlers)
+[GIN-debug] DELETE /admin/api/recipes/:id    --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).DeleteRecipe-fm (3 handlers)
+[GIN-debug] GET    /admin/api/recipes/:id/comments --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).GetRecipeComments-fm (3 handlers)
+[GIN-debug] POST   /admin/api/recipes/:id/comments --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).CreateRecipeComment-fm (3 handlers)
+[GIN-debug] DELETE /admin/api/comments/:id   --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).DeleteRecipeComment-fm (3 handlers)
+[GIN-debug] GET    /admin/api/mealtimes      --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).GetMealTimes-fm (3 handlers)
+[GIN-debug] GET    /admin/api/mealtimes/:id  --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).GetMealTime-fm (3 handlers)
+[GIN-debug] POST   /admin/api/mealtimes      --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).CreateMealTime-fm (3 handlers)
+[GIN-debug] PUT    /admin/api/mealtimes/:id  --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).UpdateMealTime-fm (3 handlers)
+[GIN-debug] DELETE /admin/api/mealtimes/:id  --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).DeleteMealTime-fm (3 handlers)
+[GIN-debug] GET    /admin/api/zones          --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).GetCleaningZones-fm (3 handlers)
+[GIN-debug] GET    /admin/api/zones/:id      --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).GetCleaningZone-fm (3 handlers)
+[GIN-debug] POST   /admin/api/zones          --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).CreateCleaningZone-fm (3 handlers)
+[GIN-debug] PUT    /admin/api/zones/:id      --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).UpdateCleaningZone-fm (3 handlers)
+[GIN-debug] DELETE /admin/api/zones/:id      --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).DeleteCleaningZone-fm (3 handlers)
+[GIN-debug] GET    /admin/api/childcare      --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).GetChildcareSchedules-fm (3 handlers)
+[GIN-debug] POST   /admin/api/childcare      --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).CreateChildcareSchedule-fm (3 handlers)
+[GIN-debug] PUT    /admin/api/childcare/:id  --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).UpdateChildcareSchedule-fm (3 handlers)
+[GIN-debug] DELETE /admin/api/childcare/:id  --> podlevskikh/awesomeProject/internal/handlers.(*AdminHandler).DeleteChildcareSchedule-fm (3 handlers)
+[GIN-debug] POST   /admin/api/regenerate-schedule --> main.main.func3 (3 handlers)
+[GIN-debug] GET    /helper/                  --> main.main.func4 (3 handlers)
+[GIN-debug] GET    /helper/api/schedule/today --> podlevskikh/awesomeProject/internal/handlers.(*HelperHandler).GetTodaySchedule-fm (3 handlers)
+[GIN-debug] GET    /helper/api/schedule/date/:date --> podlevskikh/awesomeProject/internal/handlers.(*HelperHandler).GetScheduleByDate-fm (3 handlers)
+[GIN-debug] GET    /helper/api/schedule/upcoming --> podlevskikh/awesomeProject/internal/handlers.(*HelperHandler).GetUpcomingSchedules-fm (3 handlers)
+[GIN-debug] POST   /helper/api/tasks/:id/complete --> podlevskikh/awesomeProject/internal/handlers.(*HelperHandler).CompleteTask-fm (3 handlers)
+[GIN-debug] POST   /helper/api/tasks/:id/uncomplete --> podlevskikh/awesomeProject/internal/handlers.(*HelperHandler).UncompleteTask-fm (3 handlers)
+[GIN-debug] GET    /helper/api/shopping      --> podlevskikh/awesomeProject/internal/handlers.(*HelperHandler).GetShoppingList-fm (3 handlers)
+[GIN-debug] POST   /helper/api/shopping      --> podlevskikh/awesomeProject/internal/handlers.(*HelperHandler).AddShoppingListItem-fm (3 handlers)
+[GIN-debug] POST   /helper/api/shopping/:id/purchased --> podlevskikh/awesomeProject/internal/handlers.(*HelperHandler).MarkItemPurchased-fm (3 handlers)
+[GIN-debug] DELETE /helper/api/shopping/:id  --> podlevskikh/awesomeProject/internal/handlers.(*HelperHandler).DeleteShoppingListItem-fm (3 handlers)
+[GIN-debug] GET    /helper/api/recipes/:id   --> podlevskikh/awesomeProject/internal/handlers.(*HelperHandler).GetRecipeDetails-fm (3 handlers)
+[GIN-debug] GET    /                         --> main.main.func5 (3 handlers)
+2025/12/06 23:34:19 Starting server on :8080
+2025/12/06 23:34:19 Admin interface: http://localhost:8080/admin
+2025/12/06 23:34:19 Helper interface: http://localhost:8080/helper
+[GIN-debug] [WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.
+Please check https://github.com/gin-gonic/gin/blob/master/docs/doc.md#dont-trust-all-proxies for details.
+[GIN-debug] Listening and serving HTTP on :8080
+
+2025/12/06 23:34:25 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:172
+[0m[33m[0.741ms] [34;1m[rows:1][0m SELECT * FROM `cleaning_zones` WHERE `cleaning_zones`.`id` = "5" ORDER BY `cleaning_zones`.`id` LIMIT 1
+[GIN] 2025/12/06 - 23:34:25 | 200 |    1.001966ms |             ::1 | GET      "/admin/api/zones/5"
+
+2025/12/06 23:34:35 [31;1m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:103 [35;1mrecord not found
+[0m[33m[0.578ms] [34;1m[rows:0][0m SELECT * FROM `meal_times` WHERE `meal_times`.`id` = "1" ORDER BY `meal_times`.`id` LIMIT 1
+[GIN] 2025/12/06 - 23:34:35 | 404 |     690.849µs |             ::1 | GET      "/admin/api/mealtimes/1"
+
+2025/12/06 23:34:42 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:92
+[0m[33m[0.227ms] [34;1m[rows:3][0m SELECT * FROM `meal_times` ORDER BY default_time
+[GIN] 2025/12/06 - 23:34:42 | 200 |     368.869µs |             ::1 | GET      "/admin/api/mealtimes"
+
+2025/12/06 23:34:49 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:103
+[0m[33m[0.177ms] [34;1m[rows:1][0m SELECT * FROM `meal_times` WHERE `meal_times`.`id` = "2" ORDER BY `meal_times`.`id` LIMIT 1
+[GIN] 2025/12/06 - 23:34:49 | 200 |     384.404µs |             ::1 | GET      "/admin/api/mealtimes/2"
+[GIN] 2025/12/06 - 23:37:33 | 200 |    2.042742ms |             ::1 | GET      "/helper/"
+[GIN] 2025/12/06 - 23:37:33 | 404 |         835ns |             ::1 | GET      "/.well-known/appspecific/com.chrome.devtools.json"
+[GIN] 2025/12/06 - 23:37:33 | 200 |    6.250489ms |             ::1 | GET      "/static/css/style.css"
+[GIN] 2025/12/06 - 23:37:33 | 200 |    6.424629ms |             ::1 | GET      "/static/js/helper.js"
+
+2025/12/06 23:37:33 [32m
+[0m[33m[1.183ms] [34;1m[rows:3][0m SELECT * FROM `recipes` WHERE `recipes`.`id` IN (2,6,10)
+
+2025/12/06 23:37:33 [32m
+[0m[33m[0.258ms] [34;1m[rows:3][0m SELECT * FROM `cleaning_zones` WHERE `cleaning_zones`.`id` IN (5,3,4)
+
+2025/12/06 23:37:33 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:28
+[0m[33m[3.208ms] [34;1m[rows:6][0m SELECT * FROM `schedule_tasks` WHERE `schedule_tasks`.`schedule_id` = 22
+
+2025/12/06 23:37:33 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:28
+[0m[33m[3.556ms] [34;1m[rows:1][0m SELECT * FROM `daily_schedules` WHERE date = "2025-12-06 00:00:00" ORDER BY `daily_schedules`.`id` LIMIT 1
+[GIN] 2025/12/06 - 23:37:33 | 200 |    3.906639ms |             ::1 | GET      "/helper/api/schedule/today"
+
+2025/12/06 23:37:35 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:172
+[0m[33m[0.178ms] [34;1m[rows:1][0m SELECT * FROM `cleaning_zones` WHERE `cleaning_zones`.`id` = "5" ORDER BY `cleaning_zones`.`id` LIMIT 1
+[GIN] 2025/12/06 - 23:37:35 | 200 |     247.058µs |             ::1 | GET      "/admin/api/zones/5"
+
+2025/12/06 23:37:42 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:172
+[0m[33m[0.226ms] [34;1m[rows:1][0m SELECT * FROM `cleaning_zones` WHERE `cleaning_zones`.`id` = "3" ORDER BY `cleaning_zones`.`id` LIMIT 1
+[GIN] 2025/12/06 - 23:37:42 | 200 |     354.505µs |             ::1 | GET      "/admin/api/zones/3"
+
+2025/12/06 23:37:45 [32m
+[0m[33m[0.169ms] [34;1m[rows:3][0m SELECT * FROM `recipes` WHERE `recipes`.`id` IN (2,6,10)
+
+2025/12/06 23:37:45 [32m
+[0m[33m[0.103ms] [34;1m[rows:3][0m SELECT * FROM `cleaning_zones` WHERE `cleaning_zones`.`id` IN (5,3,4)
+
+2025/12/06 23:37:45 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:91
+[0m[33m[0.531ms] [34;1m[rows:6][0m SELECT * FROM `schedule_tasks` WHERE `schedule_tasks`.`schedule_id` = 22
+
+2025/12/06 23:37:45 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:91
+[0m[33m[0.727ms] [34;1m[rows:1][0m SELECT * FROM `daily_schedules` WHERE date >= "2025-12-01 00:00:00" AND date < "2025-12-08 00:00:00" ORDER BY date
+[GIN] 2025/12/06 - 23:37:45 | 200 |     891.248µs |             ::1 | GET      "/helper/api/schedule/upcoming?days=7&start_date=2025-12-01"
+
+2025/12/06 23:37:46 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:172
+[0m[33m[0.207ms] [34;1m[rows:1][0m SELECT * FROM `cleaning_zones` WHERE `cleaning_zones`.`id` = "5" ORDER BY `cleaning_zones`.`id` LIMIT 1
+[GIN] 2025/12/06 - 23:37:46 | 200 |     279.425µs |             ::1 | GET      "/admin/api/zones/5"
+
+2025/12/06 23:37:48 [32m
+[0m[33m[0.203ms] [34;1m[rows:7][0m SELECT * FROM `recipes` WHERE `recipes`.`id` IN (4,6,9,2,7,8,3)
+
+2025/12/06 23:37:48 [32m
+[0m[33m[0.147ms] [34;1m[rows:7][0m SELECT * FROM `cleaning_zones` WHERE `cleaning_zones`.`id` IN (11,4,5,2,9,10,3)
+
+2025/12/06 23:37:48 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:91
+[0m[33m[1.119ms] [34;1m[rows:30][0m SELECT * FROM `schedule_tasks` WHERE `schedule_tasks`.`schedule_id` IN (34,35,36,37,38)
+
+2025/12/06 23:37:48 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:91
+[0m[33m[1.382ms] [34;1m[rows:5][0m SELECT * FROM `daily_schedules` WHERE date >= "2025-12-08 00:00:00" AND date < "2025-12-15 00:00:00" ORDER BY date
+[GIN] 2025/12/06 - 23:37:48 | 200 |    1.742152ms |             ::1 | GET      "/helper/api/schedule/upcoming?days=7&start_date=2025-12-08"
+
+2025/12/06 23:37:49 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:172
+[0m[33m[0.180ms] [34;1m[rows:1][0m SELECT * FROM `cleaning_zones` WHERE `cleaning_zones`.`id` = "2" ORDER BY `cleaning_zones`.`id` LIMIT 1
+[GIN] 2025/12/06 - 23:37:49 | 200 |     256.117µs |             ::1 | GET      "/admin/api/zones/2"
+[GIN] 2025/12/06 - 23:37:54 | 200 |     596.779µs |             ::1 | GET      "/admin/"
+[GIN] 2025/12/06 - 23:37:54 | 304 |     131.158µs |             ::1 | GET      "/static/css/style.css"
+[GIN] 2025/12/06 - 23:37:54 | 200 |     662.156µs |             ::1 | GET      "/static/js/admin.js"
+
+2025/12/06 23:37:54 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:25
+[0m[33m[0.363ms] [34;1m[rows:11][0m SELECT * FROM `recipes` ORDER BY created_at DESC
+[GIN] 2025/12/06 - 23:37:54 | 200 |     649.144µs |             ::1 | GET      "/admin/api/recipes"
+
+2025/12/06 23:37:56 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:92
+[0m[33m[0.200ms] [34;1m[rows:3][0m SELECT * FROM `meal_times` ORDER BY default_time
+[GIN] 2025/12/06 - 23:37:56 | 200 |     264.465µs |             ::1 | GET      "/admin/api/mealtimes"
+
+2025/12/06 23:37:58 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:103
+[0m[33m[0.148ms] [34;1m[rows:1][0m SELECT * FROM `meal_times` WHERE `meal_times`.`id` = "2" ORDER BY `meal_times`.`id` LIMIT 1
+[GIN] 2025/12/06 - 23:37:58 | 200 |     214.198µs |             ::1 | GET      "/admin/api/mealtimes/2"
+
+2025/12/06 23:38:02 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:161
+[0m[33m[0.272ms] [34;1m[rows:10][0m SELECT * FROM `cleaning_zones` ORDER BY priority DESC
+[GIN] 2025/12/06 - 23:38:02 | 200 |     868.616µs |             ::1 | GET      "/admin/api/zones"
+
+2025/12/06 23:38:04 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:172
+[0m[33m[0.189ms] [34;1m[rows:1][0m SELECT * FROM `cleaning_zones` WHERE `cleaning_zones`.`id` = "10" ORDER BY `cleaning_zones`.`id` LIMIT 1
+[GIN] 2025/12/06 - 23:38:04 | 200 |     284.798µs |             ::1 | GET      "/admin/api/zones/10"
+
+2025/12/06 23:38:08 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:236
+[0m[33m[0.636ms] [34;1m[rows:2][0m SELECT * FROM `childcare_schedules` WHERE date BETWEEN "2025-12-06 23:38:08.308" AND "2026-01-05 23:38:08.308" ORDER BY date, start_time
+[GIN] 2025/12/06 - 23:38:08 | 200 |     763.034µs |             ::1 | GET      "/admin/api/childcare"
+
+2025/12/06 23:38:09 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:25
+[0m[33m[0.402ms] [34;1m[rows:11][0m SELECT * FROM `recipes` ORDER BY created_at DESC
+[GIN] 2025/12/06 - 23:38:09 | 200 |     607.136µs |             ::1 | GET      "/admin/api/recipes"
+
+2025/12/06 23:38:23 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:236
+[0m[33m[0.244ms] [34;1m[rows:2][0m SELECT * FROM `childcare_schedules` WHERE date BETWEEN "2025-12-06 23:38:23.011" AND "2026-01-05 23:38:23.011" ORDER BY date, start_time
+[GIN] 2025/12/06 - 23:38:23 | 200 |     326.308µs |             ::1 | GET      "/admin/api/childcare"
+[GIN] 2025/12/06 - 23:38:32 | 404 |         642ns |             ::1 | GET      "/admin/api/childcare/1"
+[GIN] 2025/12/06 - 23:38:35 | 404 |         767ns |             ::1 | GET      "/admin/api/childcare/1"
+
+2025/12/06 23:38:59 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:250
+[0m[33m[2.217ms] [34;1m[rows:1][0m INSERT INTO `childcare_schedules` (`date`,`start_time`,`end_time`,`notes`,`created_at`,`updated_at`) VALUES ("2025-12-10 00:00:00","16:38","01:38","","2025-12-06 23:38:59.487","2025-12-06 23:38:59.487") RETURNING `id`
+[GIN] 2025/12/06 - 23:38:59 | 201 |    2.393388ms |             ::1 | POST     "/admin/api/childcare"
+
+2025/12/06 23:38:59 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:236
+[0m[33m[0.274ms] [34;1m[rows:3][0m SELECT * FROM `childcare_schedules` WHERE date BETWEEN "2025-12-06 23:38:59.501" AND "2026-01-05 23:38:59.501" ORDER BY date, start_time
+[GIN] 2025/12/06 - 23:38:59 | 200 |     355.344µs |             ::1 | GET      "/admin/api/childcare"
+[GIN] 2025/12/06 - 23:39:03 | 404 |         595ns |             ::1 | GET      "/admin/api/childcare/4"
+
+2025/12/06 23:39:21 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:250
+[0m[33m[1.236ms] [34;1m[rows:1][0m INSERT INTO `childcare_schedules` (`date`,`start_time`,`end_time`,`notes`,`created_at`,`updated_at`) VALUES ("2025-12-07 00:00:00","02:39","03:39","","2025-12-06 23:39:21.097","2025-12-06 23:39:21.097") RETURNING `id`
+[GIN] 2025/12/06 - 23:39:21 | 201 |    1.323314ms |             ::1 | POST     "/admin/api/childcare"
+
+2025/12/06 23:39:21 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:236
+[0m[33m[0.235ms] [34;1m[rows:4][0m SELECT * FROM `childcare_schedules` WHERE date BETWEEN "2025-12-06 23:39:21.1" AND "2026-01-05 23:39:21.1" ORDER BY date, start_time
+[GIN] 2025/12/06 - 23:39:21 | 200 |     312.391µs |             ::1 | GET      "/admin/api/childcare"
+[GIN] 2025/12/06 - 23:39:27 | 200 |     348.391µs |             ::1 | GET      "/helper/"
+[GIN] 2025/12/06 - 23:39:27 | 404 |         666ns |             ::1 | GET      "/.well-known/appspecific/com.chrome.devtools.json"
+[GIN] 2025/12/06 - 23:39:27 | 200 |     284.395µs |             ::1 | GET      "/static/css/style.css"
+[GIN] 2025/12/06 - 23:39:27 | 200 |     257.642µs |             ::1 | GET      "/static/js/helper.js"
+
+2025/12/06 23:39:27 [32m
+[0m[33m[0.166ms] [34;1m[rows:3][0m SELECT * FROM `recipes` WHERE `recipes`.`id` IN (2,6,10)
+
+2025/12/06 23:39:27 [32m
+[0m[33m[0.210ms] [34;1m[rows:3][0m SELECT * FROM `cleaning_zones` WHERE `cleaning_zones`.`id` IN (5,3,4)
+
+2025/12/06 23:39:27 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:28
+[0m[33m[0.815ms] [34;1m[rows:6][0m SELECT * FROM `schedule_tasks` WHERE `schedule_tasks`.`schedule_id` = 22
+
+2025/12/06 23:39:27 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:28
+[0m[33m[1.418ms] [34;1m[rows:1][0m SELECT * FROM `daily_schedules` WHERE date = "2025-12-06 00:00:00" ORDER BY `daily_schedules`.`id` LIMIT 1
+[GIN] 2025/12/06 - 23:39:27 | 200 |    1.682441ms |             ::1 | GET      "/helper/api/schedule/today"
+
+2025/12/06 23:39:29 [32m
+[0m[33m[0.163ms] [34;1m[rows:3][0m SELECT * FROM `recipes` WHERE `recipes`.`id` IN (2,6,10)
+
+2025/12/06 23:39:29 [32m
+[0m[33m[0.118ms] [34;1m[rows:3][0m SELECT * FROM `cleaning_zones` WHERE `cleaning_zones`.`id` IN (5,3,4)
+
+2025/12/06 23:39:29 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:91
+[0m[33m[0.620ms] [34;1m[rows:6][0m SELECT * FROM `schedule_tasks` WHERE `schedule_tasks`.`schedule_id` = 22
+
+2025/12/06 23:39:29 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:91
+[0m[33m[0.876ms] [34;1m[rows:1][0m SELECT * FROM `daily_schedules` WHERE date >= "2025-12-01 00:00:00" AND date < "2025-12-08 00:00:00" ORDER BY date
+[GIN] 2025/12/06 - 23:39:29 | 200 |    1.029158ms |             ::1 | GET      "/helper/api/schedule/upcoming?days=7&start_date=2025-12-01"
+
+2025/12/06 23:39:34 [32m
+[0m[33m[0.228ms] [34;1m[rows:7][0m SELECT * FROM `recipes` WHERE `recipes`.`id` IN (4,6,9,2,7,8,3)
+
+2025/12/06 23:39:34 [32m
+[0m[33m[0.169ms] [34;1m[rows:7][0m SELECT * FROM `cleaning_zones` WHERE `cleaning_zones`.`id` IN (11,4,5,2,9,10,3)
+
+2025/12/06 23:39:34 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:91
+[0m[33m[1.091ms] [34;1m[rows:30][0m SELECT * FROM `schedule_tasks` WHERE `schedule_tasks`.`schedule_id` IN (34,35,36,37,38)
+
+2025/12/06 23:39:34 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:91
+[0m[33m[1.464ms] [34;1m[rows:5][0m SELECT * FROM `daily_schedules` WHERE date >= "2025-12-08 00:00:00" AND date < "2025-12-15 00:00:00" ORDER BY date
+[GIN] 2025/12/06 - 23:39:34 | 200 |    1.947663ms |             ::1 | GET      "/helper/api/schedule/upcoming?days=7&start_date=2025-12-08"
+
+2025/12/06 23:39:41 [32m
+[0m[33m[0.173ms] [34;1m[rows:3][0m SELECT * FROM `recipes` WHERE `recipes`.`id` IN (2,6,10)
+
+2025/12/06 23:39:41 [32m
+[0m[33m[0.219ms] [34;1m[rows:3][0m SELECT * FROM `cleaning_zones` WHERE `cleaning_zones`.`id` IN (5,3,4)
+
+2025/12/06 23:39:41 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:91
+[0m[33m[0.722ms] [34;1m[rows:6][0m SELECT * FROM `schedule_tasks` WHERE `schedule_tasks`.`schedule_id` = 22
+
+2025/12/06 23:39:41 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:91
+[0m[33m[0.994ms] [34;1m[rows:1][0m SELECT * FROM `daily_schedules` WHERE date >= "2025-12-01 00:00:00" AND date < "2025-12-08 00:00:00" ORDER BY date
+[GIN] 2025/12/06 - 23:39:41 | 200 |    1.286619ms |             ::1 | GET      "/helper/api/schedule/upcoming?days=7&start_date=2025-12-01"
+
+2025/12/06 23:40:09 [32m
+[0m[33m[0.290ms] [34;1m[rows:7][0m SELECT * FROM `recipes` WHERE `recipes`.`id` IN (4,6,9,2,7,8,3)
+
+2025/12/06 23:40:09 [32m
+[0m[33m[0.163ms] [34;1m[rows:7][0m SELECT * FROM `cleaning_zones` WHERE `cleaning_zones`.`id` IN (11,4,5,2,9,10,3)
+
+2025/12/06 23:40:09 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:91
+[0m[33m[1.503ms] [34;1m[rows:30][0m SELECT * FROM `schedule_tasks` WHERE `schedule_tasks`.`schedule_id` IN (34,35,36,37,38)
+
+2025/12/06 23:40:09 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/helper.go:91
+[0m[33m[1.838ms] [34;1m[rows:5][0m SELECT * FROM `daily_schedules` WHERE date >= "2025-12-08 00:00:00" AND date < "2025-12-15 00:00:00" ORDER BY date
+[GIN] 2025/12/06 - 23:40:09 | 200 |     2.22642ms |             ::1 | GET      "/helper/api/schedule/upcoming?days=7&start_date=2025-12-08"
+
+2025/12/06 23:40:26 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:282
+[0m[33m[1.210ms] [34;1m[rows:1][0m DELETE FROM `childcare_schedules` WHERE `childcare_schedules`.`id` = "4"
+[GIN] 2025/12/06 - 23:40:26 | 200 |    1.349222ms |             ::1 | DELETE   "/admin/api/childcare/4"
+
+2025/12/06 23:40:26 [32m/Users/podlevskikh/go/src/podlevskikh/awesomeProject/internal/handlers/admin.go:236
+[0m[33m[0.197ms] [34;1m[rows:3][0m SELECT * FROM `childcare_schedules` WHERE date BETWEEN "2025-12-06 23:40:26.481" AND "2026-01-05 23:40:26.481" ORDER BY date, start_time
+[GIN] 2025/12/06 - 23:40:26 | 200 |     257.944µs |             ::1 | GET      "/admin/api/childcare"
+[GIN] 2025/12/06 - 23:40:31 | 404 |         739ns |             ::1 | GET      "/admin/api/childcare/1"
+[GIN] 2025/12/06 - 23:40:31 | 404 |         681ns |             ::1 | GET      "/admin/api/childcare/1"

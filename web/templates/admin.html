@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Helper Management System</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Admin Panel</h1>
+            <nav>
+                <button onclick="showSection('recipes')" class="nav-btn">Recipes</button>
+                <button onclick="showSection('mealtimes')" class="nav-btn">Meal Times</button>
+                <button onclick="showSection('zones')" class="nav-btn">Cleaning Zones</button>
+                <button onclick="showSection('childcare')" class="nav-btn">Childcare</button>
+                <button onclick="showSection('shopping')" class="nav-btn">Shopping List</button>
+                <button onclick="regenerateSchedule()" class="nav-btn btn-primary">Regenerate Schedule</button>
+            </nav>
+        </header>
+
+        <!-- Recipes Section -->
+        <section id="recipes-section" class="content-section">
+            <h2>Recipes Management</h2>
+            <button onclick="showRecipeForm()" class="btn btn-primary">Add New Recipe</button>
+
+            <!-- Filters -->
+            <div class="filters-container" style="margin-top: 20px;">
+                <div class="filters-row">
+                    <div class="filter-group">
+                        <label>Search by Name:</label>
+                        <input type="text" id="filter-search" placeholder="Search recipes..." oninput="filterRecipes()">
+                    </div>
+                    <div class="filter-group">
+                        <label>Category:</label>
+                        <select id="filter-category" onchange="filterRecipes()">
+                            <option value="">All Categories</option>
+                            <option value="breakfast">Breakfast</option>
+                            <option value="lunch">Lunch</option>
+                            <option value="dinner">Dinner</option>
+                            <option value="snack">Snack</option>
+                            <option value="baby_food">Baby Food</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Family Member:</label>
+                        <select id="filter-family" onchange="filterRecipes()">
+                            <option value="">All Members</option>
+                            <option value="all">All</option>
+                            <option value="adult">Adult</option>
+                            <option value="baby">Baby</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Minimum Rating:</label>
+                        <select id="filter-rating" onchange="filterRecipes()">
+                            <option value="0">All Ratings</option>
+                            <option value="1">1+ Stars</option>
+                            <option value="2">2+ Stars</option>
+                            <option value="3">3+ Stars</option>
+                            <option value="4">4+ Stars</option>
+                            <option value="5">5 Stars</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div id="recipe-form" class="form-container" style="display:none;">
+                <h3 id="recipe-form-title">Add Recipe</h3>
+                <form id="recipeForm">
+                    <input type="hidden" id="recipe-id">
+                    <div class="form-group">
+                        <label>Name:</label>
+                        <input type="text" id="recipe-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description:</label>
+                        <textarea id="recipe-description"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Ingredients:</label>
+                        <textarea id="recipe-ingredients" placeholder="One per line"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Instructions:</label>
+                        <textarea id="recipe-instructions"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Category:</label>
+                            <select id="recipe-category">
+                                <option value="breakfast">Breakfast</option>
+                                <option value="lunch">Lunch</option>
+                                <option value="dinner">Dinner</option>
+                                <option value="snack">Snack</option>
+                                <option value="baby_food">Baby Food</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Family Member:</label>
+                            <select id="recipe-family-member">
+                                <option value="all">All</option>
+                                <option value="adult">Adult</option>
+                                <option value="baby">Baby</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Tags (comma-separated):</label>
+                        <input type="text" id="recipe-tags" placeholder="vegetarian, quick, healthy">
+                    </div>
+                    <div class="form-group">
+                        <label>Image URL:</label>
+                        <input type="url" id="recipe-image-url" placeholder="https://example.com/image.jpg">
+                    </div>
+                    <div class="form-group">
+                        <label>Video URL (YouTube, Vimeo, etc.):</label>
+                        <input type="url" id="recipe-video-url" placeholder="https://www.youtube.com/embed/...">
+                    </div>
+                    <div class="form-group">
+                        <label>Rating:</label>
+                        <input type="hidden" id="recipe-rating" value="0">
+                        <div class="star-rating" id="star-rating-input">
+                            <span class="star" data-value="1">★</span>
+                            <span class="star" data-value="2">★</span>
+                            <span class="star" data-value="3">★</span>
+                            <span class="star" data-value="4">★</span>
+                            <span class="star" data-value="5">★</span>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Recipe</button>
+                        <button type="button" onclick="hideRecipeForm()" class="btn">Cancel</button>
+                    </div>
+                </form>
+
+                <!-- Comments Section (shown when editing) -->
+                <div id="recipe-comments-section" style="display:none; margin-top: 20px;">
+                    <h3>Comments</h3>
+                    <div id="recipe-comments-list"></div>
+                    <div class="form-group" style="margin-top: 15px;">
+                        <textarea id="new-comment" placeholder="Add a comment..." rows="3"></textarea>
+                        <button onclick="addRecipeComment()" class="btn btn-primary" style="margin-top: 10px;">Add Comment</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="recipes-list" class="list-container"></div>
+        </section>
+
+        <!-- Meal Times Section -->
+        <section id="mealtimes-section" class="content-section" style="display:none;">
+            <h2>Meal Times Configuration</h2>
+            <button onclick="showMealTimeForm()" class="btn btn-primary">Add Meal Time</button>
+            
+            <div id="mealtime-form" class="form-container" style="display:none;">
+                <h3 id="mealtime-form-title">Add Meal Time</h3>
+                <form id="mealtimeForm">
+                    <input type="hidden" id="mealtime-id">
+                    <div class="form-group">
+                        <label>Name:</label>
+                        <input type="text" id="mealtime-name" required placeholder="e.g., Breakfast, Lunch">
+                    </div>
+                    <div class="form-group">
+                        <label>Default Time:</label>
+                        <input type="time" id="mealtime-time" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Family Member:</label>
+                        <select id="mealtime-family-member">
+                            <option value="all">All</option>
+                            <option value="adult">Adult</option>
+                            <option value="baby">Baby</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="mealtime-active" checked>
+                            Active
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Meal Time</button>
+                        <button type="button" onclick="hideMealTimeForm()" class="btn">Cancel</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="mealtimes-list" class="list-container"></div>
+        </section>
+
+        <!-- Cleaning Zones Section -->
+        <section id="zones-section" class="content-section" style="display:none;">
+            <h2>Cleaning Zones</h2>
+            <button onclick="showZoneForm()" class="btn btn-primary">Add Cleaning Zone</button>
+            
+            <div id="zone-form" class="form-container" style="display:none;">
+                <h3 id="zone-form-title">Add Cleaning Zone</h3>
+                <form id="zoneForm">
+                    <input type="hidden" id="zone-id">
+                    <div class="form-group">
+                        <label>Name:</label>
+                        <input type="text" id="zone-name" required placeholder="e.g., Bedroom, Kitchen">
+                    </div>
+                    <div class="form-group">
+                        <label>Description:</label>
+                        <textarea id="zone-description"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Frequency per Week:</label>
+                            <input type="number" id="zone-frequency" min="1" max="7" value="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Priority:</label>
+                            <select id="zone-priority">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Zone</button>
+                        <button type="button" onclick="hideZoneForm()" class="btn">Cancel</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="zones-list" class="list-container"></div>
+        </section>
+
+        <!-- Childcare Section -->
+        <section id="childcare-section" class="content-section" style="display:none;">
+            <h2>Childcare Schedule</h2>
+            <button onclick="showChildcareForm()" class="btn btn-primary">Add Childcare Time</button>
+            
+            <div id="childcare-form" class="form-container" style="display:none;">
+                <h3 id="childcare-form-title">Add Childcare Time</h3>
+                <form id="childcareForm">
+                    <input type="hidden" id="childcare-id">
+                    <div class="form-group">
+                        <label>Date:</label>
+                        <input type="date" id="childcare-date" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Start Time:</label>
+                            <input type="time" id="childcare-start" required>
+                        </div>
+                        <div class="form-group">
+                            <label>End Time:</label>
+                            <input type="time" id="childcare-end" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes:</label>
+                        <textarea id="childcare-notes"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" onclick="hideChildcareForm()" class="btn">Cancel</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="childcare-list" class="list-container"></div>
+        </section>
+
+        <!-- Shopping List Section -->
+        <section id="shopping-section" class="content-section" style="display:none;">
+            <h2>Shopping List</h2>
+            <div id="admin-shopping-list" class="shopping-checklist"></div>
+        </section>
+    </div>
+
+    <script src="/static/js/admin.js"></script>
+</body>
+</html>
+
