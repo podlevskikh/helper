@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"podlevskikh/awesomeProject/internal/database"
@@ -12,8 +13,14 @@ import (
 )
 
 func main() {
+	// Get database path from environment or use default
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "./helper_app.db"
+	}
+
 	// Initialize database
-	if err := database.Initialize("./helper_app.db"); err != nil {
+	if err := database.Initialize(dbPath); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
@@ -165,12 +172,18 @@ func main() {
 		c.Redirect(302, "/helper")
 	})
 
-	// Start server
-	log.Println("Starting server on :8080")
-	log.Println("Admin interface: http://localhost:8080/admin")
-	log.Println("Helper interface: http://localhost:8080/helper")
+	// Get port from environment or use default
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 
-	if err := router.Run(":8080"); err != nil {
+	// Start server
+	log.Printf("Starting server on :%s", port)
+	log.Printf("Admin interface: http://localhost:%s/admin", port)
+	log.Printf("Helper interface: http://localhost:%s/helper", port)
+
+	if err := router.Run(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

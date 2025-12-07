@@ -20,11 +20,24 @@ A web application for managing household tasks, meal planning, cleaning schedule
 
 ## Installation & Running
 
-### Prerequisites
+### Option 1: Deploy to Railway.app (Recommended for Production)
+
+See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md) for detailed instructions.
+
+Quick steps:
+1. Push code to GitHub
+2. Connect repository to Railway
+3. Railway will automatically build and deploy using Docker
+4. Configure volume for persistent database storage
+
+### Option 2: Run Locally with Go
+
+#### Prerequisites
 - Go 1.24 or higher
 - Git
+- GCC (for SQLite CGO support)
 
-### Steps
+#### Steps
 
 1. **Clone or navigate to the project directory**
 ```bash
@@ -46,6 +59,18 @@ Note: First run will take 1-2 minutes to compile SQLite driver.
 4. **Access the application**
 - Admin interface: http://localhost:8080/admin
 - Helper interface: http://localhost:8080/helper
+
+### Option 3: Run with Docker
+
+```bash
+# Build the image
+docker build -t helper-app .
+
+# Run the container
+docker run -p 8080:8080 -v $(pwd)/data:/data helper-app
+```
+
+Access at http://localhost:8080
 
 ## Usage Guide
 
