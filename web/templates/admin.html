@@ -15,6 +15,7 @@
                 <button onclick="showSection('mealtimes')" class="nav-btn">Meal Times</button>
                 <button onclick="showSection('zones')" class="nav-btn">Cleaning Zones</button>
                 <button onclick="showSection('childcare')" class="nav-btn">Childcare</button>
+                <button onclick="showSection('calendar')" class="nav-btn">Calendar</button>
                 <button onclick="showSection('shopping')" class="nav-btn">Shopping List</button>
                 <button onclick="regenerateSchedule()" class="nav-btn btn-primary">Regenerate Schedule</button>
             </nav>
@@ -111,8 +112,10 @@
                         <input type="text" id="recipe-tags" placeholder="vegetarian, quick, healthy">
                     </div>
                     <div class="form-group">
-                        <label>Image URL:</label>
-                        <input type="url" id="recipe-image-url" placeholder="https://example.com/image.jpg">
+                        <label>Image:</label>
+                        <input type="file" id="recipe-image-file" accept="image/*">
+                        <input type="hidden" id="recipe-image-url">
+                        <div id="current-image-preview" style="margin-top: 10px;"></div>
                     </div>
                     <div class="form-group">
                         <label>Video URL (YouTube, Vimeo, etc.):</label>
@@ -268,11 +271,94 @@
             <div id="childcare-list" class="list-container"></div>
         </section>
 
+        <!-- Calendar Section -->
+        <section id="calendar-section" class="content-section" style="display:none;">
+            <h2>Schedule Calendar</h2>
+            <div class="schedule-nav">
+                <button onclick="showAdminCalendarView('thisweek')" class="schedule-nav-btn active" id="admin-thisweek-btn">This Week</button>
+                <button onclick="showAdminCalendarView('nextweek')" class="schedule-nav-btn" id="admin-nextweek-btn">Next Week</button>
+            </div>
+
+            <!-- This Week View -->
+            <div id="admin-thisweek-view" class="schedule-view">
+                <h3>This Week</h3>
+                <div id="admin-thisweek-calendar" class="calendar-grid"></div>
+            </div>
+
+            <!-- Next Week View -->
+            <div id="admin-nextweek-view" class="schedule-view" style="display:none;">
+                <h3>Next Week</h3>
+                <div id="admin-nextweek-calendar" class="calendar-grid"></div>
+            </div>
+        </section>
+
         <!-- Shopping List Section -->
         <section id="shopping-section" class="content-section" style="display:none;">
             <h2>Shopping List</h2>
             <div id="admin-shopping-list" class="shopping-checklist"></div>
         </section>
+
+        <!-- Recipe Selection Modal -->
+        <div id="recipe-selection-modal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width: 800px;">
+                <span class="close" onclick="closeRecipeSelectionModal()">&times;</span>
+                <h2>Select Recipes for <span id="modal-meal-title"></span></h2>
+                <div id="modal-meal-date" style="margin-bottom: 15px; color: #666;"></div>
+
+                <!-- Current Recipes -->
+                <div id="current-recipes-section" style="margin-bottom: 20px;">
+                    <h3>Current Recipes:</h3>
+                    <div id="current-recipes-list" class="recipes-list"></div>
+                </div>
+
+                <!-- Available Recipes -->
+                <div id="available-recipes-section">
+                    <h3>Add from Library:</h3>
+                    <div class="filters-container" style="margin-bottom: 15px;">
+                        <input type="text" id="modal-recipe-search" placeholder="Search recipes..." oninput="filterModalRecipes()">
+                        <select id="modal-recipe-category" onchange="filterModalRecipes()">
+                            <option value="">All Categories</option>
+                            <option value="breakfast">Breakfast</option>
+                            <option value="lunch">Lunch</option>
+                            <option value="dinner">Dinner</option>
+                            <option value="snack">Snack</option>
+                            <option value="baby_food">Baby Food</option>
+                        </select>
+                    </div>
+                    <div id="available-recipes-list" class="recipes-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Zone Selection Modal -->
+        <div id="zone-selection-modal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width: 800px;">
+                <span class="close" onclick="closeZoneSelectionModal()">&times;</span>
+                <h2>Select Zones for <span id="modal-cleaning-title"></span></h2>
+                <div id="modal-cleaning-date" style="margin-bottom: 15px; color: #666;"></div>
+
+                <!-- Current Zones -->
+                <div id="current-zones-section" style="margin-bottom: 20px;">
+                    <h3>Current Zones:</h3>
+                    <div id="current-zones-list" class="zones-list"></div>
+                </div>
+
+                <!-- Available Zones -->
+                <div id="available-zones-section">
+                    <h3>Add from List:</h3>
+                    <div class="filters-container" style="margin-bottom: 15px;">
+                        <input type="text" id="modal-zone-search" placeholder="Search zones..." oninput="filterModalZones()">
+                        <select id="modal-zone-priority" onchange="filterModalZones()">
+                            <option value="">All Priorities</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                    <div id="available-zones-list" class="zones-list"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="/static/js/admin.js"></script>

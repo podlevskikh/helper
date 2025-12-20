@@ -1,7 +1,11 @@
 package handlers
 
 import (
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"podlevskikh/awesomeProject/internal/models"
 	"strconv"
 	"time"
@@ -83,6 +87,58 @@ func (h *AdminHandler) DeleteRecipe(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Recipe deleted"})
+}
+
+// UploadRecipeImage handles image file upload for recipes
+func (h *AdminHandler) UploadRecipeImage(c *gin.Context) {
+	file, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No file uploaded"})
+		return
+	}
+
+	// Validate file type
+	ext := filepath.Ext(file.Filename)
+	allowedExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true}
+	if !allowedExts[ext] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file type. Allowed: jpg, jpeg, png, gif, webp"})
+		return
+	}
+
+	// Create uploads directory if it doesn't exist
+	uploadsDir := "web/static/uploads/recipes"
+	if err := os.MkdirAll(uploadsDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
+		return
+	}
+
+	// Generate unique filename
+	filename := fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(file.Filename))
+	filePath := filepath.Join(uploadsDir, filename)
+
+	// Save file
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open uploaded file"})
+		return
+	}
+	defer src.Close()
+
+	dst, err := os.Create(filePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
+		return
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, src); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
+		return
+	}
+
+	// Return URL path
+	imageURL := fmt.Sprintf("/static/uploads/recipes/%s", filename)
+	c.JSON(http.StatusOK, gin.H{"url": imageURL})
 }
 
 // MealTime handlers
@@ -346,5 +402,184 @@ func (h *AdminHandler) DeleteRecipeComment(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted"})
+}
+
+// Task Recipe Management handlers
+
+// GetTask returns a single task with its recipes and zones
+func (h *AdminHandler) GetTask(c *gin.Context) {
+	id := c.Param("id")
+	var task models.ScheduleTask
+
+	if err := h.db.Preload("Recipes").Preload("Recipe").Preload("Zone").Preload("Zones").First(&task, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, task)
+}
+
+// AddRecipeToTask adds a recipe to a meal task
+func (h *AdminHandler) AddRecipeToTask(c *gin.Context) {
+	taskID := c.Param("id")
+
+	var input struct {
+		RecipeID uint `json:"recipe_id"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get the task
+	var task models.ScheduleTask
+	if err := h.db.Preload("Recipes").First(&task, taskID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	// Verify it's a meal task
+	if task.TaskType != "meal" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Can only add recipes to meal tasks"})
+		return
+	}
+
+	// Get the recipe
+	var recipe models.Recipe
+	if err := h.db.First(&recipe, input.RecipeID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
+		return
+	}
+
+	// Add recipe to task using Association
+	if err := h.db.Model(&task).Association("Recipes").Append(&recipe); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Reload task with recipes
+	if err := h.db.Preload("Recipes").First(&task, taskID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, task)
+}
+
+// RemoveRecipeFromTask removes a recipe from a meal task
+func (h *AdminHandler) RemoveRecipeFromTask(c *gin.Context) {
+	taskID := c.Param("id")
+	recipeID := c.Param("recipe_id")
+
+	// Get the task
+	var task models.ScheduleTask
+	if err := h.db.Preload("Recipes").First(&task, taskID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	// Get the recipe
+	var recipe models.Recipe
+	if err := h.db.First(&recipe, recipeID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
+		return
+	}
+
+	// Remove recipe from task
+	if err := h.db.Model(&task).Association("Recipes").Delete(&recipe); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Reload task with recipes
+	if err := h.db.Preload("Recipes").First(&task, taskID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, task)
+}
+
+// AddZoneToTask adds a cleaning zone to a cleaning task
+func (h *AdminHandler) AddZoneToTask(c *gin.Context) {
+	taskID := c.Param("id")
+
+	var input struct {
+		ZoneID uint `json:"zone_id"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get the task
+	var task models.ScheduleTask
+	if err := h.db.Preload("Zones").First(&task, taskID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	// Verify it's a cleaning task
+	if task.TaskType != "cleaning" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Can only add zones to cleaning tasks"})
+		return
+	}
+
+	// Get the zone
+	var zone models.CleaningZone
+	if err := h.db.First(&zone, input.ZoneID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Zone not found"})
+		return
+	}
+
+	// Add zone to task using Association
+	if err := h.db.Model(&task).Association("Zones").Append(&zone); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Reload task with zones
+	if err := h.db.Preload("Zones").First(&task, taskID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, task)
+}
+
+// RemoveZoneFromTask removes a cleaning zone from a cleaning task
+func (h *AdminHandler) RemoveZoneFromTask(c *gin.Context) {
+	taskID := c.Param("id")
+	zoneID := c.Param("zone_id")
+
+	// Get the task
+	var task models.ScheduleTask
+	if err := h.db.Preload("Zones").First(&task, taskID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	// Get the zone
+	var zone models.CleaningZone
+	if err := h.db.First(&zone, zoneID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Zone not found"})
+		return
+	}
+
+	// Remove zone from task
+	if err := h.db.Model(&task).Association("Zones").Delete(&zone); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Reload task with zones
+	if err := h.db.Preload("Zones").First(&task, taskID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, task)
 }
 

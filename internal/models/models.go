@@ -76,15 +76,17 @@ type ScheduleTask struct {
 	Duration    int       `json:"duration"` // in minutes
 	Title       string    `gorm:"not null" json:"title"`
 	Description string    `json:"description"`
-	RecipeID    *uint     `json:"recipe_id,omitempty"` // if task_type is meal
-	ZoneID      *uint     `json:"zone_id,omitempty"`   // if task_type is cleaning
+	RecipeID    *uint     `json:"recipe_id,omitempty"` // if task_type is meal (deprecated, use Recipes relation)
+	ZoneID      *uint     `json:"zone_id,omitempty"`   // if task_type is cleaning (deprecated, use Zones relation)
 	Completed   bool      `gorm:"default:false" json:"completed"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 
 	// Relations
-	Recipe *Recipe       `gorm:"foreignKey:RecipeID" json:"recipe,omitempty"`
-	Zone   *CleaningZone `gorm:"foreignKey:ZoneID" json:"zone,omitempty"`
+	Recipe  *Recipe       `gorm:"foreignKey:RecipeID" json:"recipe,omitempty"` // deprecated, use Recipes
+	Recipes []Recipe      `gorm:"many2many:meal_recipes;" json:"recipes,omitempty"` // multiple recipes for a meal
+	Zone    *CleaningZone `gorm:"foreignKey:ZoneID" json:"zone,omitempty"` // deprecated, use Zones
+	Zones   []CleaningZone `gorm:"many2many:task_zones;" json:"zones,omitempty"` // multiple zones for a cleaning task
 }
 
 // ShoppingListItem represents items needed for shopping

@@ -22,9 +22,9 @@ func NewHelperHandler(db *gorm.DB) *HelperHandler {
 func (h *HelperHandler) GetTodaySchedule(c *gin.Context) {
 	today := time.Now()
 	todayStart := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
-	
+
 	var schedule models.DailySchedule
-	if err := h.db.Preload("Tasks.Recipe").Preload("Tasks.Zone").
+	if err := h.db.Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
 		Where("date = ?", todayStart).First(&schedule).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusOK, gin.H{"message": "No schedule for today", "tasks": []models.ScheduleTask{}})
@@ -33,7 +33,7 @@ func (h *HelperHandler) GetTodaySchedule(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, schedule)
 }
 
@@ -45,9 +45,9 @@ func (h *HelperHandler) GetScheduleByDate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format. Use YYYY-MM-DD"})
 		return
 	}
-	
+
 	var schedule models.DailySchedule
-	if err := h.db.Preload("Tasks.Recipe").Preload("Tasks.Zone").
+	if err := h.db.Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
 		Where("date = ?", date).First(&schedule).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusOK, gin.H{"message": "No schedule for this date", "tasks": []models.ScheduleTask{}})
@@ -56,7 +56,7 @@ func (h *HelperHandler) GetScheduleByDate(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, schedule)
 }
 
@@ -86,7 +86,7 @@ func (h *HelperHandler) GetUpcomingSchedules(c *gin.Context) {
 	endDate := startDate.AddDate(0, 0, days)
 
 	var schedules []models.DailySchedule
-	if err := h.db.Preload("Tasks.Recipe").Preload("Tasks.Zone").
+	if err := h.db.Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
 		Where("date >= ? AND date < ?", startDate, endDate).
 		Order("date").Find(&schedules).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

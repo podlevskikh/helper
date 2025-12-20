@@ -78,6 +78,7 @@ func main() {
 			api.POST("/recipes", adminHandler.CreateRecipe)
 			api.PUT("/recipes/:id", adminHandler.UpdateRecipe)
 			api.DELETE("/recipes/:id", adminHandler.DeleteRecipe)
+			api.POST("/recipes/upload-image", adminHandler.UploadRecipeImage)
 
 			// Recipe Comments
 			api.GET("/recipes/:id/comments", adminHandler.GetRecipeComments)
@@ -103,6 +104,13 @@ func main() {
 			api.POST("/childcare", adminHandler.CreateChildcareSchedule)
 			api.PUT("/childcare/:id", adminHandler.UpdateChildcareSchedule)
 			api.DELETE("/childcare/:id", adminHandler.DeleteChildcareSchedule)
+
+			// Task management
+			api.GET("/tasks/:id", adminHandler.GetTask)
+			api.POST("/tasks/:id/recipes", adminHandler.AddRecipeToTask)
+			api.DELETE("/tasks/:id/recipes/:recipe_id", adminHandler.RemoveRecipeFromTask)
+			api.POST("/tasks/:id/zones", adminHandler.AddZoneToTask)
+			api.DELETE("/tasks/:id/zones/:zone_id", adminHandler.RemoveZoneFromTask)
 
 			// Schedule management
 			api.POST("/regenerate-schedule", func(c *gin.Context) {

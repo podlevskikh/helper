@@ -185,9 +185,38 @@ function renderTask(task) {
     const completedClass = task.completed ? 'completed' : '';
 
     let description = task.description || '';
-    if (task.recipe && task.recipe.name) {
+
+    // Handle multiple recipes for meal tasks
+    if (task.task_type === 'meal' && task.recipes && task.recipes.length > 0) {
+        description = '<div class="recipe-list">';
+        task.recipes.forEach((recipe, index) => {
+            description += `
+                <div class="recipe-item" style="margin-bottom: 8px;">
+                    <strong>${index + 1}. <a href="#" onclick="showRecipe(${recipe.id}); return false;" style="color: #3498db;">${recipe.name}</a></strong>
+                    ${recipe.category ? `<span style="margin-left: 8px; font-size: 11px; color: #95a5a6;">(${recipe.category})</span>` : ''}
+                </div>
+            `;
+        });
+        description += '</div>';
+    } else if (task.recipe && task.recipe.name) {
+        // Fallback for old single recipe
         description = `<a href="#" onclick="showRecipe(${task.recipe.id}); return false;">${task.recipe.name}</a>`;
+    } else if (task.task_type === 'cleaning' && task.zones && task.zones.length > 0) {
+        // Handle multiple zones for cleaning tasks
+        description = '<div class="zone-list">';
+        task.zones.forEach((zone, index) => {
+            const zoneName = zone.description ? `${zone.name}: ${zone.description}` : zone.name;
+            const priorityBadge = zone.priority ? ` (Priority: ${zone.priority})` : '';
+            description += `
+                <div class="zone-item" style="margin-bottom: 8px;">
+                    <strong>${index + 1}. <a href="#" onclick="showZone(${zone.id}); return false;" style="color: #2196f3; font-weight: 600;">${zoneName}</a></strong>
+                    ${priorityBadge}
+                </div>
+            `;
+        });
+        description += '</div>';
     } else if (task.zone && task.zone.name) {
+        // Fallback for old single zone
         const zoneName = task.zone.description ? `${task.zone.name}: ${task.zone.description}` : task.zone.name;
         description = `<a href="#" onclick="showZone(${task.zone.id}); return false;" style="cursor: pointer;">${zoneName}</a>`;
     }
@@ -209,7 +238,7 @@ function renderTask(task) {
                 <div class="task-title">${task.title}</div>
                 <div class="task-description">${description}</div>
                 <span class="task-type ${typeClass}">${task.task_type}</span>
-                ${task.duration && task.task_type !== 'cleaning' ? `<span style="margin-left: 10px; font-size: 12px; color: #7f8c8d;">${task.duration} min</span>` : ''}
+                ${task.duration && task.task_type !== 'cleaning' && task.task_type !== 'meal' ? `<span style="margin-left: 10px; font-size: 12px; color: #7f8c8d;">${task.duration} min</span>` : ''}
             </div>
             <div class="task-actions">
                 ${task.completed ?
@@ -233,13 +262,55 @@ function renderCalendarTask(task) {
     let description = task.description || '';
     let clickable = false;
     let clickHandler = '';
+    let recipesHtml = '';
+    let zonesHtml = '';
 
-    if (task.recipe && task.recipe.name) {
+    // Handle multiple recipes for meal tasks
+    if (task.task_type === 'meal' && task.recipes && task.recipes.length > 0) {
+        // Build list of all recipes with clickable links
+        recipesHtml = '<div class="calendar-recipes-list" style="margin-top: 5px;">';
+        task.recipes.forEach((recipe, index) => {
+            recipesHtml += `
+                <div class="calendar-recipe-item" style="font-size: 12px; margin: 2px 0; padding-left: 20px;">
+                    ${index + 1}. <a href="#" onclick="showRecipe(${recipe.id}); return false;" style="color: #2980b9; text-decoration: none;">${recipe.name}</a>
+                    ${recipe.category ? `<span style="font-size: 10px; color: #95a5a6; margin-left: 4px;">(${recipe.category})</span>` : ''}
+                </div>
+            `;
+        });
+        recipesHtml += '</div>';
+
+        if (task.recipes.length === 1) {
+            description = task.recipes[0].name;
+        } else {
+            description = `${task.recipes.length} блюда`;
+        }
+    } else if (task.recipe && task.recipe.name) {
+        // Fallback for old single recipe
         description = task.recipe.name;
         clickable = true;
         clickHandler = `showRecipe(${task.recipe.id})`;
+    } else if (task.task_type === 'cleaning' && task.zones && task.zones.length > 0) {
+        // Handle multiple zones for cleaning tasks
+        zonesHtml = '<div class="calendar-zones-list" style="margin-top: 5px;">';
+        task.zones.forEach((zone, index) => {
+            const zoneName = zone.description ? `${zone.name}: ${zone.description}` : zone.name;
+            const priorityBadge = zone.priority ? ` (${zone.priority})` : '';
+            zonesHtml += `
+                <div class="calendar-zone-item" style="font-size: 12px; margin: 2px 0; padding-left: 20px;">
+                    ${index + 1}. <a href="#" onclick="showZone(${zone.id}); return false;" style="color: #1976d2; text-decoration: none; font-weight: 600;">${zoneName}</a>
+                    ${priorityBadge}
+                </div>
+            `;
+        });
+        zonesHtml += '</div>';
+
+        if (task.zones.length === 1) {
+            description = task.zones[0].name;
+        } else {
+            description = `${task.zones.length} зоны`;
+        }
     } else if (task.zone && task.zone.name) {
-        // Show zone description if available, otherwise just the name
+        // Fallback for old single zone
         description = task.zone.description ? `${task.zone.name}: ${task.zone.description}` : task.zone.name;
         clickable = true;
         clickHandler = `showZone(${task.zone.id})`;
@@ -255,23 +326,27 @@ function renderCalendarTask(task) {
         }
     }
 
-    const taskContent = `
-        <span class="task-icon">${typeIcon}</span>
-        ${timeDisplay ? `<span class="task-time">${timeDisplay}</span>` : ''}
-        <span class="task-title">${description || task.title}</span>
-        ${task.duration && task.task_type !== 'cleaning' ? `<span class="task-duration">${task.duration} min</span>` : ''}
+    const mainContent = `
+        <div>
+            <span class="task-icon">${typeIcon}</span>
+            ${timeDisplay ? `<span class="task-time">${timeDisplay}</span>` : ''}
+            <span class="task-title">${description || task.title}</span>
+            ${task.duration && task.task_type !== 'cleaning' && task.task_type !== 'meal' ? `<span class="task-duration">${task.duration} min</span>` : ''}
+        </div>
+        ${recipesHtml}
+        ${zonesHtml}
     `;
 
-    if (clickable) {
+    if (clickable && !recipesHtml && !zonesHtml) {
         return `
             <div class="calendar-task ${typeClass}" onclick="${clickHandler}" style="cursor: pointer;">
-                ${taskContent}
+                ${mainContent}
             </div>
         `;
     } else {
         return `
             <div class="calendar-task ${typeClass}">
-                ${taskContent}
+                ${mainContent}
             </div>
         `;
     }
@@ -387,11 +462,11 @@ function showRecipe(recipeId) {
             // Render star rating
             const rating = recipe.rating || 0;
             const fullStars = Math.floor(rating);
-            let starsHtml = '<div style="font-size: 24px; color: #f39c12; margin: 10px 0;">';
+            let starsHtml = '<div style="margin: 10px 0;"><span style="color: gold; font-size: 20px;">';
             for (let i = 1; i <= 5; i++) {
                 starsHtml += i <= fullStars ? '★' : '☆';
             }
-            starsHtml += ` <span style="font-size: 16px; color: #7f8c8d;">(${rating.toFixed(1)})</span></div>`;
+            starsHtml += `</span> ${rating.toFixed(1)}</div>`;
 
             // Load comments
             fetch(`/admin/api/recipes/${recipeId}/comments`)
@@ -399,48 +474,38 @@ function showRecipe(recipeId) {
                 .then(comments => {
                     let commentsHtml = '';
                     if (comments && comments.length > 0) {
-                        commentsHtml = '<h3 style="margin-top: 20px;">Comments</h3>';
-                        commentsHtml += '<div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 10px;">';
+                        commentsHtml = '<h3>Comments</h3>';
                         comments.forEach(comment => {
                             const date = new Date(comment.created_at).toLocaleDateString();
                             commentsHtml += `
-                                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #ddd;">
-                                    <p style="margin: 0; color: #2c3e50;">${comment.comment}</p>
-                                    <small style="color: #7f8c8d;">${date}</small>
+                                <div style="margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-left: 3px solid #3498db;">
+                                    <p style="margin: 0 0 5px 0;">${comment.comment}</p>
+                                    <small style="color: #6c757d;">${date}</small>
                                 </div>
                             `;
                         });
-                        commentsHtml += '</div>';
                     }
 
                     details.innerHTML = `
                         <h2>${recipe.name}</h2>
                         ${starsHtml}
-
-                        ${recipe.image_url ? `<img src="${recipe.image_url}" alt="${recipe.name}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 15px 0;">` : ''}
-
-                        <p><strong>Category:</strong> ${recipe.category || 'N/A'} | <strong>For:</strong> ${recipe.family_member || 'all'}</p>
-
-                        ${recipe.description ? `<p style="margin: 15px 0;">${recipe.description}</p>` : ''}
-
+                        <p><strong>Category:</strong> ${recipe.category || 'N/A'}</p>
+                        <p><strong>Family Member:</strong> ${recipe.family_member || 'all'}</p>
+                        ${recipe.description ? `<p><strong>Description:</strong> ${recipe.description}</p>` : ''}
                         ${recipe.video_url ? `
-                            <h3 style="margin-top: 20px;">Video</h3>
+                            <h3>Video</h3>
                             <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; margin: 15px 0;">
                                 <iframe src="${recipe.video_url}"
                                         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;"
                                         allowfullscreen></iframe>
                             </div>
                         ` : ''}
-
-                        <h3 style="margin-top: 20px;">Ingredients</h3>
-                        <pre style="white-space: pre-wrap; background: #f8f9fa; padding: 15px; border-radius: 5px;">${recipe.ingredients || 'No ingredients listed'}</pre>
-
-                        <h3 style="margin-top: 20px;">Instructions</h3>
-                        <pre style="white-space: pre-wrap; background: #f8f9fa; padding: 15px; border-radius: 5px;">${recipe.instructions || 'No instructions'}</pre>
-
+                        <h3>Ingredients</h3>
+                        <pre style="white-space: pre-wrap;">${recipe.ingredients || 'No ingredients listed'}</pre>
+                        <h3>Instructions</h3>
+                        <pre style="white-space: pre-wrap;">${recipe.instructions || 'No instructions'}</pre>
                         ${commentsHtml}
-
-                        ${recipe.tags ? `<p style="margin-top: 20px;"><strong>Tags:</strong> ${recipe.tags}</p>` : ''}
+                        ${recipe.tags ? `<p><strong>Tags:</strong> ${recipe.tags}</p>` : ''}
                     `;
 
                     modal.style.display = 'flex';
@@ -460,35 +525,11 @@ function showZone(zoneId) {
             const modal = document.getElementById('zone-modal');
             const details = document.getElementById('zone-details');
 
-            // Handle both old numeric priority and new string priority
-            let priority = zone.priority;
-            if (!isNaN(priority)) {
-                // Convert old numeric priority to new string format
-                const num = parseInt(priority);
-                if (num <= 3) priority = 'high';
-                else if (num <= 7) priority = 'medium';
-                else priority = 'low';
-            }
-
-            const priorityLabel = priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : 'Medium';
-            const priorityColor = {
-                'high': '#e74c3c',
-                'medium': '#f39c12',
-                'low': '#3498db'
-            }[priority.toLowerCase()] || '#f39c12';
-
             details.innerHTML = `
-                <h2>🧹 ${zone.name}</h2>
-
-                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
-                    <p style="margin: 5px 0;"><strong>Priority:</strong> <span style="color: ${priorityColor}; font-weight: bold;">${priorityLabel}</span></p>
-                    <p style="margin: 5px 0;"><strong>Frequency:</strong> ${zone.frequency_per_week}x per week</p>
-                </div>
-
-                ${zone.description ? `
-                    <h3 style="margin-top: 20px;">Description</h3>
-                    <p style="background: #f8f9fa; padding: 15px; border-radius: 5px; white-space: pre-wrap;">${zone.description}</p>
-                ` : ''}
+                <h2>${zone.name}</h2>
+                <p><strong>Priority:</strong> ${zone.priority || 'N/A'}</p>
+                <p><strong>Frequency:</strong> ${zone.frequency_per_week}x per week</p>
+                ${zone.description ? `<p><strong>Description:</strong> ${zone.description}</p>` : ''}
             `;
 
             modal.style.display = 'flex';

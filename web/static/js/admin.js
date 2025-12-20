@@ -11,6 +11,7 @@ function showSection(section) {
     else if (section === 'mealtimes') loadMealTimes();
     else if (section === 'zones') loadZones();
     else if (section === 'childcare') loadChildcare();
+    else if (section === 'calendar') loadAdminCalendar();
     else if (section === 'shopping') loadAdminShoppingList();
 }
 
@@ -136,6 +137,8 @@ function showRecipeForm() {
 
 function hideRecipeForm() {
     document.getElementById('recipe-form').style.display = 'none';
+    document.getElementById('recipe-image-file').value = '';
+    document.getElementById('current-image-preview').innerHTML = '';
 }
 
 function editRecipe(id) {
@@ -155,6 +158,14 @@ function editRecipe(id) {
             document.getElementById('recipe-rating').value = recipe.rating || 0;
             updateStarDisplay(recipe.rating || 0);
 
+            // Show current image preview
+            const imagePreview = document.getElementById('current-image-preview');
+            if (recipe.image_url) {
+                imagePreview.innerHTML = `<img src="${recipe.image_url}" alt="Current image" style="max-width: 200px; max-height: 200px; border-radius: 4px;">`;
+            } else {
+                imagePreview.innerHTML = '';
+            }
+
             document.getElementById('recipe-form-title').textContent = 'Edit Recipe';
             document.getElementById('recipe-form').style.display = 'block';
 
@@ -168,6 +179,34 @@ function saveRecipe(e) {
     e.preventDefault();
 
     const id = document.getElementById('recipe-id').value;
+    const imageFile = document.getElementById('recipe-image-file').files[0];
+
+    // If there's a new image file, upload it first
+    if (imageFile) {
+        const formData = new FormData();
+        formData.append('image', imageFile);
+
+        fetch('/admin/api/recipes/upload-image', {
+            method: 'POST',
+            body: formData
+        })
+        .then(r => r.json())
+        .then(result => {
+            if (result.url) {
+                document.getElementById('recipe-image-url').value = result.url;
+            }
+            saveRecipeData(id);
+        })
+        .catch(err => {
+            console.error('Error uploading image:', err);
+            alert('Failed to upload image');
+        });
+    } else {
+        saveRecipeData(id);
+    }
+}
+
+function saveRecipeData(id) {
     const data = {
         name: document.getElementById('recipe-name').value,
         description: document.getElementById('recipe-description').value,
@@ -445,7 +484,7 @@ function editChildcare(id) {
             document.getElementById('childcare-start').value = cc.start_time;
             document.getElementById('childcare-end').value = cc.end_time;
             document.getElementById('childcare-notes').value = cc.notes || '';
-            
+
             document.getElementById('childcare-form-title').textContent = 'Edit Childcare Time';
             document.getElementById('childcare-form').style.display = 'block';
         });
@@ -453,7 +492,7 @@ function editChildcare(id) {
 
 function saveChildcare(e) {
     e.preventDefault();
-    
+
     const id = document.getElementById('childcare-id').value;
     const data = {
         date: document.getElementById('childcare-date').value + 'T00:00:00Z',
@@ -461,10 +500,10 @@ function saveChildcare(e) {
         end_time: document.getElementById('childcare-end').value,
         notes: document.getElementById('childcare-notes').value
     };
-    
+
     const url = id ? `/admin/api/childcare/${id}` : '/admin/api/childcare';
     const method = id ? 'PUT' : 'POST';
-    
+
     fetch(url, {
         method: method,
         headers: {'Content-Type': 'application/json'},
@@ -584,5 +623,428 @@ function deleteRecipeComment(commentId) {
         fetch(`/admin/api/comments/${commentId}`, {method: 'DELETE'})
             .then(() => loadRecipeComments(recipeId));
     }
+}
+
+// CALENDAR FUNCTIONS
+
+let currentAdminCalendarView = 'thisweek';
+let currentTaskForRecipeSelection = null;
+let allRecipesForModal = [];
+
+function loadAdminCalendar() {
+    showAdminCalendarView('thisweek');
+}
+
+function showAdminCalendarView(view) {
+    currentAdminCalendarView = view;
+
+    // Hide all calendar views
+    document.querySelectorAll('#calendar-section .schedule-view').forEach(v => v.style.display = 'none');
+    document.querySelectorAll('#calendar-section .schedule-nav-btn').forEach(btn => btn.classList.remove('active'));
+
+    // Show selected view
+    document.getElementById(`admin-${view}-view`).style.display = 'block';
+    document.getElementById(`admin-${view}-btn`).classList.add('active');
+
+    // Load data for the view
+    if (view === 'thisweek') {
+        loadAdminWeekCalendar(0);
+    } else if (view === 'nextweek') {
+        loadAdminWeekCalendar(1);
+    }
+}
+
+function loadAdminWeekCalendar(weekOffset) {
+    const today = new Date();
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() + (weekOffset * 7));
+
+    // Get Monday of the week
+    const dayOfWeek = startDate.getDay();
+    const diff = startDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    startDate.setDate(diff);
+
+    const containerId = weekOffset === 0 ? 'admin-thisweek-calendar' : 'admin-nextweek-calendar';
+
+    // Load 7 days starting from Monday
+    fetch(`/helper/api/schedule/upcoming?days=7&start_date=${startDate.toISOString().split('T')[0]}`)
+        .then(r => r.json())
+        .then(schedules => {
+            const container = document.getElementById(containerId);
+
+            if (!schedules || schedules.length === 0) {
+                container.innerHTML = '<p>No schedules available.</p>';
+                return;
+            }
+
+            container.innerHTML = schedules.map(schedule => {
+                const date = new Date(schedule.date);
+                const isToday = date.toDateString() === new Date().toDateString();
+                const dateStr = date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long'
+                });
+
+                const tasks = schedule.tasks ? schedule.tasks.sort((a, b) => {
+                    if (a.time && !b.time) return -1;
+                    if (!a.time && b.time) return 1;
+                    if (a.time && b.time) return a.time.localeCompare(b.time);
+                    return 0;
+                }) : [];
+
+                const timedTasks = tasks.filter(t => t.time);
+                const untimedTasks = tasks.filter(t => !t.time);
+
+                return `
+                    <div class="calendar-day ${isToday ? 'today' : ''}">
+                        <div class="calendar-day-header">
+                            ${dateStr}
+                            ${isToday ? '<span class="today-badge">Today</span>' : ''}
+                        </div>
+                        <div class="calendar-day-content">
+                            ${timedTasks.length > 0 ? `
+                                <div class="task-section">
+                                    <h4>Schedule:</h4>
+                                    ${timedTasks.map(task => renderAdminCalendarTask(task, date)).join('')}
+                                </div>
+                            ` : ''}
+                            ${untimedTasks.length > 0 ? `
+                                <div class="task-section">
+                                    <h4>Cleaning (anytime):</h4>
+                                    ${untimedTasks.map(task => renderAdminCalendarTask(task, date)).join('')}
+                                </div>
+                            ` : ''}
+                            ${tasks.length === 0 ? '<p class="no-tasks">No tasks</p>' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        });
+}
+
+function renderAdminCalendarTask(task, date) {
+    const typeClass = task.task_type || 'other';
+
+    let timeDisplay = 'Anytime';
+    if (task.time) {
+        if (task.end_time && task.task_type === 'childcare') {
+            timeDisplay = `${task.time} - ${task.end_time}`;
+        } else {
+            timeDisplay = task.time;
+        }
+    }
+
+    let description = task.description || '';
+
+    // For meal tasks, show recipes
+    if (task.task_type === 'meal') {
+        const recipes = task.recipes || [];
+        if (recipes.length > 0) {
+            description = recipes.map(r => r.name).join(', ');
+        } else if (task.recipe && task.recipe.name) {
+            description = task.recipe.name;
+        }
+
+        // Make meal tasks clickable to manage recipes
+        return `
+            <div class="calendar-task ${typeClass}" onclick="openRecipeSelectionModal(${task.id}, '${task.title}', '${date.toISOString()}')" style="cursor: pointer;">
+                <div class="task-time">${timeDisplay}</div>
+                <div class="task-title">${task.title}</div>
+                ${description ? `<div class="task-description">${description}</div>` : ''}
+            </div>
+        `;
+    } else if (task.task_type === 'cleaning') {
+        // For cleaning tasks, show only zone names
+        const zones = task.zones || [];
+        if (zones.length > 0) {
+            description = zones.map(z => z.name).join(', ');
+        } else if (task.zone && task.zone.name) {
+            description = task.zone.name;
+        }
+
+        // Make cleaning tasks clickable to manage zones
+        return `
+            <div class="calendar-task ${typeClass}" onclick="openZoneSelectionModal(${task.id}, '${task.title}', '${date.toISOString()}')" style="cursor: pointer;">
+                <div class="task-time">${timeDisplay}</div>
+                <div class="task-title">${task.title}</div>
+                ${description ? `<div class="task-description">${description}</div>` : ''}
+            </div>
+        `;
+    }
+
+    return `
+        <div class="calendar-task ${typeClass}">
+            <div class="task-time">${timeDisplay}</div>
+            <div class="task-title">${task.title}</div>
+            ${description ? `<div class="task-description">${description}</div>` : ''}
+        </div>
+    `;
+}
+
+
+
+// RECIPE SELECTION MODAL
+
+function openRecipeSelectionModal(taskId, taskTitle, taskDate) {
+    currentTaskForRecipeSelection = taskId;
+
+    document.getElementById('modal-meal-title').textContent = taskTitle;
+    const date = new Date(taskDate);
+    document.getElementById('modal-meal-date').textContent = date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    });
+
+    // Load current task with recipes
+    fetch(`/admin/api/tasks/${taskId}`)
+        .then(r => r.json())
+        .then(task => {
+            displayCurrentRecipes(task.recipes || []);
+        });
+
+    // Load all recipes for selection
+    fetch('/admin/api/recipes')
+        .then(r => r.json())
+        .then(recipes => {
+            allRecipesForModal = recipes;
+            filterModalRecipes();
+        });
+
+    document.getElementById('recipe-selection-modal').style.display = 'block';
+}
+
+function closeRecipeSelectionModal() {
+    document.getElementById('recipe-selection-modal').style.display = 'none';
+    currentTaskForRecipeSelection = null;
+
+    // Reload calendar to show updated recipes
+    if (currentAdminCalendarView === 'thisweek') {
+        loadAdminWeekCalendar(0);
+    } else if (currentAdminCalendarView === 'nextweek') {
+        loadAdminWeekCalendar(1);
+    }
+}
+
+function displayCurrentRecipes(recipes) {
+    const container = document.getElementById('current-recipes-list');
+
+    if (!recipes || recipes.length === 0) {
+        container.innerHTML = '<p style="color: #7f8c8d;">No recipes selected yet</p>';
+        return;
+    }
+
+    container.innerHTML = recipes.map(recipe => `
+        <div class="recipe-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid #ecf0f1; border-radius: 5px; margin-bottom: 10px;">
+            <div>
+                <strong>${recipe.name}</strong>
+                ${recipe.description ? `<div style="font-size: 12px; color: #7f8c8d;">${recipe.description}</div>` : ''}
+            </div>
+            <button onclick="removeRecipeFromMeal(${recipe.id})" class="btn btn-danger" style="font-size: 12px;">Remove</button>
+        </div>
+    `).join('');
+}
+
+function filterModalRecipes() {
+    const searchTerm = document.getElementById('modal-recipe-search').value.toLowerCase();
+    const category = document.getElementById('modal-recipe-category').value;
+
+    const filtered = allRecipesForModal.filter(recipe => {
+        const matchesSearch = !searchTerm || recipe.name.toLowerCase().includes(searchTerm);
+        const matchesCategory = !category || recipe.category === category;
+        return matchesSearch && matchesCategory;
+    });
+
+    displayAvailableRecipes(filtered);
+}
+
+function displayAvailableRecipes(recipes) {
+    const container = document.getElementById('available-recipes-list');
+
+    if (!recipes || recipes.length === 0) {
+        container.innerHTML = '<p style="color: #7f8c8d;">No recipes found</p>';
+        return;
+    }
+
+    container.innerHTML = recipes.map(recipe => `
+        <div class="recipe-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid #ecf0f1; border-radius: 5px; margin-bottom: 10px;">
+            <div style="flex: 1;">
+                <strong>${recipe.name}</strong>
+                ${recipe.description ? `<div style="font-size: 12px; color: #7f8c8d;">${recipe.description}</div>` : ''}
+                <div style="font-size: 11px; color: #95a5a6; margin-top: 3px;">
+                    ${recipe.category ? `Category: ${recipe.category}` : ''}
+                    ${recipe.family_member ? `| For: ${recipe.family_member}` : ''}
+                </div>
+            </div>
+            <button onclick="addRecipeToMeal(${recipe.id})" class="btn btn-primary" style="font-size: 12px;">Add</button>
+        </div>
+    `).join('');
+}
+
+function addRecipeToMeal(recipeId) {
+    if (!currentTaskForRecipeSelection) return;
+
+    fetch(`/admin/api/tasks/${currentTaskForRecipeSelection}/recipes`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({recipe_id: recipeId})
+    })
+    .then(r => r.json())
+    .then(task => {
+        displayCurrentRecipes(task.recipes || []);
+    })
+    .catch(err => {
+        console.error('Error adding recipe:', err);
+        alert('Failed to add recipe');
+    });
+}
+
+function removeRecipeFromMeal(recipeId) {
+    if (!currentTaskForRecipeSelection) return;
+
+    fetch(`/admin/api/tasks/${currentTaskForRecipeSelection}/recipes/${recipeId}`, {
+        method: 'DELETE'
+    })
+    .then(r => r.json())
+    .then(task => {
+        displayCurrentRecipes(task.recipes || []);
+    })
+    .catch(err => {
+        console.error('Error removing recipe:', err);
+        alert('Failed to remove recipe');
+    });
+}
+
+
+// ZONE SELECTION MODAL
+
+let currentTaskForZoneSelection = null;
+let allZonesForModal = [];
+
+function openZoneSelectionModal(taskId, taskTitle, taskDate) {
+    currentTaskForZoneSelection = taskId;
+
+    document.getElementById('modal-cleaning-title').textContent = taskTitle;
+    const date = new Date(taskDate);
+    document.getElementById('modal-cleaning-date').textContent = date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    });
+
+    // Load current task with zones
+    fetch(`/admin/api/tasks/${taskId}`)
+        .then(r => r.json())
+        .then(task => {
+            displayCurrentZones(task.zones || []);
+        })
+        .catch(err => {
+            console.error('Error loading task:', err);
+        });
+
+    // Load all zones
+    fetch('/admin/api/zones')
+        .then(r => r.json())
+        .then(zones => {
+            allZonesForModal = zones;
+            filterModalZones();
+        })
+        .catch(err => {
+            console.error('Error loading zones:', err);
+        });
+
+    document.getElementById('zone-selection-modal').style.display = 'block';
+}
+
+function closeZoneSelectionModal() {
+    document.getElementById('zone-selection-modal').style.display = 'none';
+    currentTaskForZoneSelection = null;
+
+    // Reload calendar to show updated zones
+    if (currentAdminCalendarView === 'thisweek') {
+        loadAdminWeekCalendar(0);
+    } else if (currentAdminCalendarView === 'nextweek') {
+        loadAdminWeekCalendar(1);
+    }
+}
+
+function displayCurrentZones(zones) {
+    const container = document.getElementById('current-zones-list');
+    if (zones.length === 0) {
+        container.innerHTML = '<p style="color: #999;">No zones selected yet</p>';
+        return;
+    }
+
+    container.innerHTML = zones.map(zone => `
+        <div class="zone-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid #ddd; margin-bottom: 8px; border-radius: 4px;">
+            <div>
+                <strong>${zone.name}</strong>
+                ${zone.description ? `<div style="font-size: 12px; color: #666;">${zone.description}</div>` : ''}
+                ${zone.priority ? `<span style="font-size: 11px; padding: 2px 6px; background: ${zone.priority === 'high' ? '#e74c3c' : zone.priority === 'medium' ? '#f39c12' : '#95a5a6'}; color: white; border-radius: 3px; margin-top: 4px; display: inline-block;">${zone.priority}</span>` : ''}
+            </div>
+            <button onclick="removeZoneFromCleaning(${zone.id})" class="btn-danger" style="padding: 5px 10px;">Remove</button>
+        </div>
+    `).join('');
+}
+
+function filterModalZones() {
+    const searchTerm = document.getElementById('modal-zone-search').value.toLowerCase();
+    const priorityFilter = document.getElementById('modal-zone-priority').value;
+
+    const filtered = allZonesForModal.filter(zone => {
+        const matchesSearch = zone.name.toLowerCase().includes(searchTerm) ||
+                            (zone.description && zone.description.toLowerCase().includes(searchTerm));
+        const matchesPriority = !priorityFilter || zone.priority === priorityFilter;
+        return matchesSearch && matchesPriority;
+    });
+
+    const container = document.getElementById('available-zones-list');
+    container.innerHTML = filtered.map(zone => `
+        <div class="zone-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid #ddd; margin-bottom: 8px; border-radius: 4px;">
+            <div>
+                <strong>${zone.name}</strong>
+                ${zone.description ? `<div style="font-size: 12px; color: #666;">${zone.description}</div>` : ''}
+                ${zone.priority ? `<span style="font-size: 11px; padding: 2px 6px; background: ${zone.priority === 'high' ? '#e74c3c' : zone.priority === 'medium' ? '#f39c12' : '#95a5a6'}; color: white; border-radius: 3px; margin-top: 4px; display: inline-block;">${zone.priority}</span>` : ''}
+            </div>
+            <button onclick="addZoneToCleaning(${zone.id})" class="btn-primary" style="padding: 5px 10px;">Add</button>
+        </div>
+    `).join('');
+}
+
+function addZoneToCleaning(zoneId) {
+    if (!currentTaskForZoneSelection) return;
+
+    fetch(`/admin/api/tasks/${currentTaskForZoneSelection}/zones`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({zone_id: zoneId})
+    })
+    .then(r => r.json())
+    .then(task => {
+        displayCurrentZones(task.zones || []);
+    })
+    .catch(err => {
+        console.error('Error adding zone:', err);
+        alert('Failed to add zone');
+    });
+}
+
+function removeZoneFromCleaning(zoneId) {
+    if (!currentTaskForZoneSelection) return;
+
+    fetch(`/admin/api/tasks/${currentTaskForZoneSelection}/zones/${zoneId}`, {
+        method: 'DELETE'
+    })
+    .then(r => r.json())
+    .then(task => {
+        displayCurrentZones(task.zones || []);
+    })
+    .catch(err => {
+        console.error('Error removing zone:', err);
+        alert('Failed to remove zone');
+    });
 }
 
