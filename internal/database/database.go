@@ -1,12 +1,14 @@
 package database
 
 import (
+	"fmt"
 	"log"
+	"os"
 
 	"podlevskikh/awesomeProject/internal/data"
 	"podlevskikh/awesomeProject/internal/models"
 
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -14,15 +16,26 @@ import (
 var DB *gorm.DB
 
 // Initialize sets up the database connection and runs migrations
-func Initialize(dbPath string) error {
+// It accepts a DATABASE_URL connection string for PostgreSQL
+func Initialize(databaseURL string) error {
 	var err error
 
-	DB, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{
+	// If databaseURL is empty, try to get it from environment
+	if databaseURL == "" {
+		databaseURL = os.Getenv("DATABASE_URL")
+	}
+
+	// If still empty, return error
+	if databaseURL == "" {
+		return fmt.Errorf("DATABASE_URL is required")
+	}
+
+	DB, err = gorm.Open(postgres.Open(databaseURL), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
 
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	log.Println("Database connection established")

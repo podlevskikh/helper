@@ -9,8 +9,8 @@ import (
 )
 
 func main() {
-	// Initialize database
-	if err := database.Initialize("./helper_app.db"); err != nil {
+	// Initialize database - will use DATABASE_URL from environment
+	if err := database.Initialize(""); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 

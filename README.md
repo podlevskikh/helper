@@ -20,57 +20,116 @@ A web application for managing household tasks, meal planning, cleaning schedule
 
 ## Installation & Running
 
-### Option 1: Deploy to Railway.app (Recommended for Production)
-
-See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md) for detailed instructions.
-
-Quick steps:
-1. Push code to GitHub
-2. Connect repository to Railway
-3. Railway will automatically build and deploy using Docker
-4. Configure volume for persistent database storage
-
-### Option 2: Run Locally with Go
-
-#### Prerequisites
+### Prerequisites
 - Go 1.24 or higher
-- Git
-- GCC (for SQLite CGO support)
+- Docker and Docker Compose (for local development)
+- PostgreSQL database (local via Docker or cloud via Neon)
 
-#### Steps
+### Option 1: Run Locally with Docker Compose (Recommended for Development)
 
-1. **Clone or navigate to the project directory**
+This option runs both the application and PostgreSQL database in Docker.
+
+1. **Clone the repository**
 ```bash
-cd /Users/podlevskikh/go/src/podlevskikh/awesomeProject
+cd /Users/podlevskikh/go/src/podlevskikh/helper
 ```
 
-2. **Install dependencies**
+2. **Start the application and database**
+```bash
+docker-compose up -d
+```
+
+This will:
+- Start a PostgreSQL database on port 5432
+- Build and start the application on port 8080
+- Automatically run database migrations
+
+3. **Access the application**
+- Admin interface: http://localhost:8080/admin
+- Helper interface: http://localhost:8080/helper
+
+4. **Stop the application**
+```bash
+docker-compose down
+```
+
+To remove the database data as well:
+```bash
+docker-compose down -v
+```
+
+### Option 2: Run Locally with Go (Development)
+
+1. **Set up PostgreSQL database**
+
+You can use the PostgreSQL from docker-compose:
+```bash
+docker-compose up -d postgres
+```
+
+Or install PostgreSQL locally.
+
+2. **Configure environment variables**
+
+Copy the example environment file:
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and set your database connection:
+```env
+DATABASE_URL=postgres://helper:helper_password@localhost:5432/helper_db?sslmode=disable
+PORT=8080
+```
+
+3. **Install dependencies**
 ```bash
 go mod tidy
 ```
 
-3. **Run the server**
+4. **Run the server**
 ```bash
+# Load environment variables and run
+export $(cat .env | xargs) && go run cmd/server/main.go
+```
+
+Or on Windows (PowerShell):
+```powershell
+Get-Content .env | ForEach-Object { $var = $_.Split('='); [Environment]::SetEnvironmentVariable($var[0], $var[1]) }
 go run cmd/server/main.go
 ```
 
-Note: First run will take 1-2 minutes to compile SQLite driver.
-
-4. **Access the application**
+5. **Access the application**
 - Admin interface: http://localhost:8080/admin
 - Helper interface: http://localhost:8080/helper
 
-### Option 3: Run with Docker
+### Option 3: Deploy to Production (Railway with Neon PostgreSQL)
 
-```bash
-# Build the image
-docker build -t helper-app .
+#### Step 1: Set up Neon PostgreSQL
 
-# Run the container
-docker run -p 8080:8080 -v $(pwd)/data:/data helper-app
-```
+1. Go to [Neon](https://neon.tech) and create a free account
+2. Create a new project
+3. Copy the connection string (it looks like: `postgres://user:password@host/database?sslmode=require`)
 
-Access at http://localhost:8080
+#### Step 2: Deploy to Railway
+
+1. Push your code to GitHub
+
+2. Go to [Railway.app](https://railway.app) and create a new project
+
+3. Connect your GitHub repository
+
+4. Add environment variable in Railway:
+   - Key: `DATABASE_URL`
+   - Value: Your Neon connection string
+
+5. Railway will automatically:
+   - Detect the Dockerfile
+   - Build the application
+   - Deploy it
+   - Provide a public URL
+
+6. Access your application at the Railway-provided URL
 
 ## Usage Guide
 
@@ -128,18 +187,24 @@ Access at http://localhost:8080
 
 ```
 .
-├── cmd/server/          # Main application entry point
+├── cmd/
+│   ├── server/          # Main application entry point
+│   ├── seed/            # Database seeding utility
+│   └── regenerate/      # Schedule regeneration utility
 ├── internal/
-│   ├── models/          # Database models
+│   ├── models/          # Database models (GORM)
 │   ├── handlers/        # HTTP handlers (admin & helper)
 │   ├── database/        # Database initialization
-│   └── scheduler/       # Schedule generation logic
+│   ├── scheduler/       # Schedule generation logic
+│   └── data/            # Data initialization (holidays)
 ├── web/
 │   ├── templates/       # HTML templates
 │   └── static/
 │       ├── css/         # Stylesheets
 │       └── js/          # JavaScript files
-└── helper_app.db        # SQLite database (created on first run)
+├── docker-compose.yml   # Local development setup
+├── Dockerfile           # Production container
+└── .env.example         # Environment variables template
 ```
 
 ## API Endpoints
@@ -187,9 +252,43 @@ Edit `web/static/css/style.css` to customize appearance
 
 ## Database
 
-The application uses SQLite database (`helper_app.db`) which is created automatically on first run.
+The application uses PostgreSQL database with GORM ORM.
 
-To reset the database, simply delete `helper_app.db` and restart the server.
+### Database Migrations
+
+Database migrations run automatically on application startup. The following tables are created:
+- `recipes` - Recipe information
+- `meal_times` - Configured meal times
+- `cleaning_zones` - Cleaning zones and schedules
+- `childcare_schedules` - Childcare tasks
+- `daily_schedules` - Generated daily schedules
+- `schedule_tasks` - Individual tasks in schedules
+- `shopping_list_items` - Shopping list
+- `settings` - Application settings
+- `holidays` - Holiday calendar
+- `recipe_comments` - Comments on recipes
+
+### Seeding Data
+
+To populate the database with sample data:
+
+```bash
+# Make sure DATABASE_URL is set
+export DATABASE_URL="postgres://helper:helper_password@localhost:5432/helper_db?sslmode=disable"
+
+# Run the seed command
+go run cmd/seed/seed.go
+```
+
+### Resetting the Database
+
+For local development with docker-compose:
+```bash
+docker-compose down -v  # Remove volumes
+docker-compose up -d    # Restart with fresh database
+```
+
+For production, you'll need to manually drop and recreate the database in your PostgreSQL provider (Neon, etc.).
 
 ## Future Enhancements
 

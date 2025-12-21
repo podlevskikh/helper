@@ -13,14 +13,11 @@ import (
 )
 
 func main() {
-	// Get database path from environment or use default
-	dbPath := os.Getenv("DB_PATH")
-	if dbPath == "" {
-		dbPath = "./helper_app.db"
-	}
+	// Get database URL from environment
+	databaseURL := os.Getenv("DATABASE_URL")
 
 	// Initialize database
-	if err := database.Initialize(dbPath); err != nil {
+	if err := database.Initialize(databaseURL); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 

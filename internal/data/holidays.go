@@ -52,10 +52,10 @@ func IsHoliday(db *gorm.DB, date time.Time) bool {
 
 	// Check if it's a public holiday
 	var count int64
-	// SQLite uses strftime for date extraction
+	// PostgreSQL uses EXTRACT for date extraction
 	db.Model(&models.Holiday{}).Where(
-		"(is_recurring = ? AND strftime('%m', date) = ? AND strftime('%d', date) = ?) OR date = ?",
-		true, date.Format("01"), date.Format("02"), date.Format("2006-01-02"),
+		"(is_recurring = ? AND EXTRACT(MONTH FROM date) = ? AND EXTRACT(DAY FROM date) = ?) OR date = ?",
+		true, int(date.Month()), date.Day(), date.Format("2006-01-02"),
 	).Count(&count)
 
 	return count > 0

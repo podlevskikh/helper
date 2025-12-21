@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: helper-postgres
+    environment:
+      POSTGRES_USER: helper
+      POSTGRES_PASSWORD: helper_password
+      POSTGRES_DB: helper_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helper"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: helper-app
+    environment:
+      DATABASE_URL: "postgres://helper:helper_password@postgres:5432/helper_db?sslmode=disable"
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./web:/app/web
+
+volumes:
+  postgres_data:
+
