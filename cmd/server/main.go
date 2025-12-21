@@ -16,6 +16,18 @@ func main() {
 	// Get database URL from environment
 	databaseURL := os.Getenv("DATABASE_URL")
 
+	// Debug logging for Railway
+	if databaseURL == "" {
+		log.Println("WARNING: DATABASE_URL environment variable is not set")
+		log.Println("Available environment variables:")
+		for _, env := range os.Environ() {
+			log.Println("  ", env)
+		}
+	} else {
+		// Log that we have DATABASE_URL (but don't log the actual value for security)
+		log.Println("DATABASE_URL is set (length:", len(databaseURL), ")")
+	}
+
 	// Initialize database
 	if err := database.Initialize(databaseURL); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)

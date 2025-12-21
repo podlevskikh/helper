@@ -27,18 +27,24 @@ func Initialize(databaseURL string) error {
 
 	// If still empty, return error
 	if databaseURL == "" {
+		log.Println("ERROR: DATABASE_URL is not set")
+		log.Println("Please set DATABASE_URL environment variable with PostgreSQL connection string")
+		log.Println("Example: postgres://user:password@host:port/database?sslmode=disable")
 		return fmt.Errorf("DATABASE_URL is required")
 	}
+
+	log.Println("Attempting to connect to PostgreSQL database...")
 
 	DB, err = gorm.Open(postgres.Open(databaseURL), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
 
 	if err != nil {
+		log.Printf("Failed to connect to database. Error: %v", err)
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	log.Println("Database connection established")
+	log.Println("✅ Database connection established successfully")
 
 	// Run migrations
 	err = DB.AutoMigrate(
