@@ -1,10 +1,12 @@
 // Section navigation
-function showSection(section) {
+function showSection(section, event) {
     document.querySelectorAll('.content-section').forEach(s => s.style.display = 'none');
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
 
     document.getElementById(`${section}-section`).style.display = 'block';
-    event.target.classList.add('active');
+    if (event && event.target) {
+        event.target.classList.add('active');
+    }
 
     // Load data for the section
     if (section === 'recipes') loadRecipes();
@@ -15,8 +17,12 @@ function showSection(section) {
     else if (section === 'shopping') loadAdminShoppingList();
 }
 
+// Global variables
+let allMealTimes = [];
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    loadMealTimesForFilters(); // Load meal times first
     loadRecipes();
     setupForms();
 });
@@ -63,6 +69,46 @@ function updateStarDisplay(rating, isHover = false) {
     });
 }
 
+// MEAL TIMES HELPERS
+function loadMealTimesForFilters() {
+    fetch('/admin/api/mealtimes')
+        .then(r => r.json())
+        .then(mealTimes => {
+            allMealTimes = mealTimes.filter(mt => mt.active);
+            populateMealTypeFilters();
+            populateMealTypeCheckboxes();
+        })
+        .catch(err => console.error('Error loading meal times:', err));
+}
+
+function populateMealTypeFilters() {
+    // Populate main filter
+    const filterSelect = document.getElementById('filter-meal-type');
+    if (filterSelect) {
+        filterSelect.innerHTML = '<option value="">All Meal Types</option>' +
+            allMealTimes.map(mt => `<option value="${mt.id}">${mt.name}</option>`).join('');
+    }
+
+    // Populate modal filter
+    const modalSelect = document.getElementById('modal-recipe-meal-type');
+    if (modalSelect) {
+        modalSelect.innerHTML = '<option value="">All Meal Types</option>' +
+            allMealTimes.map(mt => `<option value="${mt.id}">${mt.name}</option>`).join('');
+    }
+}
+
+function populateMealTypeCheckboxes() {
+    const container = document.getElementById('recipe-meal-types');
+    if (!container) return;
+
+    container.innerHTML = allMealTimes.map(mt => `
+        <label class="checkbox-label">
+            <input type="checkbox" name="meal-type" value="${mt.id}" data-name="${mt.name}">
+            ${mt.name}
+        </label>
+    `).join('');
+}
+
 // RECIPES
 let allRecipes = [];
 
@@ -79,13 +125,16 @@ function displayRecipes(recipes) {
     const list = document.getElementById('recipes-list');
     list.innerHTML = recipes.map(recipe => {
         const stars = renderStars(recipe.rating || 0);
+        const mealTypes = recipe.meal_times && recipe.meal_times.length > 0
+            ? recipe.meal_times.map(mt => mt.name).join(', ')
+            : (recipe.category || 'N/A'); // Fallback to old category field
         return `
             <div class="recipe-card">
                 <div class="recipe-card-info">
                     <div class="recipe-card-title">${recipe.name}</div>
                     <div class="recipe-card-meta">
                         <span>${stars}</span>
-                        <span>📁 ${recipe.category || 'N/A'}</span>
+                        <span>🍽️ ${mealTypes}</span>
                         <span>👤 ${recipe.family_member || 'all'}</span>
                     </div>
                 </div>
@@ -110,17 +159,22 @@ function renderStars(rating) {
 
 function filterRecipes() {
     const search = document.getElementById('filter-search').value.toLowerCase();
-    const category = document.getElementById('filter-category').value;
+    const mealTypeId = document.getElementById('filter-meal-type').value;
     const family = document.getElementById('filter-family').value;
     const minRating = parseFloat(document.getElementById('filter-rating').value);
 
     const filtered = allRecipes.filter(recipe => {
         const matchSearch = !search || recipe.name.toLowerCase().includes(search);
-        const matchCategory = !category || recipe.category === category;
+
+        // Check if recipe has this meal type (either in meal_times array or old category field)
+        const matchMealType = !mealTypeId ||
+            (recipe.meal_times && recipe.meal_times.some(mt => mt.id == mealTypeId)) ||
+            (recipe.category && allMealTimes.find(mt => mt.id == mealTypeId && mt.name === recipe.category));
+
         const matchFamily = !family || recipe.family_member === family;
         const matchRating = !minRating || (recipe.rating || 0) >= minRating;
 
-        return matchSearch && matchCategory && matchFamily && matchRating;
+        return matchSearch && matchMealType && matchFamily && matchRating;
     });
 
     displayRecipes(filtered);
@@ -133,6 +187,9 @@ function showRecipeForm() {
     document.getElementById('recipe-id').value = '';
     document.getElementById('recipe-comments-section').style.display = 'none';
     updateStarDisplay(0);
+
+    // Uncheck all meal type checkboxes
+    document.querySelectorAll('#recipe-meal-types input[type="checkbox"]').forEach(cb => cb.checked = false);
 }
 
 function hideRecipeForm() {
@@ -150,13 +207,30 @@ function editRecipe(id) {
             document.getElementById('recipe-description').value = recipe.description || '';
             document.getElementById('recipe-ingredients').value = recipe.ingredients || '';
             document.getElementById('recipe-instructions').value = recipe.instructions || '';
-            document.getElementById('recipe-category').value = recipe.category || 'breakfast';
             document.getElementById('recipe-family-member').value = recipe.family_member || 'all';
             document.getElementById('recipe-tags').value = recipe.tags || '';
             document.getElementById('recipe-image-url').value = recipe.image_url || '';
             document.getElementById('recipe-video-url').value = recipe.video_url || '';
             document.getElementById('recipe-rating').value = recipe.rating || 0;
             updateStarDisplay(recipe.rating || 0);
+
+            // Set meal type checkboxes
+            const checkboxes = document.querySelectorAll('#recipe-meal-types input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = false);
+
+            if (recipe.meal_times && recipe.meal_times.length > 0) {
+                recipe.meal_times.forEach(mt => {
+                    const checkbox = document.querySelector(`#recipe-meal-types input[value="${mt.id}"]`);
+                    if (checkbox) checkbox.checked = true;
+                });
+            } else if (recipe.category) {
+                // Fallback: try to match old category to meal time name
+                const matchingMealTime = allMealTimes.find(mt => mt.name === recipe.category);
+                if (matchingMealTime) {
+                    const checkbox = document.querySelector(`#recipe-meal-types input[value="${matchingMealTime.id}"]`);
+                    if (checkbox) checkbox.checked = true;
+                }
+            }
 
             // Show current image preview
             const imagePreview = document.getElementById('current-image-preview');
@@ -207,12 +281,17 @@ function saveRecipe(e) {
 }
 
 function saveRecipeData(id) {
+    // Get selected meal type IDs from checkboxes
+    const selectedMealTypes = Array.from(
+        document.querySelectorAll('#recipe-meal-types input[type="checkbox"]:checked')
+    ).map(cb => parseInt(cb.value));
+
     const data = {
         name: document.getElementById('recipe-name').value,
         description: document.getElementById('recipe-description').value,
         ingredients: document.getElementById('recipe-ingredients').value,
         instructions: document.getElementById('recipe-instructions').value,
-        category: document.getElementById('recipe-category').value,
+        meal_time_ids: selectedMealTypes, // Send array of meal time IDs
         family_member: document.getElementById('recipe-family-member').value,
         tags: document.getElementById('recipe-tags').value,
         image_url: document.getElementById('recipe-image-url').value,
@@ -524,10 +603,36 @@ function deleteChildcare(id) {
 
 // Schedule regeneration
 function regenerateSchedule() {
-    if (confirm('Regenerate schedule for the next 7 days?')) {
+    if (confirm('Regenerate schedule for the next 7 days? This will delete existing schedules and create new ones.')) {
+        // Show loading indicator
+        const originalText = event && event.target ? event.target.textContent : '';
+        if (event && event.target) {
+            event.target.textContent = 'Regenerating...';
+            event.target.disabled = true;
+        }
+
         fetch('/admin/api/regenerate-schedule', {method: 'POST'})
-            .then(r => r.json())
-            .then(data => alert(data.message));
+            .then(r => {
+                if (!r.ok) {
+                    throw new Error(`HTTP error! status: ${r.status}`);
+                }
+                return r.json();
+            })
+            .then(data => {
+                alert(data.message || 'Schedule regenerated successfully!');
+                console.log('Schedule regeneration response:', data);
+            })
+            .catch(error => {
+                console.error('Error regenerating schedule:', error);
+                alert('Error regenerating schedule: ' + error.message);
+            })
+            .finally(() => {
+                // Restore button state
+                if (event && event.target) {
+                    event.target.textContent = originalText;
+                    event.target.disabled = false;
+                }
+            });
     }
 }
 
@@ -849,12 +954,17 @@ function displayCurrentRecipes(recipes) {
 
 function filterModalRecipes() {
     const searchTerm = document.getElementById('modal-recipe-search').value.toLowerCase();
-    const category = document.getElementById('modal-recipe-category').value;
+    const mealTypeId = document.getElementById('modal-recipe-meal-type').value;
 
     const filtered = allRecipesForModal.filter(recipe => {
         const matchesSearch = !searchTerm || recipe.name.toLowerCase().includes(searchTerm);
-        const matchesCategory = !category || recipe.category === category;
-        return matchesSearch && matchesCategory;
+
+        // Check if recipe has this meal type (either in meal_times array or old category field)
+        const matchesMealType = !mealTypeId ||
+            (recipe.meal_times && recipe.meal_times.some(mt => mt.id == mealTypeId)) ||
+            (recipe.category && allMealTimes.find(mt => mt.id == mealTypeId && mt.name === recipe.category));
+
+        return matchesSearch && matchesMealType;
     });
 
     displayAvailableRecipes(filtered);
@@ -868,19 +978,25 @@ function displayAvailableRecipes(recipes) {
         return;
     }
 
-    container.innerHTML = recipes.map(recipe => `
+    container.innerHTML = recipes.map(recipe => {
+        const mealTypes = recipe.meal_times && recipe.meal_times.length > 0
+            ? recipe.meal_times.map(mt => mt.name).join(', ')
+            : (recipe.category || 'N/A');
+
+        return `
         <div class="recipe-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid #ecf0f1; border-radius: 5px; margin-bottom: 10px;">
             <div style="flex: 1;">
                 <strong>${recipe.name}</strong>
                 ${recipe.description ? `<div style="font-size: 12px; color: #7f8c8d;">${recipe.description}</div>` : ''}
                 <div style="font-size: 11px; color: #95a5a6; margin-top: 3px;">
-                    ${recipe.category ? `Category: ${recipe.category}` : ''}
+                    ${mealTypes ? `Meal Types: ${mealTypes}` : ''}
                     ${recipe.family_member ? `| For: ${recipe.family_member}` : ''}
                 </div>
             </div>
             <button onclick="addRecipeToMeal(${recipe.id})" class="btn btn-primary" style="font-size: 12px;">Add</button>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function addRecipeToMeal(recipeId) {

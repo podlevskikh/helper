@@ -26,7 +26,7 @@ func NewAdminHandler(db *gorm.DB) *AdminHandler {
 
 func (h *AdminHandler) GetRecipes(c *gin.Context) {
 	var recipes []models.Recipe
-	if err := h.db.Order("created_at DESC").Find(&recipes).Error; err != nil {
+	if err := h.db.Preload("MealTimes").Order("created_at DESC").Find(&recipes).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -36,7 +36,7 @@ func (h *AdminHandler) GetRecipes(c *gin.Context) {
 func (h *AdminHandler) GetRecipe(c *gin.Context) {
 	id := c.Param("id")
 	var recipe models.Recipe
-	if err := h.db.First(&recipe, id).Error; err != nil {
+	if err := h.db.Preload("MealTimes").First(&recipe, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
 		return
 	}
@@ -44,39 +44,101 @@ func (h *AdminHandler) GetRecipe(c *gin.Context) {
 }
 
 func (h *AdminHandler) CreateRecipe(c *gin.Context) {
-	var recipe models.Recipe
-	if err := c.ShouldBindJSON(&recipe); err != nil {
+	var input struct {
+		models.Recipe
+		MealTimeIDs []uint `json:"meal_time_ids"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
+	recipe := input.Recipe
+
+	// Create the recipe first
 	if err := h.db.Create(&recipe).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
+	// Associate meal times if provided
+	if len(input.MealTimeIDs) > 0 {
+		var mealTimes []models.MealTime
+		if err := h.db.Find(&mealTimes, input.MealTimeIDs).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find meal times"})
+			return
+		}
+
+		if err := h.db.Model(&recipe).Association("MealTimes").Replace(mealTimes); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to associate meal times"})
+			return
+		}
+	}
+
+	// Reload recipe with associations
+	h.db.Preload("MealTimes").First(&recipe, recipe.ID)
+
 	c.JSON(http.StatusCreated, recipe)
 }
 
 func (h *AdminHandler) UpdateRecipe(c *gin.Context) {
 	id := c.Param("id")
 	var recipe models.Recipe
-	
+
 	if err := h.db.First(&recipe, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
 		return
 	}
-	
-	if err := c.ShouldBindJSON(&recipe); err != nil {
+
+	var input struct {
+		models.Recipe
+		MealTimeIDs []uint `json:"meal_time_ids"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
+	// Update recipe fields
+	recipe.Name = input.Name
+	recipe.Description = input.Description
+	recipe.Ingredients = input.Ingredients
+	recipe.Instructions = input.Instructions
+	recipe.FamilyMember = input.FamilyMember
+	recipe.Tags = input.Tags
+	recipe.ImageURL = input.ImageURL
+	recipe.VideoURL = input.VideoURL
+	recipe.Rating = input.Rating
+	recipe.PrepTime = input.PrepTime
+	recipe.CookTime = input.CookTime
+	recipe.Servings = input.Servings
+
 	if err := h.db.Save(&recipe).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
+	// Update meal time associations
+	if input.MealTimeIDs != nil {
+		var mealTimes []models.MealTime
+		if len(input.MealTimeIDs) > 0 {
+			if err := h.db.Find(&mealTimes, input.MealTimeIDs).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find meal times"})
+				return
+			}
+		}
+
+		if err := h.db.Model(&recipe).Association("MealTimes").Replace(mealTimes); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update meal times"})
+			return
+		}
+	}
+
+	// Reload recipe with associations
+	h.db.Preload("MealTimes").First(&recipe, recipe.ID)
+
 	c.JSON(http.StatusOK, recipe)
 }
 

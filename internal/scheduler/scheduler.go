@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
@@ -76,57 +77,97 @@ func (s *Scheduler) generateMealTasks(schedule *models.DailySchedule, date time.
 	if err := s.db.Where("active = ?", true).Find(&mealTimes).Error; err != nil {
 		return err
 	}
-	
+
 	for _, mealTime := range mealTimes {
-		// Find a suitable recipe for this meal
-		recipe, err := s.selectRecipeForMeal(mealTime.Name, mealTime.FamilyMember)
-		if err != nil {
-			log.Printf("Warning: No recipe found for %s (%s), creating task without recipe", mealTime.Name, mealTime.FamilyMember)
-		}
-		
-		task := models.ScheduleTask{
-			ScheduleID:  schedule.ID,
-			TaskType:    "meal",
-			Time:        mealTime.DefaultTime,
-			Title:       fmt.Sprintf("%s - %s", mealTime.Name, mealTime.FamilyMember),
-			Description: "",
-			Completed:   false,
-		}
-		
-		if recipe != nil {
-			task.RecipeID = &recipe.ID
-			task.Description = recipe.Name
-			task.Duration = 60 // default 1 hour for meals
-		} else {
-			task.Duration = 60 // default 1 hour
-		}
-		
-		if err := s.db.Create(&task).Error; err != nil {
-			return err
+		// Get all times for this meal (support multiple times per meal)
+		times := s.getMealTimes(mealTime)
+
+		// Create a task for each time slot
+		for _, timeSlot := range times {
+			// Find a suitable recipe for this meal
+			recipe, err := s.selectRecipeForMeal(mealTime.ID, mealTime.FamilyMember)
+			if err != nil {
+				log.Printf("Warning: No recipe found for %s (%s), creating task without recipe", mealTime.Name, mealTime.FamilyMember)
+			}
+
+			task := models.ScheduleTask{
+				ScheduleID:  schedule.ID,
+				TaskType:    "meal",
+				Time:        timeSlot,
+				Title:       fmt.Sprintf("%s - %s", mealTime.Name, mealTime.FamilyMember),
+				Description: "",
+				Completed:   false,
+			}
+
+			if recipe != nil {
+				task.RecipeID = &recipe.ID
+				task.Description = recipe.Name
+				task.Duration = 60 // default 1 hour for meals
+			} else {
+				task.Duration = 60 // default 1 hour
+			}
+
+			if err := s.db.Create(&task).Error; err != nil {
+				return err
+			}
 		}
 	}
-	
+
 	return nil
 }
 
+// getMealTimes returns all time slots for a meal time
+func (s *Scheduler) getMealTimes(mealTime models.MealTime) []string {
+	// If DefaultTimes is set (JSON array), parse and return it
+	if mealTime.DefaultTimes != "" {
+		var times []string
+		// Parse JSON array - expecting format: ["09:00", "12:00", "15:00"]
+		if err := json.Unmarshal([]byte(mealTime.DefaultTimes), &times); err == nil && len(times) > 0 {
+			return times
+		}
+		log.Printf("Warning: Failed to parse DefaultTimes for meal %s, falling back to DefaultTime", mealTime.Name)
+	}
+
+	// Fallback to single DefaultTime
+	return []string{mealTime.DefaultTime}
+}
+
 // selectRecipeForMeal selects an appropriate recipe for a meal
-func (s *Scheduler) selectRecipeForMeal(mealName, familyMember string) (*models.Recipe, error) {
+func (s *Scheduler) selectRecipeForMeal(mealTimeID uint, familyMember string) (*models.Recipe, error) {
 	var recipes []models.Recipe
-	
-	// Query recipes matching the meal category and family member
-	query := s.db.Where("category = ?", mealName)
-	
-	// Filter by family member (all, specific, or matching)
-	query = query.Where("family_member = ? OR family_member = ?", familyMember, "all")
-	
-	if err := query.Find(&recipes).Error; err != nil {
+
+	// Query recipes that are linked to this meal time via many-to-many relation
+	// Also filter by family member
+	err := s.db.
+		Joins("JOIN recipe_meal_times ON recipe_meal_times.recipe_id = recipes.id").
+		Where("recipe_meal_times.meal_time_id = ?", mealTimeID).
+		Where("recipes.family_member = ? OR recipes.family_member = ?", familyMember, "all").
+		Find(&recipes).Error
+
+	if err != nil {
 		return nil, err
 	}
-	
+
+	// Fallback: if no recipes found with many-to-many, try old category field
+	if len(recipes) == 0 {
+		var mealTime models.MealTime
+		if err := s.db.First(&mealTime, mealTimeID).Error; err != nil {
+			return nil, err
+		}
+
+		// Try to find recipes using old category field
+		query := s.db.Where("category = ?", mealTime.Name)
+		query = query.Where("family_member = ? OR family_member = ?", familyMember, "all")
+
+		if err := query.Find(&recipes).Error; err != nil {
+			return nil, err
+		}
+	}
+
 	if len(recipes) == 0 {
 		return nil, fmt.Errorf("no recipes found")
 	}
-	
+
 	// Randomly select a recipe (can be improved with rotation logic)
 	selectedRecipe := recipes[rand.Intn(len(recipes))]
 	return &selectedRecipe, nil

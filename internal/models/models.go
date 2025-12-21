@@ -11,7 +11,10 @@ type Recipe struct {
 	Description  string    `json:"description"`
 	Ingredients  string    `gorm:"type:text" json:"ingredients"` // JSON or text list
 	Instructions string    `gorm:"type:text" json:"instructions"`
-	Category     string    `json:"category"` // breakfast, lunch, dinner, snack, baby_food
+	PrepTime     int       `json:"prep_time"` // in minutes
+	CookTime     int       `json:"cook_time"` // in minutes
+	Servings     int       `json:"servings"`
+	Category     string    `json:"category,omitempty"` // DEPRECATED: use MealTimes relation instead
 	FamilyMember string    `json:"family_member"` // all, adult, baby, specific person
 	Tags         string    `json:"tags"` // comma-separated tags
 	ImageURL     string    `json:"image_url"` // URL to recipe image
@@ -19,17 +22,24 @@ type Recipe struct {
 	Rating       float64   `gorm:"default:0" json:"rating"` // 0-5 stars
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+
+	// Relations
+	MealTimes []MealTime `gorm:"many2many:recipe_meal_times;" json:"meal_times,omitempty"` // multiple meal types for this recipe
 }
 
 // MealTime represents configured meal times
 type MealTime struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`
-	Name         string    `gorm:"not null" json:"name"` // breakfast, lunch, dinner, snack1, etc
-	DefaultTime  string    `gorm:"not null" json:"default_time"` // HH:MM format
+	Name         string    `gorm:"not null" json:"name"` // breakfast, lunch, dinner, snack1, babyfood, etc
+	DefaultTime  string    `gorm:"not null" json:"default_time"` // HH:MM format (primary time, kept for backward compatibility)
+	DefaultTimes string    `gorm:"type:text" json:"default_times"` // JSON array of times ["09:00", "12:00", "15:00"]
 	FamilyMember string    `json:"family_member"` // who this meal is for
 	Active       bool      `gorm:"default:true" json:"active"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+
+	// Relations
+	Recipes []Recipe `gorm:"many2many:recipe_meal_times;" json:"recipes,omitempty"` // recipes for this meal type
 }
 
 // CleaningZone represents a zone in the house that needs cleaning

@@ -131,12 +131,23 @@ func main() {
 
 				log.Println("Clearing schedules from", today.Format("2006-01-02"), "to", endDate.Format("2006-01-02"))
 
-				// Delete tasks first (foreign key constraint)
+				// Delete in correct order to respect foreign key constraints:
+				// 1. Delete meal_recipes (references schedule_tasks)
+				if err := db.Exec("DELETE FROM meal_recipes WHERE schedule_task_id IN (SELECT id FROM schedule_tasks WHERE schedule_id IN (SELECT id FROM daily_schedules WHERE date >= ? AND date < ?))", today, endDate).Error; err != nil {
+					log.Printf("Warning: Failed to delete meal_recipes: %v", err)
+				}
+
+				// 2. Delete task_zones (references schedule_tasks)
+				if err := db.Exec("DELETE FROM task_zones WHERE schedule_task_id IN (SELECT id FROM schedule_tasks WHERE schedule_id IN (SELECT id FROM daily_schedules WHERE date >= ? AND date < ?))", today, endDate).Error; err != nil {
+					log.Printf("Warning: Failed to delete task_zones: %v", err)
+				}
+
+				// 3. Delete schedule_tasks (references daily_schedules)
 				if err := db.Exec("DELETE FROM schedule_tasks WHERE schedule_id IN (SELECT id FROM daily_schedules WHERE date >= ? AND date < ?)", today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to delete schedule tasks: %v", err)
 				}
 
-				// Delete schedules
+				// 4. Delete daily_schedules
 				if err := db.Exec("DELETE FROM daily_schedules WHERE date >= ? AND date < ?", today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to delete daily schedules: %v", err)
 				}

@@ -11,13 +11,13 @@
         <header>
             <h1>Admin Panel</h1>
             <nav>
-                <button onclick="showSection('recipes')" class="nav-btn">Recipes</button>
-                <button onclick="showSection('mealtimes')" class="nav-btn">Meal Times</button>
-                <button onclick="showSection('zones')" class="nav-btn">Cleaning Zones</button>
-                <button onclick="showSection('childcare')" class="nav-btn">Childcare</button>
-                <button onclick="showSection('calendar')" class="nav-btn">Calendar</button>
-                <button onclick="showSection('shopping')" class="nav-btn">Shopping List</button>
-                <button onclick="regenerateSchedule()" class="nav-btn btn-primary">Regenerate Schedule</button>
+                <button onclick="showSection('recipes', event)" class="nav-btn active">Recipes</button>
+                <button onclick="showSection('mealtimes', event)" class="nav-btn">Meal Times</button>
+                <button onclick="showSection('zones', event)" class="nav-btn">Cleaning Zones</button>
+                <button onclick="showSection('childcare', event)" class="nav-btn">Childcare</button>
+                <button onclick="showSection('calendar', event)" class="nav-btn">Calendar</button>
+                <button onclick="showSection('shopping', event)" class="nav-btn">Shopping List</button>
+                <button onclick="regenerateSchedule(event)" class="nav-btn btn-primary">Regenerate Schedule</button>
             </nav>
         </header>
 
@@ -34,14 +34,10 @@
                         <input type="text" id="filter-search" placeholder="Search recipes..." oninput="filterRecipes()">
                     </div>
                     <div class="filter-group">
-                        <label>Category:</label>
-                        <select id="filter-category" onchange="filterRecipes()">
-                            <option value="">All Categories</option>
-                            <option value="breakfast">Breakfast</option>
-                            <option value="lunch">Lunch</option>
-                            <option value="dinner">Dinner</option>
-                            <option value="snack">Snack</option>
-                            <option value="baby_food">Baby Food</option>
+                        <label>Meal Type:</label>
+                        <select id="filter-meal-type" onchange="filterRecipes()">
+                            <option value="">All Meal Types</option>
+                            <!-- Will be populated dynamically from MealTimes -->
                         </select>
                     </div>
                     <div class="filter-group">
@@ -87,25 +83,19 @@
                         <label>Instructions:</label>
                         <textarea id="recipe-instructions"></textarea>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Category:</label>
-                            <select id="recipe-category">
-                                <option value="breakfast">Breakfast</option>
-                                <option value="lunch">Lunch</option>
-                                <option value="dinner">Dinner</option>
-                                <option value="snack">Snack</option>
-                                <option value="baby_food">Baby Food</option>
-                            </select>
+                    <div class="form-group">
+                        <label>Meal Types (select one or more):</label>
+                        <div id="recipe-meal-types" class="checkbox-group">
+                            <!-- Will be populated dynamically from MealTimes -->
                         </div>
-                        <div class="form-group">
-                            <label>Family Member:</label>
-                            <select id="recipe-family-member">
-                                <option value="all">All</option>
-                                <option value="adult">Adult</option>
-                                <option value="baby">Baby</option>
-                            </select>
-                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Family Member:</label>
+                        <select id="recipe-family-member">
+                            <option value="all">All</option>
+                            <option value="adult">Adult</option>
+                            <option value="baby">Baby</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>Tags (comma-separated):</label>
@@ -316,13 +306,9 @@
                     <h3>Add from Library:</h3>
                     <div class="filters-container" style="margin-bottom: 15px;">
                         <input type="text" id="modal-recipe-search" placeholder="Search recipes..." oninput="filterModalRecipes()">
-                        <select id="modal-recipe-category" onchange="filterModalRecipes()">
-                            <option value="">All Categories</option>
-                            <option value="breakfast">Breakfast</option>
-                            <option value="lunch">Lunch</option>
-                            <option value="dinner">Dinner</option>
-                            <option value="snack">Snack</option>
-                            <option value="baby_food">Baby Food</option>
+                        <select id="modal-recipe-meal-type" onchange="filterModalRecipes()">
+                            <option value="">All Meal Types</option>
+                            <!-- Will be populated dynamically from MealTimes -->
                         </select>
                     </div>
                     <div id="available-recipes-list" class="recipes-list"></div>
@@ -361,7 +347,7 @@
         </div>
     </div>
 
-    <script src="/static/js/admin.js"></script>
+    <script src="/static/js/admin.js?v=4"></script>
 </body>
 </html>
 
