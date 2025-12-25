@@ -137,11 +137,12 @@ func (s *Scheduler) selectRecipeForMeal(mealTimeID uint, familyMember string) (*
 	var recipes []models.Recipe
 
 	// Query recipes that are linked to this meal time via many-to-many relation
-	// Also filter by family member
+	// Also filter by family member and is_active status
 	err := s.db.
 		Joins("JOIN recipe_meal_times ON recipe_meal_times.recipe_id = recipes.id").
 		Where("recipe_meal_times.meal_time_id = ?", mealTimeID).
 		Where("recipes.family_member = ? OR recipes.family_member = ?", familyMember, "all").
+		Where("recipes.is_active = ?", true).
 		Find(&recipes).Error
 
 	if err != nil {
@@ -158,6 +159,7 @@ func (s *Scheduler) selectRecipeForMeal(mealTimeID uint, familyMember string) (*
 		// Try to find recipes using old category field
 		query := s.db.Where("category = ?", mealTime.Name)
 		query = query.Where("family_member = ? OR family_member = ?", familyMember, "all")
+		query = query.Where("is_active = ?", true)
 
 		if err := query.Find(&recipes).Error; err != nil {
 			return nil, err

@@ -20,6 +20,7 @@ type Recipe struct {
 	ImageURL     string    `json:"image_url"` // URL to recipe image
 	VideoURL     string    `json:"video_url"` // URL to recipe video
 	Rating       float64   `gorm:"default:0" json:"rating"` // 0-5 stars
+	IsActive     bool      `gorm:"default:true" json:"is_active"` // whether recipe is active and can be scheduled
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 

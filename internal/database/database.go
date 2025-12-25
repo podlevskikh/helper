@@ -66,6 +66,9 @@ func Initialize(databaseURL string) error {
 
 	log.Println("Database migrations completed")
 
+	// Run data migrations
+	runDataMigrations()
+
 	// Initialize default settings
 	initializeDefaultSettings()
 
@@ -77,6 +80,12 @@ func Initialize(databaseURL string) error {
 	}
 
 	return nil
+}
+
+// runDataMigrations runs data migrations after schema migrations
+func runDataMigrations() {
+	// Set is_active to true for all existing recipes that don't have it set
+	DB.Exec("UPDATE recipes SET is_active = true WHERE is_active IS NULL")
 }
 
 // initializeDefaultSettings creates default settings if they don't exist

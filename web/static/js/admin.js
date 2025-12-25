@@ -128,10 +128,14 @@ function displayRecipes(recipes) {
         const mealTypes = recipe.meal_times && recipe.meal_times.length > 0
             ? recipe.meal_times.map(mt => mt.name).join(', ')
             : (recipe.category || 'N/A'); // Fallback to old category field
+        const isActive = recipe.is_active !== false; // Default to true if undefined
+        const activeStatus = isActive
+            ? '<span style="color: #27ae60; font-size: 12px;">✓ Active</span>'
+            : '<span style="color: #e74c3c; font-size: 12px;">✗ Inactive</span>';
         return `
-            <div class="recipe-card">
+            <div class="recipe-card" style="${!isActive ? 'opacity: 0.6;' : ''}">
                 <div class="recipe-card-info">
-                    <div class="recipe-card-title">${recipe.name}</div>
+                    <div class="recipe-card-title">${recipe.name} ${activeStatus}</div>
                     <div class="recipe-card-meta">
                         <span>${stars}</span>
                         <span>🍽️ ${mealTypes}</span>
@@ -190,6 +194,9 @@ function showRecipeForm() {
 
     // Uncheck all meal type checkboxes
     document.querySelectorAll('#recipe-meal-types input[type="checkbox"]').forEach(cb => cb.checked = false);
+
+    // Set is_active to true by default for new recipes
+    document.getElementById('recipe-is-active').checked = true;
 }
 
 function hideRecipeForm() {
@@ -212,6 +219,7 @@ function editRecipe(id) {
             document.getElementById('recipe-image-url').value = recipe.image_url || '';
             document.getElementById('recipe-video-url').value = recipe.video_url || '';
             document.getElementById('recipe-rating').value = recipe.rating || 0;
+            document.getElementById('recipe-is-active').checked = recipe.is_active !== false; // Default to true if undefined
             updateStarDisplay(recipe.rating || 0);
 
             // Set meal type checkboxes
@@ -296,7 +304,8 @@ function saveRecipeData(id) {
         tags: document.getElementById('recipe-tags').value,
         image_url: document.getElementById('recipe-image-url').value,
         video_url: document.getElementById('recipe-video-url').value,
-        rating: parseFloat(document.getElementById('recipe-rating').value) || 0
+        rating: parseFloat(document.getElementById('recipe-rating').value) || 0,
+        is_active: document.getElementById('recipe-is-active').checked
     };
 
     const url = id ? `/admin/api/recipes/${id}` : '/admin/api/recipes';

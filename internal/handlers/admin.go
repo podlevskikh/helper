@@ -114,6 +114,7 @@ func (h *AdminHandler) UpdateRecipe(c *gin.Context) {
 	recipe.PrepTime = input.PrepTime
 	recipe.CookTime = input.CookTime
 	recipe.Servings = input.Servings
+	recipe.IsActive = input.IsActive
 
 	if err := h.db.Save(&recipe).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -144,10 +145,47 @@ func (h *AdminHandler) UpdateRecipe(c *gin.Context) {
 
 func (h *AdminHandler) DeleteRecipe(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.db.Delete(&models.Recipe{}, id).Error; err != nil {
+
+	// First, get the recipe to ensure it exists
+	var recipe models.Recipe
+	if err := h.db.First(&recipe, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
+		return
+	}
+
+	// Clear all associations before deleting the recipe
+	// 1. Clear MealTimes association (recipe_meal_times table)
+	if err := h.db.Model(&recipe).Association("MealTimes").Clear(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear meal times association"})
+		return
+	}
+
+	// 2. Clear any task associations (meal_recipes table - many-to-many)
+	// This removes the recipe from any scheduled tasks
+	if err := h.db.Exec("DELETE FROM meal_recipes WHERE recipe_id = ?", id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear task associations"})
+		return
+	}
+
+	// 3. Clear deprecated RecipeID foreign key in schedule_tasks
+	// Set RecipeID to NULL for any tasks that reference this recipe
+	if err := h.db.Exec("UPDATE schedule_tasks SET recipe_id = NULL WHERE recipe_id = ?", id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear schedule task references"})
+		return
+	}
+
+	// 4. Delete any comments associated with this recipe
+	if err := h.db.Where("recipe_id = ?", id).Delete(&models.RecipeComment{}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete recipe comments"})
+		return
+	}
+
+	// Now delete the recipe itself
+	if err := h.db.Delete(&recipe).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Recipe deleted"})
 }
 
