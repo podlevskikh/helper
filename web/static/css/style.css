@@ -441,7 +441,7 @@ nav {
     padding: 20px;
     border-bottom: 1px solid #f0f0f0;
     display: flex;
-    justify-content: space-between;
+    gap: 15px;
     align-items: center;
     transition: all 0.3s ease;
     position: relative;
@@ -472,8 +472,33 @@ nav {
 }
 
 .task-item.completed {
-    opacity: 0.6;
+    opacity: 0.65;
     background: linear-gradient(90deg, rgba(56, 239, 125, 0.1) 0%, transparent 100%);
+}
+
+.task-item.completed .task-title {
+    text-decoration: line-through;
+    color: #95a5a6;
+}
+
+.task-item.completed .task-description {
+    opacity: 0.7;
+}
+
+/* Large checkbox for today's view */
+.task-checkbox-large {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    cursor: pointer;
+    accent-color: #667eea;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.task-checkbox-large:hover {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
 }
 
 .task-info {
@@ -839,6 +864,51 @@ nav {
 
 .calendar-task:last-child {
     margin-bottom: 0;
+}
+
+/* Completed task styling */
+.calendar-task.completed {
+    opacity: 0.65;
+    background: linear-gradient(90deg, rgba(56, 239, 125, 0.15) 0%, rgba(56, 239, 125, 0.05) 100%);
+}
+
+.calendar-task.completed .task-title {
+    text-decoration: line-through;
+    color: #95a5a6;
+}
+
+.calendar-task.completed .task-time {
+    opacity: 0.7;
+}
+
+/* Task checkbox styling */
+.calendar-task-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+}
+
+.task-checkbox {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    margin-top: 2px;
+    cursor: pointer;
+    accent-color: #667eea;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.task-checkbox:hover {
+    transform: scale(1.1);
+}
+
+.calendar-task-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
 .calendar-task.meal {

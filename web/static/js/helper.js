@@ -233,18 +233,16 @@ function renderTask(task) {
 
     return `
         <div class="task-item ${completedClass}">
+            <input type="checkbox"
+                   class="task-checkbox-large"
+                   ${task.completed ? 'checked' : ''}
+                   onchange="toggleTaskCompletion(${task.id}, this.checked)">
             <div class="task-info">
                 <div class="task-time">${timeDisplay}</div>
                 <div class="task-title">${task.title}</div>
                 <div class="task-description">${description}</div>
                 <span class="task-type ${typeClass}">${task.task_type}</span>
                 ${task.duration && task.task_type !== 'cleaning' && task.task_type !== 'meal' ? `<span style="margin-left: 10px; font-size: 12px; color: #7f8c8d;">${task.duration} min</span>` : ''}
-            </div>
-            <div class="task-actions">
-                ${task.completed ?
-                    `<button class="btn" onclick="uncompleteTask(${task.id})">Cancel</button>` :
-                    `<button class="btn btn-success" onclick="completeTask(${task.id})">Done</button>`
-                }
             </div>
         </div>
     `;
@@ -253,6 +251,7 @@ function renderTask(task) {
 // Render task for calendar view
 function renderCalendarTask(task) {
     const typeClass = task.task_type || 'other';
+    const completedClass = task.completed ? 'completed' : '';
     const typeIcon = {
         'meal': '🍽️',
         'cleaning': '🧹',
@@ -327,25 +326,34 @@ function renderCalendarTask(task) {
     }
 
     const mainContent = `
-        <div>
-            <span class="task-icon">${typeIcon}</span>
-            ${timeDisplay ? `<span class="task-time">${timeDisplay}</span>` : ''}
-            <span class="task-title">${description || task.title}</span>
-            ${task.duration && task.task_type !== 'cleaning' && task.task_type !== 'meal' ? `<span class="task-duration">${task.duration} min</span>` : ''}
+        <div class="calendar-task-content">
+            <input type="checkbox"
+                   class="task-checkbox"
+                   ${task.completed ? 'checked' : ''}
+                   onchange="toggleTaskCompletion(${task.id}, this.checked)"
+                   onclick="event.stopPropagation()">
+            <div class="calendar-task-info">
+                <div>
+                    <span class="task-icon">${typeIcon}</span>
+                    ${timeDisplay ? `<span class="task-time">${timeDisplay}</span>` : ''}
+                    <span class="task-title">${description || task.title}</span>
+                    ${task.duration && task.task_type !== 'cleaning' && task.task_type !== 'meal' ? `<span class="task-duration">${task.duration} min</span>` : ''}
+                </div>
+                ${recipesHtml}
+                ${zonesHtml}
+            </div>
         </div>
-        ${recipesHtml}
-        ${zonesHtml}
     `;
 
     if (clickable && !recipesHtml && !zonesHtml) {
         return `
-            <div class="calendar-task ${typeClass}" onclick="${clickHandler}" style="cursor: pointer;">
+            <div class="calendar-task ${typeClass} ${completedClass}" onclick="${clickHandler}" style="cursor: pointer;">
                 ${mainContent}
             </div>
         `;
     } else {
         return `
-            <div class="calendar-task ${typeClass}">
+            <div class="calendar-task ${typeClass} ${completedClass}">
                 ${mainContent}
             </div>
         `;
@@ -364,6 +372,38 @@ function uncompleteTask(taskId) {
     fetch(`/helper/api/tasks/${taskId}/uncomplete`, {method: 'POST'})
         .then(() => {
             loadTodaySchedule();
+        });
+}
+
+// Toggle task completion (for checkboxes)
+function toggleTaskCompletion(taskId, isCompleted) {
+    const endpoint = isCompleted ? 'complete' : 'uncomplete';
+    fetch(`/helper/api/tasks/${taskId}/${endpoint}`, {method: 'POST'})
+        .then(response => {
+            if (!response.ok) {
+                // If request failed, revert checkbox state
+                const checkbox = document.querySelector(`input[onchange*="${taskId}"]`);
+                if (checkbox) {
+                    checkbox.checked = !isCompleted;
+                }
+            } else {
+                // Reload current view to update UI
+                if (currentScheduleView === 'today') {
+                    loadTodaySchedule();
+                } else if (currentScheduleView === 'thisweek') {
+                    loadWeekCalendar(0);
+                } else if (currentScheduleView === 'nextweek') {
+                    loadWeekCalendar(1);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error toggling task completion:', error);
+            // Revert checkbox state on error
+            const checkbox = document.querySelector(`input[onchange*="${taskId}"]`);
+            if (checkbox) {
+                checkbox.checked = !isCompleted;
+            }
         });
 }
 
