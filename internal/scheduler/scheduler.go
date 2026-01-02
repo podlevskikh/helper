@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"podlevskikh/awesomeProject/internal/models"
-	"podlevskikh/awesomeProject/internal/data"
 	"time"
+
+	"podlevskikh/awesomeProject/internal/data"
+	"podlevskikh/awesomeProject/internal/models"
 
 	"gorm.io/gorm"
 )
@@ -51,22 +52,22 @@ func (s *Scheduler) GenerateScheduleForDate(date time.Time) error {
 	if err := s.db.Create(&schedule).Error; err != nil {
 		return fmt.Errorf("failed to create daily schedule: %w", err)
 	}
-	
+
 	// Generate meal tasks
 	if err := s.generateMealTasks(&schedule, date); err != nil {
 		return fmt.Errorf("failed to generate meal tasks: %w", err)
 	}
-	
+
 	// Generate cleaning tasks
 	if err := s.generateCleaningTasks(&schedule, date); err != nil {
 		return fmt.Errorf("failed to generate cleaning tasks: %w", err)
 	}
-	
+
 	// Add childcare tasks if they exist
 	if err := s.addChildcareTasks(&schedule, date); err != nil {
 		return fmt.Errorf("failed to add childcare tasks: %w", err)
 	}
-	
+
 	log.Printf("Successfully generated schedule for %s with ID %d", date.Format("2006-01-02"), schedule.ID)
 	return nil
 }
@@ -204,7 +205,7 @@ func (s *Scheduler) generateCleaningTasks(schedule *models.DailySchedule, date t
 				TaskType:    "cleaning",
 				Time:        "", // No specific time for cleaning tasks
 				Duration:    30, // Default 30 minutes for cleaning
-				Title:       fmt.Sprintf("Clean %s", zone.Name),
+				Title:       zone.Name,
 				Description: zone.Description,
 				ZoneID:      &zone.ID,
 				Completed:   false,
@@ -227,21 +228,21 @@ func (s *Scheduler) shouldCleanZoneToday(zone models.CleaningZone, dayOfWeek int
 	// For frequency_per_week = 1: clean on specific day based on zone ID
 	// For frequency_per_week = 2: clean on 2 specific days
 	// etc.
-	
+
 	if zone.FrequencyPerWeek >= 7 {
 		return true // clean every day
 	}
-	
+
 	// Use zone ID to determine which days to clean
 	// This ensures consistent scheduling
 	daysToClean := s.calculateCleaningDays(zone.FrequencyPerWeek, int(zone.ID))
-	
+
 	for _, day := range daysToClean {
 		if dayOfWeek == day {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -250,17 +251,17 @@ func (s *Scheduler) calculateCleaningDays(frequency, zoneID int) []int {
 	if frequency <= 0 {
 		return []int{}
 	}
-	
+
 	// Distribute days evenly across the week
 	interval := 7 / frequency
 	startDay := zoneID % 7 // offset based on zone ID for variety
-	
+
 	days := make([]int, 0, frequency)
 	for i := 0; i < frequency; i++ {
 		day := (startDay + (i * interval)) % 7
 		days = append(days, day)
 	}
-	
+
 	return days
 }
 
@@ -268,28 +269,28 @@ func (s *Scheduler) calculateCleaningDays(frequency, zoneID int) []int {
 func (s *Scheduler) findAvailableTimeSlot(schedule *models.DailySchedule, duration int) string {
 	// Simple implementation: assign cleaning tasks to morning slots
 	// Can be improved to check for conflicts
-	
+
 	// Default cleaning time slots: 9:00, 10:30, 14:00, 15:30
 	defaultSlots := []string{"09:00", "10:30", "14:00", "15:30"}
-	
+
 	// Return first available slot (simplified)
 	// In a more advanced version, check existing tasks for conflicts
 	if len(defaultSlots) > 0 {
 		return defaultSlots[rand.Intn(len(defaultSlots))]
 	}
-	
+
 	return "10:00"
 }
 
 // addChildcareTasks adds childcare tasks from the childcare schedule
 func (s *Scheduler) addChildcareTasks(schedule *models.DailySchedule, date time.Time) error {
 	var childcareSchedules []models.ChildcareSchedule
-	
+
 	// Find childcare schedules for this date
 	if err := s.db.Where("DATE(date) = DATE(?)", date).Find(&childcareSchedules).Error; err != nil {
 		return err
 	}
-	
+
 	for _, cc := range childcareSchedules {
 		task := models.ScheduleTask{
 			ScheduleID:  schedule.ID,
@@ -306,7 +307,7 @@ func (s *Scheduler) addChildcareTasks(schedule *models.DailySchedule, date time.
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -314,7 +315,7 @@ func (s *Scheduler) addChildcareTasks(schedule *models.DailySchedule, date time.
 func (s *Scheduler) calculateDuration(startTime, endTime string) int {
 	start, _ := time.Parse("15:04", startTime)
 	end, _ := time.Parse("15:04", endTime)
-	
+
 	duration := end.Sub(start)
 	return int(duration.Minutes())
 }
@@ -322,14 +323,13 @@ func (s *Scheduler) calculateDuration(startTime, endTime string) int {
 // GenerateScheduleForNextDays generates schedules for the next N days
 func (s *Scheduler) GenerateScheduleForNextDays(days int) error {
 	today := time.Now()
-	
+
 	for i := 0; i < days; i++ {
 		date := today.AddDate(0, 0, i)
 		if err := s.GenerateScheduleForDate(date); err != nil {
 			log.Printf("Error generating schedule for %s: %v", date.Format("2006-01-02"), err)
 		}
 	}
-	
+
 	return nil
 }
-

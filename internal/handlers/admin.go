@@ -383,17 +383,29 @@ func (h *AdminHandler) DeleteCleaningZone(c *gin.Context) {
 
 func (h *AdminHandler) GetChildcareSchedules(c *gin.Context) {
 	var schedules []models.ChildcareSchedule
-	
+
 	// Get schedules for the next 30 days
 	startDate := time.Now()
 	endDate := startDate.AddDate(0, 0, 30)
-	
+
 	if err := h.db.Where("date BETWEEN ? AND ?", startDate, endDate).
 		Order("date, start_time").Find(&schedules).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, schedules)
+}
+
+func (h *AdminHandler) GetChildcareSchedule(c *gin.Context) {
+	id := c.Param("id")
+	var schedule models.ChildcareSchedule
+
+	if err := h.db.First(&schedule, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Childcare schedule not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, schedule)
 }
 
 func (h *AdminHandler) CreateChildcareSchedule(c *gin.Context) {

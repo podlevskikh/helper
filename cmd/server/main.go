@@ -110,6 +110,7 @@ func main() {
 
 			// Childcare schedules
 			api.GET("/childcare", adminHandler.GetChildcareSchedules)
+			api.GET("/childcare/:id", adminHandler.GetChildcareSchedule)
 			api.POST("/childcare", adminHandler.CreateChildcareSchedule)
 			api.PUT("/childcare/:id", adminHandler.UpdateChildcareSchedule)
 			api.DELETE("/childcare/:id", adminHandler.DeleteChildcareSchedule)
