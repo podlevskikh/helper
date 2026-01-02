@@ -286,10 +286,17 @@ func (s *Scheduler) findAvailableTimeSlot(schedule *models.DailySchedule, durati
 func (s *Scheduler) addChildcareTasks(schedule *models.DailySchedule, date time.Time) error {
 	var childcareSchedules []models.ChildcareSchedule
 
+	// Normalize the date to start of day for comparison
+	normalizedDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	nextDay := normalizedDate.AddDate(0, 0, 1)
+
 	// Find childcare schedules for this date
-	if err := s.db.Where("DATE(date) = DATE(?)", date).Find(&childcareSchedules).Error; err != nil {
+	// Use range query to handle different time zones and date storage formats
+	if err := s.db.Where("date >= ? AND date < ?", normalizedDate, nextDay).Find(&childcareSchedules).Error; err != nil {
 		return err
 	}
+
+	log.Printf("Found %d childcare schedules for date %s", len(childcareSchedules), date.Format("2006-01-02"))
 
 	for _, cc := range childcareSchedules {
 		task := models.ScheduleTask{
@@ -306,6 +313,8 @@ func (s *Scheduler) addChildcareTasks(schedule *models.DailySchedule, date time.
 		if err := s.db.Create(&task).Error; err != nil {
 			return err
 		}
+
+		log.Printf("Created childcare task: %s - %s", cc.StartTime, cc.EndTime)
 	}
 
 	return nil
