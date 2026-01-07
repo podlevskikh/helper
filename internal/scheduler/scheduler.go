@@ -13,6 +13,11 @@ import (
 	"gorm.io/gorm"
 )
 
+func init() {
+	// Initialize random number generator with current time
+	rand.Seed(time.Now().UnixNano())
+}
+
 type Scheduler struct {
 	db *gorm.DB
 }
@@ -133,7 +138,8 @@ func (s *Scheduler) getMealTimes(mealTime models.MealTime) []string {
 	return []string{mealTime.DefaultTime}
 }
 
-// selectRecipeForMeal selects an appropriate recipe for a meal
+// selectRecipeForMeal selects an appropriate recipe for a meal with smart rotation
+// to avoid frequent repetition of the same dishes
 func (s *Scheduler) selectRecipeForMeal(mealTimeID uint, familyMember string) (*models.Recipe, error) {
 	var recipes []models.Recipe
 
@@ -171,9 +177,125 @@ func (s *Scheduler) selectRecipeForMeal(mealTimeID uint, familyMember string) (*
 		return nil, fmt.Errorf("no recipes found")
 	}
 
-	// Randomly select a recipe (can be improved with rotation logic)
-	selectedRecipe := recipes[rand.Intn(len(recipes))]
-	return &selectedRecipe, nil
+	// Get recently used recipes to avoid repetition
+	recentlyUsed := s.getRecentlyUsedRecipes(mealTimeID, 14) // Look back 14 days
+
+	// Select recipe with weighted random selection
+	selectedRecipe := s.selectRecipeWithWeights(recipes, recentlyUsed)
+	return selectedRecipe, nil
+}
+
+// getRecentlyUsedRecipes returns a map of recipe IDs to days since last use
+func (s *Scheduler) getRecentlyUsedRecipes(mealTimeID uint, lookbackDays int) map[uint]int {
+	recentlyUsed := make(map[uint]int)
+
+	// Calculate the date range to look back
+	today := time.Now()
+	startDate := today.AddDate(0, 0, -lookbackDays)
+
+	// Query schedule tasks with recipes from the past N days
+	var tasks []models.ScheduleTask
+	err := s.db.
+		Joins("JOIN daily_schedules ON daily_schedules.id = schedule_tasks.schedule_id").
+		Where("daily_schedules.date >= ? AND daily_schedules.date < ?", startDate, today).
+		Where("schedule_tasks.task_type = ?", "meal").
+		Where("schedule_tasks.recipe_id IS NOT NULL").
+		Select("schedule_tasks.recipe_id, daily_schedules.date").
+		Find(&tasks).Error
+
+	if err != nil {
+		log.Printf("Warning: Failed to get recently used recipes: %v", err)
+		return recentlyUsed
+	}
+
+	// Build map of recipe ID to days since last use
+	for _, task := range tasks {
+		if task.RecipeID != nil {
+			// Get the schedule date for this task
+			var schedule models.DailySchedule
+			if err := s.db.First(&schedule, task.ScheduleID).Error; err == nil {
+				daysSince := int(today.Sub(schedule.Date).Hours() / 24)
+
+				// Keep track of the most recent use
+				if existing, ok := recentlyUsed[*task.RecipeID]; !ok || daysSince < existing {
+					recentlyUsed[*task.RecipeID] = daysSince
+				}
+			}
+		}
+	}
+
+	return recentlyUsed
+}
+
+// selectRecipeWithWeights selects a recipe using weighted random selection
+// Recipes used recently get lower weights to reduce repetition
+func (s *Scheduler) selectRecipeWithWeights(recipes []models.Recipe, recentlyUsed map[uint]int) *models.Recipe {
+	if len(recipes) == 0 {
+		return nil
+	}
+
+	// If only one recipe available, return it
+	if len(recipes) == 1 {
+		return &recipes[0]
+	}
+
+	// Calculate weights for each recipe
+	type weightedRecipe struct {
+		recipe *models.Recipe
+		weight float64
+	}
+
+	var weightedRecipes []weightedRecipe
+	totalWeight := 0.0
+
+	for i := range recipes {
+		recipe := &recipes[i]
+		weight := 1.0 // Base weight
+
+		// Reduce weight based on how recently the recipe was used
+		if daysSince, used := recentlyUsed[recipe.ID]; used {
+			// Weight formula: recipes used recently get much lower weight
+			// 0 days ago: weight = 0.1 (10% of normal)
+			// 1 day ago: weight = 0.2
+			// 2 days ago: weight = 0.3
+			// 3 days ago: weight = 0.5
+			// 7+ days ago: weight = 1.0 (full weight)
+			if daysSince == 0 {
+				weight = 0.1
+			} else if daysSince == 1 {
+				weight = 0.2
+			} else if daysSince == 2 {
+				weight = 0.3
+			} else if daysSince <= 4 {
+				weight = 0.5
+			} else if daysSince <= 6 {
+				weight = 0.7
+			}
+			// else weight stays 1.0 for 7+ days
+		}
+
+		weightedRecipes = append(weightedRecipes, weightedRecipe{
+			recipe: recipe,
+			weight: weight,
+		})
+		totalWeight += weight
+	}
+
+	// Select a random recipe based on weights
+	randomValue := rand.Float64() * totalWeight
+	currentSum := 0.0
+
+	for _, wr := range weightedRecipes {
+		currentSum += wr.weight
+		if currentSum >= randomValue {
+			log.Printf("Selected recipe: %s (weight: %.2f, total weight: %.2f)",
+				wr.recipe.Name, wr.weight, totalWeight)
+			return wr.recipe
+		}
+	}
+
+	// Fallback: return the last recipe (should rarely happen)
+	return weightedRecipes[len(weightedRecipes)-1].recipe
 }
 
 // generateCleaningTasks creates cleaning tasks based on zone frequency

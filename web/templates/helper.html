@@ -12,6 +12,7 @@
             <h1>My Schedule</h1>
             <nav>
                 <button onclick="showSection('schedule')" class="nav-btn active">Schedule</button>
+                <button onclick="showSection('childcare')" class="nav-btn">Childcare</button>
                 <button onclick="showSection('shopping')" class="nav-btn">Shopping List</button>
             </nav>
         </header>
@@ -40,6 +41,42 @@
             <div id="nextweek-view" class="schedule-view" style="display:none;">
                 <h2>Next Week</h2>
                 <div id="nextweek-calendar" class="calendar-grid"></div>
+            </div>
+        </section>
+
+        <!-- Childcare Section -->
+        <section id="childcare-section" class="content-section" style="display:none;">
+            <h2>Childcare Time for Today</h2>
+            <p class="info-text">Set the childcare time for today. This will be added to today's schedule.</p>
+
+            <div id="childcare-current" class="info-box" style="display:none;">
+                <h3>Current Childcare Time:</h3>
+                <p><strong>Time:</strong> <span id="current-start-time"></span> - <span id="current-end-time"></span></p>
+                <p><strong>Notes:</strong> <span id="current-notes"></span></p>
+                <button onclick="editChildcareTime()" class="btn btn-primary">Edit</button>
+                <button onclick="deleteChildcareTime()" class="btn btn-danger">Delete</button>
+            </div>
+
+            <div id="childcare-form" class="form-container">
+                <h3 id="childcare-form-title">Set Childcare Time</h3>
+                <form id="childcareForm">
+                    <div class="form-group">
+                        <label>Start Time:</label>
+                        <input type="time" id="childcare-start" required>
+                    </div>
+                    <div class="form-group">
+                        <label>End Time:</label>
+                        <input type="time" id="childcare-end" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes (optional):</label>
+                        <textarea id="childcare-notes" rows="3" placeholder="Any special notes..."></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" onclick="cancelChildcareForm()" class="btn">Cancel</button>
+                    </div>
+                </form>
             </div>
         </section>
 

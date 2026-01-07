@@ -192,13 +192,100 @@ func (h *HelperHandler) DeleteShoppingListItem(c *gin.Context) {
 // GetRecipeDetails returns full recipe details for a specific recipe
 func (h *HelperHandler) GetRecipeDetails(c *gin.Context) {
 	recipeID := c.Param("id")
-	
+
 	var recipe models.Recipe
 	if err := h.db.First(&recipe, recipeID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, recipe)
 }
 
+// Childcare handlers
+
+// GetTodayChildcare returns childcare schedule for today
+func (h *HelperHandler) GetTodayChildcare(c *gin.Context) {
+	today := time.Now()
+	todayStart := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
+	nextDay := todayStart.AddDate(0, 0, 1)
+
+	var schedules []models.ChildcareSchedule
+	if err := h.db.Where("date >= ? AND date < ?", todayStart, nextDay).
+		Order("start_time").Find(&schedules).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, schedules)
+}
+
+// SaveTodayChildcare saves or updates childcare schedule for today
+func (h *HelperHandler) SaveTodayChildcare(c *gin.Context) {
+	var input struct {
+		StartTime string `json:"start_time" binding:"required"`
+		EndTime   string `json:"end_time" binding:"required"`
+		Notes     string `json:"notes"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	today := time.Now()
+	todayStart := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
+	nextDay := todayStart.AddDate(0, 0, 1)
+
+	// Check if there's already a childcare schedule for today
+	var existing models.ChildcareSchedule
+	err := h.db.Where("date >= ? AND date < ?", todayStart, nextDay).First(&existing).Error
+
+	if err == gorm.ErrRecordNotFound {
+		// Create new schedule
+		schedule := models.ChildcareSchedule{
+			Date:      todayStart,
+			StartTime: input.StartTime,
+			EndTime:   input.EndTime,
+			Notes:     input.Notes,
+		}
+
+		if err := h.db.Create(&schedule).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusCreated, schedule)
+	} else if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	} else {
+		// Update existing schedule
+		existing.StartTime = input.StartTime
+		existing.EndTime = input.EndTime
+		existing.Notes = input.Notes
+
+		if err := h.db.Save(&existing).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, existing)
+	}
+}
+
+// DeleteTodayChildcare deletes childcare schedule for today
+func (h *HelperHandler) DeleteTodayChildcare(c *gin.Context) {
+	today := time.Now()
+	todayStart := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
+	nextDay := todayStart.AddDate(0, 0, 1)
+
+	// Find and delete childcare schedule for today
+	if err := h.db.Where("date >= ? AND date < ?", todayStart, nextDay).
+		Delete(&models.ChildcareSchedule{}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Childcare schedule deleted"})
+}

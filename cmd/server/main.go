@@ -193,6 +193,11 @@ func main() {
 
 			// Recipe details
 			api.GET("/recipes/:id", helperHandler.GetRecipeDetails)
+
+			// Childcare
+			api.GET("/childcare/today", helperHandler.GetTodayChildcare)
+			api.POST("/childcare/today", helperHandler.SaveTodayChildcare)
+			api.DELETE("/childcare/today", helperHandler.DeleteTodayChildcare)
 		}
 	}
 

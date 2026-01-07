@@ -595,3 +595,117 @@ window.onclick = function(event) {
     }
 }
 
+// CHILDCARE MANAGEMENT
+
+function loadTodayChildcare() {
+    fetch('/helper/api/childcare/today')
+        .then(r => r.json())
+        .then(schedules => {
+            const currentDiv = document.getElementById('childcare-current');
+            const formDiv = document.getElementById('childcare-form');
+
+            if (schedules && schedules.length > 0) {
+                // Show current childcare time
+                const schedule = schedules[0];
+                document.getElementById('current-start-time').textContent = schedule.start_time;
+                document.getElementById('current-end-time').textContent = schedule.end_time;
+                document.getElementById('current-notes').textContent = schedule.notes || 'No notes';
+
+                currentDiv.style.display = 'block';
+                formDiv.style.display = 'none';
+            } else {
+                // Show form to add childcare time
+                currentDiv.style.display = 'none';
+                formDiv.style.display = 'block';
+                document.getElementById('childcare-form-title').textContent = 'Set Childcare Time';
+            }
+        })
+        .catch(err => {
+            console.error('Error loading childcare:', err);
+        });
+}
+
+function editChildcareTime() {
+    fetch('/helper/api/childcare/today')
+        .then(r => r.json())
+        .then(schedules => {
+            if (schedules && schedules.length > 0) {
+                const schedule = schedules[0];
+                document.getElementById('childcare-start').value = schedule.start_time;
+                document.getElementById('childcare-end').value = schedule.end_time;
+                document.getElementById('childcare-notes').value = schedule.notes || '';
+
+                document.getElementById('childcare-current').style.display = 'none';
+                document.getElementById('childcare-form').style.display = 'block';
+                document.getElementById('childcare-form-title').textContent = 'Edit Childcare Time';
+            }
+        });
+}
+
+function saveChildcareTime(e) {
+    e.preventDefault();
+
+    const data = {
+        start_time: document.getElementById('childcare-start').value,
+        end_time: document.getElementById('childcare-end').value,
+        notes: document.getElementById('childcare-notes').value
+    };
+
+    fetch('/helper/api/childcare/today', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(() => {
+        // Clear form
+        document.getElementById('childcareForm').reset();
+        // Reload childcare display
+        loadTodayChildcare();
+        // Show success message
+        alert('Childcare time saved successfully!');
+    })
+    .catch(err => {
+        console.error('Error saving childcare:', err);
+        alert('Failed to save childcare time');
+    });
+}
+
+function deleteChildcareTime() {
+    if (!confirm('Are you sure you want to delete today\'s childcare time?')) {
+        return;
+    }
+
+    fetch('/helper/api/childcare/today', {
+        method: 'DELETE'
+    })
+    .then(() => {
+        loadTodayChildcare();
+        alert('Childcare time deleted successfully!');
+    })
+    .catch(err => {
+        console.error('Error deleting childcare:', err);
+        alert('Failed to delete childcare time');
+    });
+}
+
+function cancelChildcareForm() {
+    document.getElementById('childcareForm').reset();
+    loadTodayChildcare();
+}
+
+// Update setupForms to include childcare form
+const originalSetupForms = setupForms;
+setupForms = function() {
+    originalSetupForms();
+    document.getElementById('childcareForm').addEventListener('submit', saveChildcareTime);
+}
+
+// Update showSection to load childcare when that section is shown
+const originalShowSection = showSection;
+showSection = function(section) {
+    originalShowSection(section);
+    if (section === 'childcare') {
+        loadTodayChildcare();
+    }
+}
