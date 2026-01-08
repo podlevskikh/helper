@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadTodaySchedule();
     setupForms();
     updateTodayDate();
+    setupEventDelegation();
 });
 
 function updateTodayDate() {
@@ -52,6 +53,29 @@ function updateTodayDate() {
 
 function setupForms() {
     document.getElementById('shoppingForm').addEventListener('submit', addShoppingItem);
+}
+
+// Setup event delegation for task checkboxes
+function setupEventDelegation() {
+    // Use event delegation on document body to handle all checkbox changes
+    document.body.addEventListener('change', function(event) {
+        // Check if the changed element is a task completion checkbox
+        if (event.target.classList.contains('task-completion-toggle')) {
+            const taskId = parseInt(event.target.getAttribute('data-task-id'));
+            const isCompleted = event.target.checked;
+
+            if (taskId) {
+                toggleTaskCompletion(taskId, isCompleted);
+            }
+        }
+    });
+
+    // Prevent event propagation on checkbox clicks
+    document.body.addEventListener('click', function(event) {
+        if (event.target.classList.contains('task-completion-toggle')) {
+            event.stopPropagation();
+        }
+    });
 }
 
 // TODAY'S SCHEDULE
@@ -234,9 +258,9 @@ function renderTask(task) {
     return `
         <div class="task-item ${completedClass}">
             <input type="checkbox"
-                   class="task-checkbox-large"
-                   ${task.completed ? 'checked' : ''}
-                   onchange="toggleTaskCompletion(${task.id}, this.checked)">
+                   class="task-checkbox-large task-completion-toggle"
+                   data-task-id="${task.id}"
+                   ${task.completed ? 'checked' : ''}>
             <div class="task-info">
                 <div class="task-time">${timeDisplay}</div>
                 <div class="task-title">${task.title}</div>
@@ -328,10 +352,9 @@ function renderCalendarTask(task) {
     const mainContent = `
         <div class="calendar-task-content">
             <input type="checkbox"
-                   class="task-checkbox"
-                   ${task.completed ? 'checked' : ''}
-                   onchange="toggleTaskCompletion(${task.id}, this.checked)"
-                   onclick="event.stopPropagation()">
+                   class="task-checkbox task-completion-toggle"
+                   data-task-id="${task.id}"
+                   ${task.completed ? 'checked' : ''}>
             <div class="calendar-task-info">
                 <div>
                     <span class="task-icon">${typeIcon}</span>
@@ -375,22 +398,33 @@ function uncompleteTask(taskId) {
         });
 }
 
+// Track pending requests to prevent race conditions
+const pendingToggles = new Set();
+
 // Toggle task completion (for checkboxes)
 function toggleTaskCompletion(taskId, isCompleted) {
+    // Prevent multiple simultaneous requests for the same task
+    if (pendingToggles.has(taskId)) {
+        console.log('Toggle already in progress for task', taskId);
+        return;
+    }
+
+    pendingToggles.add(taskId);
     const endpoint = isCompleted ? 'complete' : 'uncomplete';
+
     fetch(`/helper/api/tasks/${taskId}/${endpoint}`, {method: 'POST'})
         .then(response => {
             if (!response.ok) {
                 // If request failed, revert checkbox state
-                const checkbox = document.querySelector(`input[onchange*="${taskId}"]`);
-                if (checkbox) {
-                    checkbox.checked = !isCompleted;
-                }
+                const checkboxes = document.querySelectorAll(`input[data-task-id="${taskId}"]`);
+                checkboxes.forEach(cb => {
+                    cb.checked = !isCompleted;
+                });
             } else {
                 // Update UI without reloading: toggle 'completed' class on task elements
                 const taskElements = document.querySelectorAll(`.task-item, .calendar-task`);
                 taskElements.forEach(element => {
-                    const checkbox = element.querySelector(`input[onchange*="${taskId}"]`);
+                    const checkbox = element.querySelector(`input[data-task-id="${taskId}"]`);
                     if (checkbox) {
                         if (isCompleted) {
                             element.classList.add('completed');
@@ -404,10 +438,16 @@ function toggleTaskCompletion(taskId, isCompleted) {
         .catch(error => {
             console.error('Error toggling task completion:', error);
             // Revert checkbox state on error
-            const checkbox = document.querySelector(`input[onchange*="${taskId}"]`);
-            if (checkbox) {
-                checkbox.checked = !isCompleted;
-            }
+            const checkboxes = document.querySelectorAll(`input[data-task-id="${taskId}"]`);
+            checkboxes.forEach(cb => {
+                cb.checked = !isCompleted;
+            });
+        })
+        .finally(() => {
+            // Remove from pending set after a short delay to prevent rapid re-triggering
+            setTimeout(() => {
+                pendingToggles.delete(taskId);
+            }, 300);
         });
 }
 
