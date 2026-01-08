@@ -387,14 +387,18 @@ function toggleTaskCompletion(taskId, isCompleted) {
                     checkbox.checked = !isCompleted;
                 }
             } else {
-                // Reload current view to update UI
-                if (currentScheduleView === 'today') {
-                    loadTodaySchedule();
-                } else if (currentScheduleView === 'thisweek') {
-                    loadWeekCalendar(0);
-                } else if (currentScheduleView === 'nextweek') {
-                    loadWeekCalendar(1);
-                }
+                // Update UI without reloading: toggle 'completed' class on task elements
+                const taskElements = document.querySelectorAll(`.task-item, .calendar-task`);
+                taskElements.forEach(element => {
+                    const checkbox = element.querySelector(`input[onchange*="${taskId}"]`);
+                    if (checkbox) {
+                        if (isCompleted) {
+                            element.classList.add('completed');
+                        } else {
+                            element.classList.remove('completed');
+                        }
+                    }
+                });
             }
         })
         .catch(error => {
