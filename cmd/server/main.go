@@ -60,15 +60,25 @@ func main() {
 	// Initialize Gin router
 	router := gin.Default()
 
-	// Load HTML templates
-	router.LoadHTMLGlob("web/templates/*")
+	// Load HTML templates from both web and web2 directories
+	router.LoadHTMLGlob("web*/templates/*")
 
 	// Serve static files
 	router.Static("/static", "./web/static")
+	router.Static("/static2", "./web2/static")
 
 	// Initialize handlers
 	adminHandler := handlers.NewAdminHandler(db)
 	helperHandler := handlers.NewHelperHandler(db)
+
+	// New UI routes
+	router.GET("/admin2/", func(c *gin.Context) {
+		c.HTML(200, "admin2.html", nil)
+	})
+
+	router.GET("/helper2/", func(c *gin.Context) {
+		c.HTML(200, "helper2.html", nil)
+	})
 
 	// Admin routes
 	admin := router.Group("/admin")

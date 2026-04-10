@@ -30,6 +30,7 @@ COPY --from=builder /app/server .
 
 # Copy web assets
 COPY web ./web
+COPY web2 ./web2
 
 # Expose port
 EXPOSE 8080

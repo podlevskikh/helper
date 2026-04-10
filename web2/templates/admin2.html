@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Helper Admin</title>
+    <link rel="stylesheet" href="/static2/css/admin.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-inner">
+            <div class="logo">Helper Admin</div>
+            <nav class="tabs" id="mainTabs">
+                <button class="tab active" data-tab="recipes">Recipes</button>
+                <button class="tab" data-tab="mealtimes">Meal Times</button>
+                <button class="tab" data-tab="zones">Cleaning Zones</button>
+                <button class="tab" data-tab="childcare">Childcare</button>
+                <button class="tab" data-tab="calendar">Calendar</button>
+                <button class="tab" data-tab="shopping">Shopping List</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main">
+
+        <!-- Recipes Tab -->
+        <section class="tab-content active" id="tab-recipes">
+            <div class="section-header">
+                <h2>Recipes</h2>
+                <button class="btn btn-primary" id="addRecipeBtn">+ Add Recipe</button>
+            </div>
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>For</th>
+                            <th>Prep / Cook</th>
+                            <th>Servings</th>
+                            <th>Rating</th>
+                            <th>Meal Times</th>
+                            <th>Active</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recipesList"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Meal Times Tab -->
+        <section class="tab-content" id="tab-mealtimes">
+            <div class="section-header">
+                <h2>Meal Times</h2>
+                <button class="btn btn-primary" id="addMealTimeBtn">+ Add Meal Time</button>
+            </div>
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Default Time</th>
+                            <th>Additional Times</th>
+                            <th>Family Member</th>
+                            <th>Active</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mealTimesList"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Cleaning Zones Tab -->
+        <section class="tab-content" id="tab-zones">
+            <div class="section-header">
+                <h2>Cleaning Zones</h2>
+                <button class="btn btn-primary" id="addZoneBtn">+ Add Zone</button>
+            </div>
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>Freq / Week</th>
+                            <th>Priority</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="zonesList"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Childcare Tab -->
+        <section class="tab-content" id="tab-childcare">
+            <div class="section-header">
+                <h2>Childcare Schedule</h2>
+                <button class="btn btn-primary" id="addChildcareBtn">+ Add Schedule</button>
+            </div>
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Start Time</th>
+                            <th>End Time</th>
+                            <th>Notes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="childcareList"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Calendar Tab -->
+        <section class="tab-content" id="tab-calendar">
+            <div class="section-header">
+                <h2>Calendar</h2>
+                <button class="btn btn-warning" id="regenerateBtn">&#8635; Regenerate Schedule</button>
+            </div>
+            <div class="week-tabs">
+                <button class="week-tab active" data-week="current">This Week</button>
+                <button class="week-tab" data-week="next">Next Week</button>
+            </div>
+            <div id="calendarContent" class="calendar-grid"></div>
+        </section>
+
+        <!-- Shopping List Tab -->
+        <section class="tab-content" id="tab-shopping">
+            <div class="section-header">
+                <h2>Shopping List</h2>
+                <span class="hint">Items added by the helper. Check them off as purchased.</span>
+            </div>
+            <div id="shoppingContent"></div>
+        </section>
+    </main>
+
+    <!-- Recipe Modal -->
+    <div class="modal-overlay" id="recipeModal">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h3 id="recipeModalTitle">Add Recipe</h3>
+                <button class="modal-close" data-modal="recipeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="recipeForm" autocomplete="off">
+                    <input type="hidden" id="recipeId">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2">
+                            <label>Name *</label>
+                            <input type="text" id="recipeName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Family Member</label>
+                            <select id="recipeFamilyMember">
+                                <option value="all">All</option>
+                                <option value="adult">Adult</option>
+                                <option value="baby">Baby</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="recipeDescription" rows="2"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Ingredients</label>
+                            <textarea id="recipeIngredients" rows="5" placeholder="One ingredient per line..."></textarea>
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>Instructions</label>
+                            <textarea id="recipeInstructions" rows="5" placeholder="Step by step..."></textarea>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Prep Time (min)</label>
+                            <input type="number" id="recipePrepTime" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Cook Time (min)</label>
+                            <input type="number" id="recipeCookTime" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Servings</label>
+                            <input type="number" id="recipeServings" min="1" value="2">
+                        </div>
+                        <div class="form-group">
+                            <label>Rating (0–5)</label>
+                            <input type="number" id="recipeRating" min="0" max="5" step="0.1" value="0">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Image URL</label>
+                            <input type="url" id="recipeImageURL" placeholder="https://...">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>Video URL</label>
+                            <input type="url" id="recipeVideoURL" placeholder="https://...">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Tags <span class="hint">comma-separated</span></label>
+                        <input type="text" id="recipeTags" placeholder="quick, vegetarian, kids...">
+                    </div>
+                    <div class="form-group">
+                        <label>Meal Times</label>
+                        <div id="mealTimesCheckboxes" class="checkbox-group"></div>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="recipeIsActive" checked>
+                            <span>Active (can be scheduled)</span>
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="recipeModal">Cancel</button>
+                <button class="btn btn-primary" id="saveRecipeBtn">Save Recipe</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meal Time Modal -->
+    <div class="modal-overlay" id="mealTimeModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="mealTimeModalTitle">Add Meal Time</h3>
+                <button class="modal-close" data-modal="mealTimeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="mealTimeForm" autocomplete="off">
+                    <input type="hidden" id="mealTimeId">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Name *</label>
+                            <input type="text" id="mealTimeName" required placeholder="breakfast, lunch...">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>Family Member</label>
+                            <input type="text" id="mealTimeFamilyMember" placeholder="all, adult, baby...">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Default Time (HH:MM) *</label>
+                            <input type="time" id="mealTimeDefaultTime" required>
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>Additional Times <span class="hint">JSON: ["09:00","12:00"]</span></label>
+                            <input type="text" id="mealTimeDefaultTimes" placeholder='["09:00","12:00"]'>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="mealTimeActive" checked>
+                            <span>Active</span>
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="mealTimeModal">Cancel</button>
+                <button class="btn btn-primary" id="saveMealTimeBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zone Modal -->
+    <div class="modal-overlay" id="zoneModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="zoneModalTitle">Add Cleaning Zone</h3>
+                <button class="modal-close" data-modal="zoneModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="zoneForm" autocomplete="off">
+                    <input type="hidden" id="zoneId">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Name *</label>
+                            <input type="text" id="zoneName" required placeholder="Kitchen, Bathroom...">
+                        </div>
+                        <div class="form-group">
+                            <label>Priority</label>
+                            <select id="zonePriority">
+                                <option value="high">High</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="zoneDescription" rows="2" placeholder="What to clean in this area..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Frequency per Week *</label>
+                        <input type="number" id="zoneFrequency" min="1" max="7" value="1" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="zoneModal">Cancel</button>
+                <button class="btn btn-primary" id="saveZoneBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Childcare Modal -->
+    <div class="modal-overlay" id="childcareModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="childcareModalTitle">Add Childcare Schedule</h3>
+                <button class="modal-close" data-modal="childcareModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="childcareForm" autocomplete="off">
+                    <input type="hidden" id="childcareId">
+                    <div class="form-group">
+                        <label>Date *</label>
+                        <input type="date" id="childcareDate" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Start Time *</label>
+                            <input type="time" id="childcareStartTime" required>
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>End Time *</label>
+                            <input type="time" id="childcareEndTime" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea id="childcareNotes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="childcareModal">Cancel</button>
+                <button class="btn btn-primary" id="saveChildcareBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Delete Modal -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3>Confirm Delete</h3>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage">Are you sure you want to delete this item?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="confirmModal">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="/static2/js/admin.js"></script>
+</body>
+</html>

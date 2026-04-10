@@ -33,6 +33,7 @@ services:
         condition: service_healthy
     volumes:
       - ./web:/app/web
+      - ./web2:/app/web2
 
 volumes:
   postgres_data:

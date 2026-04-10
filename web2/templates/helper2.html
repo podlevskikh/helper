@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Schedule</title>
+    <link rel="stylesheet" href="/static2/css/helper.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-inner">
+            <div class="logo">My Schedule</div>
+            <nav class="sections">
+                <button class="section-tab active" data-section="calendar">Calendar</button>
+                <button class="section-tab" data-section="shopping">Shopping List</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main">
+
+        <!-- Calendar Section -->
+        <section class="section-content active" id="section-calendar">
+            <div class="view-tabs">
+                <button class="view-tab active" data-view="today">Today</button>
+                <button class="view-tab" data-view="thisweek">This Week</button>
+                <button class="view-tab" data-view="nextweek">Next Week</button>
+            </div>
+
+            <!-- Today View -->
+            <div class="view active" id="view-today">
+                <div class="view-title" id="todayTitle"></div>
+                <div id="todayTasks" class="tasks-list"></div>
+            </div>
+
+            <!-- This Week View -->
+            <div class="view" id="view-thisweek">
+                <div class="view-title">This Week</div>
+                <div id="thisWeekContent" class="week-grid"></div>
+            </div>
+
+            <!-- Next Week View -->
+            <div class="view" id="view-nextweek">
+                <div class="view-title">Next Week</div>
+                <div id="nextWeekContent" class="week-grid"></div>
+            </div>
+        </section>
+
+        <!-- Shopping Section -->
+        <section class="section-content" id="section-shopping">
+            <div class="shopping-add">
+                <h3>Add Item</h3>
+                <form id="addShoppingForm" autocomplete="off">
+                    <div class="add-row">
+                        <input type="text" id="newItemName" placeholder="Item name..." required class="add-input-main" autocomplete="off">
+                        <button type="submit" class="add-btn-main">+ Add</button>
+                        <div class="add-secondary">
+                            <input type="text" id="newItemQty" placeholder="Qty" class="add-input-qty" autocomplete="off">
+                            <select id="newItemCategory" class="add-select">
+                                <option value="">Category</option>
+                                <option value="produce">Produce</option>
+                                <option value="dairy">Dairy</option>
+                                <option value="meat">Meat</option>
+                                <option value="bakery">Bakery</option>
+                                <option value="frozen">Frozen</option>
+                                <option value="beverages">Beverages</option>
+                                <option value="household">Household</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div id="shoppingList" class="shopping-items"></div>
+        </section>
+    </main>
+
+    <!-- Recipe Detail Modal -->
+    <div class="modal-overlay" id="recipeModal">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h3 id="recipeModalTitle">Recipe</h3>
+                <button class="modal-close" data-modal="recipeModal">&times;</button>
+            </div>
+            <div class="modal-body" id="recipeModalBody"></div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="/static2/js/helper.js"></script>
+</body>
+</html>
