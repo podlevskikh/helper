@@ -166,6 +166,7 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', async () =
 
 // ── RECIPES ───────────────────────────────────────────────────────
 let editingRecipe = null;
+let allRecipes = [];
 
 async function loadRecipes() {
   const tbody = document.getElementById('recipesList');
@@ -173,29 +174,118 @@ async function loadRecipes() {
   try {
     const [recipes, mealTimes] = await Promise.all([api.recipes.list(), api.mealTimes.list()]);
     allMealTimes = mealTimes;
-    if (!recipes.length) {
-      tbody.innerHTML = '<tr><td colspan="8"><div class="empty">No recipes yet. Add your first recipe!</div></td></tr>';
-      return;
-    }
-    tbody.innerHTML = recipes.map(r => `
-      <tr>
-        <td><strong>${esc(r.name)}</strong>${r.tags ? `<br><span style="font-size:12px;color:#64748b">${esc(r.tags)}</span>` : ''}</td>
-        <td><span class="badge badge-blue">${esc(r.family_member || 'all')}</span></td>
-        <td style="color:#64748b;font-size:13px">${r.prep_time || 0}m / ${r.cook_time || 0}m</td>
-        <td style="text-align:center">${r.servings || '—'}</td>
-        <td>${stars(r.rating)}</td>
-        <td><div class="meal-times">${(r.meal_times || []).map(mt => `<span class="badge badge-purple">${esc(mt.name)}</span>`).join('')}</div></td>
-        <td>${r.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-gray">Inactive</span>'}</td>
-        <td class="actions">
-          <button class="btn-icon" onclick="openEditRecipe(${r.id})" title="Edit">✏️</button>
-          <button class="btn-icon danger" onclick="deleteRecipe(${r.id}, '${esc(r.name)}')" title="Delete">🗑️</button>
-        </td>
-      </tr>
-    `).join('');
+    allRecipes = recipes;
+    populateMealTimeFilter(mealTimes);
+    renderRecipes();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty">Error: ${esc(err.message)}</div></td></tr>`;
+    document.getElementById('recipesList').innerHTML =
+      `<tr><td colspan="8"><div class="empty">Error: ${esc(err.message)}</div></td></tr>`;
   }
 }
+
+function populateMealTimeFilter(mealTimes) {
+  const sel = document.getElementById('recipeFilterMealTime');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All meal times</option>' +
+    mealTimes.map(mt => `<option value="${mt.id}" ${mt.id == current ? 'selected' : ''}>${esc(mt.name)}</option>`).join('');
+}
+
+function highlight(text, query) {
+  if (!query) return esc(text);
+  const safe = esc(text);
+  const safeQ = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return safe.replace(new RegExp(`(${safeQ})`, 'gi'), '<mark class="match-highlight">$1</mark>');
+}
+
+function renderRecipes() {
+  const tbody = document.getElementById('recipesList');
+  const query  = document.getElementById('recipeSearch').value.trim().toLowerCase();
+  const mtId   = document.getElementById('recipeFilterMealTime').value;
+  const family = document.getElementById('recipeFilterFamily').value;
+  const status = document.getElementById('recipeFilterActive').value;
+
+  // toggle clear button
+  const clearBtn = document.getElementById('recipeSearchClear');
+  clearBtn.classList.toggle('visible', query.length > 0);
+
+  let filtered = allRecipes.filter(r => {
+    if (query) {
+      const inName = r.name.toLowerCase().includes(query);
+      const inTags = (r.tags || '').toLowerCase().includes(query);
+      const inDesc = (r.description || '').toLowerCase().includes(query);
+      if (!inName && !inTags && !inDesc) return false;
+    }
+    if (mtId) {
+      const hasMt = (r.meal_times || []).some(mt => String(mt.id) === String(mtId));
+      if (!hasMt) return false;
+    }
+    if (family && r.family_member !== family) return false;
+    if (status === 'active'   && !r.is_active) return false;
+    if (status === 'inactive' &&  r.is_active) return false;
+    return true;
+  });
+
+  // update counter
+  const countEl = document.getElementById('recipeCount');
+  if (query || mtId || family || status) {
+    countEl.textContent = `${filtered.length} of ${allRecipes.length}`;
+  } else {
+    countEl.textContent = allRecipes.length ? `${allRecipes.length} total` : '';
+  }
+
+  if (!filtered.length) {
+    const msg = allRecipes.length
+      ? 'No recipes match the filters'
+      : 'No recipes yet. Add your first recipe!';
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty">${msg}</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(r => `
+    <tr>
+      <td>
+        <strong>${highlight(r.name, query)}</strong>
+        ${r.tags ? `<br><span style="font-size:12px;color:#64748b">${highlight(r.tags, query)}</span>` : ''}
+      </td>
+      <td><span class="badge badge-blue">${esc(r.family_member || 'all')}</span></td>
+      <td style="color:#64748b;font-size:13px">${r.prep_time || 0}m / ${r.cook_time || 0}m</td>
+      <td style="text-align:center">${r.servings || '—'}</td>
+      <td>${stars(r.rating)}</td>
+      <td><div class="meal-times">${(r.meal_times || []).map(mt => `<span class="badge badge-purple">${esc(mt.name)}</span>`).join('')}</div></td>
+      <td>${r.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-gray">Inactive</span>'}</td>
+      <td class="actions">
+        <button class="btn-icon" onclick="openEditRecipe(${r.id})" title="Edit">✏️</button>
+        <button class="btn-icon danger" onclick="deleteRecipe(${r.id}, '${esc(r.name)}')" title="Delete">🗑️</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// Wire up filter controls
+document.getElementById('recipeSearch').addEventListener('input', renderRecipes);
+document.getElementById('recipeSearchClear').addEventListener('click', () => {
+  document.getElementById('recipeSearch').value = '';
+  renderRecipes();
+  document.getElementById('recipeSearch').focus();
+});
+document.getElementById('recipeFilterMealTime').addEventListener('change', () => {
+  document.getElementById('recipeFilterMealTime').classList.toggle(
+    'active', document.getElementById('recipeFilterMealTime').value !== ''
+  );
+  renderRecipes();
+});
+document.getElementById('recipeFilterFamily').addEventListener('change', () => {
+  document.getElementById('recipeFilterFamily').classList.toggle(
+    'active', document.getElementById('recipeFilterFamily').value !== ''
+  );
+  renderRecipes();
+});
+document.getElementById('recipeFilterActive').addEventListener('change', () => {
+  document.getElementById('recipeFilterActive').classList.toggle(
+    'active', document.getElementById('recipeFilterActive').value !== ''
+  );
+  renderRecipes();
+});
 
 function buildMealTimeCheckboxes(selected = []) {
   const container = document.getElementById('mealTimesCheckboxes');
@@ -315,33 +405,64 @@ function deleteRecipe(id, name) {
 // ── MEAL TIMES ────────────────────────────────────────────────────
 async function loadMealTimes() {
   const tbody = document.getElementById('mealTimesList');
-  tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:#94a3b8">Loading...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" style="padding:24px;text-align:center;color:#94a3b8">Loading...</td></tr>';
   try {
     const items = await api.mealTimes.list();
     allMealTimes = items;
     if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="6"><div class="empty">No meal times yet.</div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty">No meal times yet.</div></td></tr>';
       return;
     }
-    tbody.innerHTML = items.map(mt => `
+    tbody.innerHTML = items.map(mt => {
+      const recipeCount = (mt.recipes || []).length;
+      return `
       <tr>
         <td><strong>${esc(mt.name)}</strong></td>
         <td>${esc(mt.default_time)}</td>
         <td style="font-size:12px;color:#64748b">${esc(mt.default_times || '—')}</td>
         <td><span class="badge badge-blue">${esc(mt.family_member || 'all')}</span></td>
+        <td>${recipeCount > 0 ? `<span class="badge badge-purple">${recipeCount} recipes</span>` : '<span class="badge badge-gray">no recipes</span>'}</td>
         <td>${mt.active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-gray">Inactive</span>'}</td>
         <td class="actions">
           <button class="btn-icon" onclick="openEditMealTime(${mt.id})" title="Edit">✏️</button>
           <button class="btn-icon danger" onclick="deleteMealTime(${mt.id}, '${esc(mt.name)}')" title="Delete">🗑️</button>
         </td>
       </tr>
-    `).join('');
+    `}).join('');
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="6"><div class="empty">Error: ${esc(err.message)}</div></td></tr>`;
   }
 }
 
-document.getElementById('addMealTimeBtn').addEventListener('click', () => {
+function buildMealTimeRecipeCheckboxes(selected = []) {
+  const container = document.getElementById('mealTimeRecipesCheckboxes');
+  const selectedIds = new Set((selected || []).map(r => r.id));
+  if (!allRecipes.length) {
+    container.innerHTML = '<span style="color:#94a3b8;font-size:13px">Loading recipes...</span>';
+    return;
+  }
+  container.innerHTML = allRecipes.map(r => `
+    <label class="checkbox-item ${selectedIds.has(r.id) ? 'checked' : ''}" data-id="${r.id}">
+      <input type="checkbox" value="${r.id}" ${selectedIds.has(r.id) ? 'checked' : ''} style="display:none">
+      <span>${esc(r.name)}</span>
+    </label>
+  `).join('');
+  container.querySelectorAll('.checkbox-item').forEach(lbl => {
+    lbl.addEventListener('click', () => {
+      const cb = lbl.querySelector('input');
+      cb.checked = !cb.checked;
+      lbl.classList.toggle('checked', cb.checked);
+    });
+  });
+}
+
+function getSelectedMealTimeRecipeIds() {
+  return Array.from(document.querySelectorAll('#mealTimeRecipesCheckboxes input:checked'))
+    .map(cb => parseInt(cb.value));
+}
+
+document.getElementById('addMealTimeBtn').addEventListener('click', async () => {
+  if (!allRecipes.length) allRecipes = await api.recipes.list().catch(() => []);
   document.getElementById('mealTimeModalTitle').textContent = 'Add Meal Time';
   document.getElementById('mealTimeId').value = '';
   document.getElementById('mealTimeName').value = '';
@@ -349,11 +470,13 @@ document.getElementById('addMealTimeBtn').addEventListener('click', () => {
   document.getElementById('mealTimeDefaultTime').value = '';
   document.getElementById('mealTimeDefaultTimes').value = '';
   document.getElementById('mealTimeActive').checked = true;
+  buildMealTimeRecipeCheckboxes([]);
   openModal('mealTimeModal');
 });
 
 async function openEditMealTime(id) {
   try {
+    if (!allRecipes.length) allRecipes = await api.recipes.list().catch(() => []);
     const mt = await apiFetch(`${ADMIN}/mealtimes/${id}`);
     document.getElementById('mealTimeModalTitle').textContent = 'Edit Meal Time';
     document.getElementById('mealTimeId').value = mt.id;
@@ -362,6 +485,7 @@ async function openEditMealTime(id) {
     document.getElementById('mealTimeDefaultTime').value = mt.default_time;
     document.getElementById('mealTimeDefaultTimes').value = mt.default_times || '';
     document.getElementById('mealTimeActive').checked = mt.active !== false;
+    buildMealTimeRecipeCheckboxes(mt.recipes || []);
     openModal('mealTimeModal');
   } catch (err) {
     showToast(err.message, 'error');
@@ -376,6 +500,7 @@ document.getElementById('saveMealTimeBtn').addEventListener('click', async () =>
     default_time: document.getElementById('mealTimeDefaultTime').value,
     default_times: document.getElementById('mealTimeDefaultTimes').value.trim(),
     active: document.getElementById('mealTimeActive').checked,
+    recipe_ids: getSelectedMealTimeRecipeIds(),
   };
   if (!data.name || !data.default_time) { showToast('Name and time are required', 'error'); return; }
   try {

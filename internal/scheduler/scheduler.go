@@ -84,6 +84,11 @@ func (s *Scheduler) generateMealTasks(schedule *models.DailySchedule, date time.
 		return err
 	}
 
+	log.Printf("Active meal times found: %d", len(mealTimes))
+	for _, mt := range mealTimes {
+		log.Printf("  -> meal time: id=%d name=%q family=%q", mt.ID, mt.Name, mt.FamilyMember)
+	}
+
 	for _, mealTime := range mealTimes {
 		// Get all times for this meal (support multiple times per meal)
 		times := s.getMealTimes(mealTime)
@@ -91,7 +96,7 @@ func (s *Scheduler) generateMealTasks(schedule *models.DailySchedule, date time.
 		// Create a task for each time slot
 		for _, timeSlot := range times {
 			// Find a suitable recipe for this meal
-			recipe, err := s.selectRecipeForMeal(mealTime.ID, mealTime.FamilyMember, date)
+			recipe, err := s.selectRecipeForMeal(mealTime.ID, mealTime.Name, mealTime.FamilyMember, date)
 			if err != nil {
 				log.Printf("Warning: No recipe found for %s (%s), creating task without recipe", mealTime.Name, mealTime.FamilyMember)
 			}
@@ -138,246 +143,146 @@ func (s *Scheduler) getMealTimes(mealTime models.MealTime) []string {
 	return []string{mealTime.DefaultTime}
 }
 
-// selectRecipeForMeal selects an appropriate recipe for a meal with smart rotation
-// to avoid frequent repetition of the same dishes
-func (s *Scheduler) selectRecipeForMeal(mealTimeID uint, familyMember string, currentDate time.Time) (*models.Recipe, error) {
-	var recipes []models.Recipe
-
-	// Query recipes that are linked to this meal time via many-to-many relation
-	// Also filter by family member and is_active status
-	err := s.db.
-		Joins("JOIN recipe_meal_times ON recipe_meal_times.recipe_id = recipes.id").
-		Where("recipe_meal_times.meal_time_id = ?", mealTimeID).
-		Where("recipes.family_member = ? OR recipes.family_member = ?", familyMember, "all").
-		Where("recipes.is_active = ?", true).
-		Find(&recipes).Error
-
+// selectRecipeForMeal picks a random recipe for a meal slot using a full-cycle rotation:
+//   - find all eligible recipes for this meal time + family member
+//   - look back N days (where N = max(recipe count, 7)) to build the "used" set
+//     only counting recipes used for THIS specific meal slot (by title)
+//   - pick randomly from recipes NOT in the used set ("fresh" pool)
+//   - if all recipes have been used (end of cycle), reset and pick from all
+func (s *Scheduler) selectRecipeForMeal(mealTimeID uint, mealTimeName, familyMember string, currentDate time.Time) (*models.Recipe, error) {
+	recipes, err := s.eligibleRecipes(mealTimeID, mealTimeName, familyMember)
 	if err != nil {
 		return nil, err
 	}
-
-	// Fallback: if no recipes found with many-to-many, try old category field
+	log.Printf("DIAG selectRecipeForMeal: meal=%q family=%q -> %d eligible recipes", mealTimeName, familyMember, len(recipes))
 	if len(recipes) == 0 {
-		var mealTime models.MealTime
-		if err := s.db.First(&mealTime, mealTimeID).Error; err != nil {
-			return nil, err
-		}
-
-		// Try to find recipes using old category field
-		query := s.db.Where("category = ?", mealTime.Name)
-		query = query.Where("family_member = ? OR family_member = ?", familyMember, "all")
-		query = query.Where("is_active = ?", true)
-
-		if err := query.Find(&recipes).Error; err != nil {
-			return nil, err
-		}
+		return nil, fmt.Errorf("no recipes found for meal time %d (%s)", mealTimeID, mealTimeName)
 	}
-
-	if len(recipes) == 0 {
-		return nil, fmt.Errorf("no recipes found")
-	}
-
-	// Get recently used recipes with their last use dates
-	recentlyUsed := s.getRecentlyUsedRecipes(mealTimeID, 30) // Look back 30 days for better rotation
-
-	// Get yesterday's recipes to ensure no repetition
-	yesterdayRecipes := s.getYesterdayRecipes(currentDate, mealTimeID)
-
-	// Select recipe with improved weighted random selection
-	selectedRecipe := s.selectRecipeWithImprovedRotation(recipes, recentlyUsed, yesterdayRecipes)
-	return selectedRecipe, nil
-}
-
-// getRecentlyUsedRecipes returns a map of recipe IDs to days since last use
-func (s *Scheduler) getRecentlyUsedRecipes(mealTimeID uint, lookbackDays int) map[uint]int {
-	recentlyUsed := make(map[uint]int)
-
-	// Calculate the date range to look back
-	today := time.Now()
-	startDate := today.AddDate(0, 0, -lookbackDays)
-
-	// Query schedule tasks with recipes from the past N days
-	var tasks []models.ScheduleTask
-	err := s.db.
-		Joins("JOIN daily_schedules ON daily_schedules.id = schedule_tasks.schedule_id").
-		Where("daily_schedules.date >= ? AND daily_schedules.date < ?", startDate, today).
-		Where("schedule_tasks.task_type = ?", "meal").
-		Where("schedule_tasks.recipe_id IS NOT NULL").
-		Select("schedule_tasks.recipe_id, daily_schedules.date").
-		Find(&tasks).Error
-
-	if err != nil {
-		log.Printf("Warning: Failed to get recently used recipes: %v", err)
-		return recentlyUsed
-	}
-
-	// Build map of recipe ID to days since last use
-	for _, task := range tasks {
-		if task.RecipeID != nil {
-			// Get the schedule date for this task
-			var schedule models.DailySchedule
-			if err := s.db.First(&schedule, task.ScheduleID).Error; err == nil {
-				daysSince := int(today.Sub(schedule.Date).Hours() / 24)
-
-				// Keep track of the most recent use
-				if existing, ok := recentlyUsed[*task.RecipeID]; !ok || daysSince < existing {
-					recentlyUsed[*task.RecipeID] = daysSince
-				}
-			}
-		}
-	}
-
-	return recentlyUsed
-}
-
-// getYesterdayRecipes returns a set of recipe IDs used yesterday for the same meal type
-// This ensures we never repeat a dish two days in a row
-func (s *Scheduler) getYesterdayRecipes(currentDate time.Time, mealTimeID uint) map[uint]bool {
-	yesterdayRecipes := make(map[uint]bool)
-
-	// Calculate yesterday's date
-	yesterday := currentDate.AddDate(0, 0, -1)
-	yesterdayStart := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, yesterday.Location())
-	yesterdayEnd := yesterdayStart.AddDate(0, 0, 1)
-
-	// Query yesterday's meal tasks for this meal type
-	var tasks []models.ScheduleTask
-	err := s.db.
-		Joins("JOIN daily_schedules ON daily_schedules.id = schedule_tasks.schedule_id").
-		Where("daily_schedules.date >= ? AND daily_schedules.date < ?", yesterdayStart, yesterdayEnd).
-		Where("schedule_tasks.task_type = ?", "meal").
-		Where("schedule_tasks.recipe_id IS NOT NULL").
-		Find(&tasks).Error
-
-	if err != nil {
-		log.Printf("Warning: Failed to get yesterday's recipes: %v", err)
-		return yesterdayRecipes
-	}
-
-	// Build set of recipe IDs used yesterday
-	for _, task := range tasks {
-		if task.RecipeID != nil {
-			yesterdayRecipes[*task.RecipeID] = true
-		}
-	}
-
-	log.Printf("Found %d recipes used yesterday", len(yesterdayRecipes))
-	return yesterdayRecipes
-}
-
-// selectRecipeWithImprovedRotation selects a recipe using improved weighted random selection
-// with strict rules to prevent repetition and ensure even rotation
-func (s *Scheduler) selectRecipeWithImprovedRotation(recipes []models.Recipe, recentlyUsed map[uint]int, yesterdayRecipes map[uint]bool) *models.Recipe {
-	if len(recipes) == 0 {
-		return nil
-	}
-
-	// If only one recipe available, return it (even if used yesterday - no choice)
 	if len(recipes) == 1 {
-		return &recipes[0]
+		return &recipes[0], nil
 	}
 
-	// Calculate weights for each recipe
-	type weightedRecipe struct {
-		recipe     *models.Recipe
-		weight     float64
-		daysSince  int
-		usedYesterday bool
+	// Lookback window = recipe pool size (so every recipe appears before any repeats),
+	// but at least 7 days.
+	lookback := len(recipes)
+	if lookback < 7 {
+		lookback = 7
 	}
 
-	var weightedRecipes []weightedRecipe
-	var eligibleRecipes []weightedRecipe // Recipes NOT used yesterday
-	totalWeight := 0.0
-	totalEligibleWeight := 0.0
+	// Filter used recipes only for this specific meal slot (title = "MealName - FamilyMember")
+	taskTitle := fmt.Sprintf("%s - %s", mealTimeName, familyMember)
+	usedIDs := s.usedRecipeIDsSince(currentDate, lookback, taskTitle)
 
-	for i := range recipes {
-		recipe := &recipes[i]
-		weight := 1.0 // Base weight
-		daysSince := -1
-		usedYesterday := yesterdayRecipes[recipe.ID]
-
-		// Get days since last use
-		if days, used := recentlyUsed[recipe.ID]; used {
-			daysSince = days
-
-			// Improved weight formula for better rotation:
-			// The longer since last use, the higher the weight
-			// This creates exponential preference for less recently used recipes
-			if daysSince == 0 {
-				weight = 0.05 // Almost never (same day)
-			} else if daysSince == 1 {
-				weight = 0.1  // Very low (yesterday - but this should be filtered out)
-			} else if daysSince == 2 {
-				weight = 0.3  // Low
-			} else if daysSince == 3 {
-				weight = 0.5  // Medium-low
-			} else if daysSince <= 5 {
-				weight = 0.8  // Medium
-			} else if daysSince <= 7 {
-				weight = 1.0  // Normal
-			} else if daysSince <= 14 {
-				weight = 1.5  // Higher preference
-			} else if daysSince <= 21 {
-				weight = 2.0  // Strong preference
-			} else {
-				weight = 3.0  // Very strong preference for recipes not used in 3+ weeks
-			}
-		} else {
-			// Never used before - give highest weight
-			weight = 5.0
-		}
-
-		wr := weightedRecipe{
-			recipe:        recipe,
-			weight:        weight,
-			daysSince:     daysSince,
-			usedYesterday: usedYesterday,
-		}
-
-		weightedRecipes = append(weightedRecipes, wr)
-		totalWeight += weight
-
-		// Track eligible recipes (not used yesterday)
-		if !usedYesterday {
-			eligibleRecipes = append(eligibleRecipes, wr)
-			totalEligibleWeight += weight
+	// Partition into fresh (not used recently) and stale
+	var fresh []models.Recipe
+	for _, r := range recipes {
+		if !usedIDs[r.ID] {
+			fresh = append(fresh, r)
 		}
 	}
 
-	// STRICT RULE: Never use a recipe from yesterday if we have alternatives
-	var candidateRecipes []weightedRecipe
-	var candidateTotalWeight float64
-
-	if len(eligibleRecipes) > 0 {
-		// Use only recipes NOT used yesterday
-		candidateRecipes = eligibleRecipes
-		candidateTotalWeight = totalEligibleWeight
-		log.Printf("Selecting from %d eligible recipes (excluding yesterday's %d recipes)",
-			len(eligibleRecipes), len(yesterdayRecipes))
-	} else {
-		// No choice - all recipes were used yesterday (unlikely with enough recipes)
-		candidateRecipes = weightedRecipes
-		candidateTotalWeight = totalWeight
-		log.Printf("Warning: All recipes were used yesterday, selecting from all %d recipes", len(weightedRecipes))
+	pool := fresh
+	if len(pool) == 0 {
+		// Full cycle completed — reset and pick from entire pool
+		pool = recipes
+		log.Printf("Recipe cycle reset for meal time %d (%s): all %d recipes were used in the last %d days",
+			mealTimeID, mealTimeName, len(recipes), lookback)
 	}
 
-	// Select a random recipe based on weights
-	randomValue := rand.Float64() * candidateTotalWeight
-	currentSum := 0.0
+	chosen := pool[rand.Intn(len(pool))]
+	log.Printf("Selected recipe '%s' for meal time %d/%s (%d fresh / %d total)",
+		chosen.Name, mealTimeID, mealTimeName, len(fresh), len(recipes))
+	return &chosen, nil
+}
 
-	for _, wr := range candidateRecipes {
-		currentSum += wr.weight
-		if currentSum >= randomValue {
-			log.Printf("Selected recipe: %s (weight: %.2f, days since last use: %d, used yesterday: %v)",
-				wr.recipe.Name, wr.weight, wr.daysSince, wr.usedYesterday)
-			return wr.recipe
+// eligibleRecipes returns active recipes linked to the given meal time and family member.
+// Falls back progressively until it finds something.
+func (s *Scheduler) eligibleRecipes(mealTimeID uint, mealTimeName, familyMember string) ([]models.Recipe, error) {
+	var recipes []models.Recipe
+
+	// Primary: many-to-many join via recipe_meal_times
+	err := s.db.
+		Joins("JOIN recipe_meal_times ON recipe_meal_times.recipe_id = recipes.id").
+		Where("recipe_meal_times.meal_time_id = ?", mealTimeID).
+		Where("recipes.family_member = ? OR recipes.family_member = 'all' OR recipes.family_member = ''", familyMember).
+		Where("recipes.is_active = ?", true).
+		Find(&recipes).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(recipes) > 0 {
+		return recipes, nil
+	}
+
+	// Fallback 1: case-insensitive category match
+	err = s.db.
+		Where("LOWER(category) = LOWER(?)", mealTimeName).
+		Where("family_member = ? OR family_member = 'all' OR family_member = ''", familyMember).
+		Where("is_active = ?", true).
+		Find(&recipes).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(recipes) > 0 {
+		log.Printf("Meal time %d (%s): category fallback, found %d recipes", mealTimeID, mealTimeName, len(recipes))
+		return recipes, nil
+	}
+
+	// Fallback 2: all active recipes for this family member (including blank family_member)
+	err = s.db.
+		Where("family_member = ? OR family_member = 'all' OR family_member = ''", familyMember).
+		Where("is_active = ?", true).
+		Find(&recipes).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(recipes) > 0 {
+		log.Printf("Meal time %d (%s): family_member fallback, found %d recipes", mealTimeID, mealTimeName, len(recipes))
+		return recipes, nil
+	}
+
+	// Fallback 3: all active recipes regardless of family_member
+	err = s.db.Where("is_active = ?", true).Find(&recipes).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(recipes) > 0 {
+		log.Printf("Meal time %d (%s): global fallback (no family_member filter), found %d recipes", mealTimeID, mealTimeName, len(recipes))
+	}
+	return recipes, nil
+}
+
+// usedRecipeIDsSince returns the set of recipe IDs used in tasks with the given title
+// within the last `days` days before `before`.
+// Filtering by title (e.g. "Breakfast - adult") ensures we only consider the same meal slot,
+// so recipes used at lunch don't block breakfast choices.
+func (s *Scheduler) usedRecipeIDsSince(before time.Time, days int, taskTitle string) map[uint]bool {
+	used := make(map[uint]bool)
+
+	startDate := before.AddDate(0, 0, -days)
+
+	var tasks []models.ScheduleTask
+	err := s.db.
+		Joins("JOIN daily_schedules ON daily_schedules.id = schedule_tasks.schedule_id").
+		Where("daily_schedules.date >= ? AND daily_schedules.date < ?", startDate, before).
+		Where("schedule_tasks.task_type = 'meal'").
+		Where("schedule_tasks.title = ?", taskTitle).
+		Where("schedule_tasks.recipe_id IS NOT NULL").
+		Find(&tasks).Error
+
+	if err != nil {
+		log.Printf("Warning: failed to query used recipes: %v", err)
+		return used
+	}
+
+	for _, t := range tasks {
+		if t.RecipeID != nil {
+			used[*t.RecipeID] = true
 		}
 	}
 
-	// Fallback: return the last candidate recipe (should rarely happen)
-	lastRecipe := candidateRecipes[len(candidateRecipes)-1]
-	log.Printf("Fallback: Selected recipe: %s", lastRecipe.recipe.Name)
-	return lastRecipe.recipe
+	log.Printf("Slot '%s': found %d distinct recipes used in the last %d days", taskTitle, len(used), days)
+	return used
 }
 
 // generateCleaningTasks creates cleaning tasks based on zone frequency

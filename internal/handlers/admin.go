@@ -245,7 +245,7 @@ func (h *AdminHandler) UploadRecipeImage(c *gin.Context) {
 
 func (h *AdminHandler) GetMealTimes(c *gin.Context) {
 	var mealTimes []models.MealTime
-	if err := h.db.Order("default_time").Find(&mealTimes).Error; err != nil {
+	if err := h.db.Preload("Recipes").Order("default_time").Find(&mealTimes).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -256,7 +256,7 @@ func (h *AdminHandler) GetMealTime(c *gin.Context) {
 	id := c.Param("id")
 	var mealTime models.MealTime
 
-	if err := h.db.First(&mealTime, id).Error; err != nil {
+	if err := h.db.Preload("Recipes").First(&mealTime, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Meal time not found"})
 		return
 	}
@@ -282,23 +282,42 @@ func (h *AdminHandler) CreateMealTime(c *gin.Context) {
 func (h *AdminHandler) UpdateMealTime(c *gin.Context) {
 	id := c.Param("id")
 	var mealTime models.MealTime
-	
+
 	if err := h.db.First(&mealTime, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Meal time not found"})
 		return
 	}
-	
-	if err := c.ShouldBindJSON(&mealTime); err != nil {
+
+	var input struct {
+		models.MealTime
+		RecipeIDs []uint `json:"recipe_ids"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
-	if err := h.db.Save(&mealTime).Error; err != nil {
+
+	input.MealTime.ID = mealTime.ID
+	if err := h.db.Save(&input.MealTime).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
-	c.JSON(http.StatusOK, mealTime)
+
+	// Update recipe associations
+	var recipes []models.Recipe
+	if len(input.RecipeIDs) > 0 {
+		if err := h.db.Find(&recipes, input.RecipeIDs).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find recipes"})
+			return
+		}
+	}
+	if err := h.db.Model(&input.MealTime).Association("Recipes").Replace(recipes); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update recipes"})
+		return
+	}
+
+	h.db.Preload("Recipes").First(&input.MealTime, input.MealTime.ID)
+	c.JSON(http.StatusOK, input.MealTime)
 }
 
 func (h *AdminHandler) DeleteMealTime(c *gin.Context) {

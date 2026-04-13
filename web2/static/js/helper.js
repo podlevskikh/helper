@@ -136,65 +136,145 @@ function getTaskZones(task) {
   return alreadyIn ? many : [single, ...many];
 }
 
-// ── Task card rendering ───────────────────────────────────────────
-function renderTaskCard(task) {
-  const timeRange = task.end_time && task.time
-    ? `${task.time} – ${task.end_time}`
-    : (task.time || '');
-
+// ── Task content builders ─────────────────────────────────────────
+// Returns { label, main, mainClickId, sub, extras }
+// label   — small muted top line (time + context)
+// main    — bold primary line
+// mainClickId — recipe id if main is clickable, else null
+// sub     — secondary muted line
+// extras  — extra recipe chips array [{id, name}]
+function taskContent(task) {
   const recipes = getTaskRecipes(task);
   const zones   = getTaskZones(task);
-  const isMealWithRecipes = task.task_type === 'meal' && recipes.length > 0;
+  const timeStr = task.time || '';
+  const timeRange = task.end_time && task.time ? `${task.time} – ${task.end_time}` : timeStr;
 
-  // Title: clickable for meal tasks — opens first recipe
-  const titleHtml = isMealWithRecipes
-    ? `<div class="task-title clickable" onclick="showRecipe(${recipes[0].id}, event)">${esc(task.title)}</div>`
-    : `<div class="task-title">${esc(task.title)}</div>`;
+  if (task.task_type === 'meal') {
+    // label = "08:00  Breakfast - adult"
+    // main  = recipe name (bold, clickable blue)
+    // sub   = nothing (all info already above)
+    const recipeName = recipes.length > 0 ? recipes[0].name
+                     : task.description   ? task.description
+                     : '';
+    const recipeId   = recipes.length > 0 ? recipes[0].id : null;
+    return {
+      label:       (timeStr ? timeStr + '  ' : '') + task.title,
+      main:        recipeName,
+      mainClickId: recipeId,
+      sub:         '',
+      extras:      recipes.slice(1),
+    };
+  }
 
-  // Chips for remaining recipes (2nd onward)
-  const recipesHtml = recipes.slice(1).map(r =>
-    `<button class="recipe-chip" onclick="showRecipe(${r.id}, event)">${esc(r.name)}</button>`
-  ).join('');
+  if (task.task_type === 'cleaning') {
+    // label = nothing (no specific time for cleaning)
+    // main  = zone name (title)
+    // sub   = zone description / task description
+    const zoneDesc = zones.length > 0 && zones[0].description
+      ? zones[0].description
+      : task.description || '';
+    return {
+      label:       '',
+      main:        task.title,
+      mainClickId: null,
+      sub:         zoneDesc,
+      extras:      [],
+    };
+  }
 
-  const zonesHtml = zones.map(z =>
-    `<span class="zone-chip">${esc(z.name)}</span>`
-  ).join('');
+  if (task.task_type === 'childcare') {
+    // label = time range (prominent)
+    // main  = "Childcare"
+    // sub   = notes
+    return {
+      label:       timeRange,
+      main:        task.title,
+      mainClickId: null,
+      sub:         task.description || '',
+      extras:      [],
+    };
+  }
+
+  // fallback
+  return {
+    label:       timeRange,
+    main:        task.title,
+    mainClickId: null,
+    sub:         task.description || '',
+    extras:      [],
+  };
+}
+
+// ── Today view ────────────────────────────────────────────────────
+function renderTaskCard(task) {
+  const c = taskContent(task);
+
+  const labelHtml = c.label
+    ? `<div class="tc-label">${esc(c.label)}</div>`
+    : '';
+
+  const mainHtml = c.main
+    ? (c.mainClickId
+        ? `<div class="tc-main tc-recipe" onclick="showRecipe(${c.mainClickId}, event)">${esc(c.main)}</div>`
+        : `<div class="tc-main">${esc(c.main)}</div>`)
+    : '';
+
+  const subHtml = c.sub
+    ? `<div class="tc-sub">${esc(c.sub)}</div>`
+    : '';
+
+  const extrasHtml = c.extras.length
+    ? `<div class="tc-extras">${c.extras.map(r =>
+        `<button class="recipe-chip" onclick="showRecipe(${r.id}, event)">${esc(r.name)}</button>`
+      ).join('')}</div>`
+    : '';
 
   return `
     <div class="task-card type-${esc(task.task_type)} ${task.completed ? 'completed' : ''}" id="task-${task.id}">
       <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''}
         onchange="toggleTask(${task.id}, this)">
       <div class="task-info">
-        ${timeRange ? `<div class="task-time-badge">${esc(timeRange)}</div>` : ''}
-        ${titleHtml}
-        ${task.description ? `<div class="task-desc">${esc(task.description)}</div>` : ''}
-        ${recipesHtml ? `<div class="task-recipes">${recipesHtml}</div>` : ''}
-        ${zonesHtml ? `<div class="task-zones">${zonesHtml}</div>` : ''}
+        ${labelHtml}${mainHtml}${subHtml}${extrasHtml}
       </div>
     </div>
   `;
 }
 
+// ── Week view ─────────────────────────────────────────────────────
 function renderWeekTask(task) {
-  const recipes = getTaskRecipes(task);
-  const isMealWithRecipes = task.task_type === 'meal' && recipes.length > 0;
+  const c = taskContent(task);
 
-  const titleHtml = isMealWithRecipes
-    ? `<div class="wt-title clickable" onclick="showRecipe(${recipes[0].id}, event)">${esc(task.title)}</div>`
-    : `<div class="wt-title">${esc(task.title)}</div>`;
+  // In the compact week view we show time in its own column,
+  // so strip the time prefix from label if it starts with it.
+  const displayTime = task.task_type === 'childcare' && task.end_time
+    ? `${task.time}–${task.end_time}`
+    : (task.time || '');
 
-  const recipesHtml = recipes.slice(1).map(r =>
-    `<button class="wt-recipe-chip" onclick="showRecipe(${r.id}, event)">${esc(r.name)}</button>`
-  ).join('');
+  // For meal: show meal label (without time, time is in column)
+  const contextLabel = task.task_type === 'meal'
+    ? task.title   // "Breakfast - adult"
+    : '';
+
+  const subHtml = c.main
+    ? (c.mainClickId
+        ? `<div class="wt-sub wt-recipe" onclick="showRecipe(${c.mainClickId}, event)">${esc(c.main)}</div>`
+        : (c.sub ? `<div class="wt-sub">${esc(c.sub)}</div>` : ''))
+    : '';
+
+  // For non-meal: sub is the description
+  const subLine = task.task_type === 'meal' ? subHtml
+    : (c.sub ? `<div class="wt-sub">${esc(c.sub)}</div>` : '');
+
+  const titleText = task.task_type === 'meal' ? contextLabel : c.main;
 
   return `
-    <div class="week-task ${task.completed ? 'wt-completed' : ''}" id="wtask-${task.id}">
+    <div class="week-task type-${esc(task.task_type)} ${task.completed ? 'wt-completed' : ''}" id="wtask-${task.id}">
       <input type="checkbox" class="wt-check" ${task.completed ? 'checked' : ''}
         onchange="toggleTask(${task.id}, this, true)">
-      <span class="wt-time">${task.time || ''}</span>
+      <span class="wt-time">${esc(displayTime)}</span>
       <div class="wt-body">
-        ${titleHtml}
-        ${recipesHtml ? `<div class="wt-recipes">${recipesHtml}</div>` : ''}
+        <div class="wt-title">${esc(titleText)}</div>
+        ${task.task_type === 'meal' ? subHtml : subLine}
       </div>
     </div>
   `;
