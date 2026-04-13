@@ -150,7 +150,7 @@ func (s *Scheduler) getMealTimes(mealTime models.MealTime) []string {
 //   - pick randomly from recipes NOT in the used set ("fresh" pool)
 //   - if all recipes have been used (end of cycle), reset and pick from all
 func (s *Scheduler) selectRecipeForMeal(mealTimeID uint, mealTimeName, familyMember string, currentDate time.Time) (*models.Recipe, error) {
-	recipes, err := s.eligibleRecipes(mealTimeID, mealTimeName, familyMember)
+	recipes, err := s.eligibleRecipes(mealTimeID, mealTimeName)
 	if err != nil {
 		return nil, err
 	}
@@ -195,60 +195,19 @@ func (s *Scheduler) selectRecipeForMeal(mealTimeID uint, mealTimeName, familyMem
 	return &chosen, nil
 }
 
-// eligibleRecipes returns active recipes linked to the given meal time and family member.
-// Falls back progressively until it finds something.
-func (s *Scheduler) eligibleRecipes(mealTimeID uint, mealTimeName, familyMember string) ([]models.Recipe, error) {
+// eligibleRecipes returns active recipes linked to the given meal time via recipe_meal_times.
+// Only recipes explicitly assigned to this meal time are considered.
+func (s *Scheduler) eligibleRecipes(mealTimeID uint, mealTimeName string) ([]models.Recipe, error) {
 	var recipes []models.Recipe
-
-	// Primary: many-to-many join via recipe_meal_times
 	err := s.db.
 		Joins("JOIN recipe_meal_times ON recipe_meal_times.recipe_id = recipes.id").
 		Where("recipe_meal_times.meal_time_id = ?", mealTimeID).
-		Where("recipes.family_member = ? OR recipes.family_member = 'all' OR recipes.family_member = ''", familyMember).
 		Where("recipes.is_active = ?", true).
 		Find(&recipes).Error
 	if err != nil {
 		return nil, err
 	}
-	if len(recipes) > 0 {
-		return recipes, nil
-	}
-
-	// Fallback 1: case-insensitive category match
-	err = s.db.
-		Where("LOWER(category) = LOWER(?)", mealTimeName).
-		Where("family_member = ? OR family_member = 'all' OR family_member = ''", familyMember).
-		Where("is_active = ?", true).
-		Find(&recipes).Error
-	if err != nil {
-		return nil, err
-	}
-	if len(recipes) > 0 {
-		log.Printf("Meal time %d (%s): category fallback, found %d recipes", mealTimeID, mealTimeName, len(recipes))
-		return recipes, nil
-	}
-
-	// Fallback 2: all active recipes for this family member (including blank family_member)
-	err = s.db.
-		Where("family_member = ? OR family_member = 'all' OR family_member = ''", familyMember).
-		Where("is_active = ?", true).
-		Find(&recipes).Error
-	if err != nil {
-		return nil, err
-	}
-	if len(recipes) > 0 {
-		log.Printf("Meal time %d (%s): family_member fallback, found %d recipes", mealTimeID, mealTimeName, len(recipes))
-		return recipes, nil
-	}
-
-	// Fallback 3: all active recipes regardless of family_member
-	err = s.db.Where("is_active = ?", true).Find(&recipes).Error
-	if err != nil {
-		return nil, err
-	}
-	if len(recipes) > 0 {
-		log.Printf("Meal time %d (%s): global fallback (no family_member filter), found %d recipes", mealTimeID, mealTimeName, len(recipes))
-	}
+	log.Printf("Meal time %d (%s): found %d eligible recipes", mealTimeID, mealTimeName, len(recipes))
 	return recipes, nil
 }
 
