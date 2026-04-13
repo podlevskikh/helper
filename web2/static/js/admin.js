@@ -49,6 +49,10 @@ const api = {
     upcoming: (startDate, days) => apiFetch(`${HELPER}/schedule/upcoming?start_date=${startDate}&days=${days}`),
     regenerate: () => apiFetch(`${ADMIN}/regenerate-schedule`, { method: 'POST' }),
   },
+  tasks: {
+    get: id => apiFetch(`${ADMIN}/tasks/${id}`),
+    update: (id, d) => apiFetch(`${ADMIN}/tasks/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  },
   shopping: {
     list: () => apiFetch(`${HELPER}/shopping`),
     purchased: id => apiFetch(`${HELPER}/shopping/${id}/purchased`, { method: 'POST' }),
@@ -767,18 +771,24 @@ function renderCalendar() {
     const tasks = sched ? (sched.tasks || []) : [];
 
     const tasksHtml = tasks.length
-      ? tasks.sort((a, b) => (a.time || '').localeCompare(b.time || '')).map(t => `
+      ? tasks.sort((a, b) => (a.time || '').localeCompare(b.time || '')).map(t => {
+          const allRecipes = [...(t.recipes || [])];
+          if (t.recipe && !allRecipes.some(r => r.id === t.recipe.id)) allRecipes.unshift(t.recipe);
+          return `
           <div class="day-task">
-            <span class="task-time">${t.time || ''}</span>
+            <span class="task-time">${t.time || ''}${t.end_time ? '–' + t.end_time : ''}</span>
             <div class="task-body">
-              <div><span class="task-type type-${t.task_type}">${t.task_type}</span></div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="task-type type-${t.task_type}">${t.task_type}</span>
+                <button class="btn-icon" onclick="openEditTask(${t.id})" title="Edit" style="margin-left:auto">✏️</button>
+              </div>
               <div class="task-title">${esc(t.title)}</div>
               ${t.description ? `<div class="task-sub">${esc(t.description)}</div>` : ''}
-              ${(t.recipes || []).map(r => `<span class="badge badge-blue" style="font-size:11px">${esc(r.name)}</span>`).join(' ')}
+              ${allRecipes.map(r => `<span class="badge badge-blue" style="font-size:11px">${esc(r.name)}</span>`).join(' ')}
               ${(t.zones || []).map(z => `<span class="badge badge-green" style="font-size:11px">${esc(z.name)}</span>`).join(' ')}
             </div>
           </div>
-        `).join('')
+        `}).join('')
       : '<div class="day-card-empty">No tasks</div>';
 
     return `
@@ -792,6 +802,85 @@ function renderCalendar() {
     `;
   }).join('');
 }
+
+// ── TASK EDIT ─────────────────────────────────────────────────────
+
+async function openEditTask(taskId) {
+  try {
+    if (!allRecipes.length) allRecipes = await api.recipes.list().catch(() => []);
+    const task = await api.tasks.get(taskId);
+
+    document.getElementById('editTaskId').value = task.id;
+    document.getElementById('editTaskType').value = task.task_type;
+    document.getElementById('editTaskTime').value = task.time || '';
+    document.getElementById('editTaskEndTime').value = task.end_time || '';
+    document.getElementById('editTaskTitle').value = task.title || '';
+    document.getElementById('editTaskDescription').value = task.description || '';
+
+    // Show end_time only for childcare
+    document.getElementById('editTaskEndTimeGroup').style.display =
+      task.task_type === 'childcare' ? '' : 'none';
+
+    // Show recipes section only for meal tasks
+    const recipesGroup = document.getElementById('editTaskRecipesGroup');
+    if (task.task_type === 'meal') {
+      recipesGroup.style.display = '';
+      // Merge recipe + recipes fields
+      const selected = [...(task.recipes || [])];
+      if (task.recipe && !selected.some(r => r.id === task.recipe.id)) selected.unshift(task.recipe);
+      buildTaskRecipeCheckboxes(selected);
+    } else {
+      recipesGroup.style.display = 'none';
+    }
+
+    openModal('taskEditModal');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function buildTaskRecipeCheckboxes(selected = []) {
+  const container = document.getElementById('editTaskRecipesCheckboxes');
+  const selectedIds = new Set((selected || []).map(r => r.id));
+  container.innerHTML = allRecipes.map(r => `
+    <label class="checkbox-item ${selectedIds.has(r.id) ? 'checked' : ''}" data-id="${r.id}">
+      <input type="checkbox" value="${r.id}" ${selectedIds.has(r.id) ? 'checked' : ''} style="display:none">
+      <span>${esc(r.name)}</span>
+    </label>
+  `).join('');
+  container.querySelectorAll('.checkbox-item').forEach(lbl => {
+    lbl.addEventListener('click', () => {
+      const cb = lbl.querySelector('input');
+      cb.checked = !cb.checked;
+      lbl.classList.toggle('checked', cb.checked);
+    });
+  });
+}
+
+document.getElementById('saveTaskBtn').addEventListener('click', async () => {
+  const id = document.getElementById('editTaskId').value;
+  const taskType = document.getElementById('editTaskType').value;
+  const recipeIds = taskType === 'meal'
+    ? Array.from(document.querySelectorAll('#editTaskRecipesCheckboxes input:checked')).map(cb => parseInt(cb.value))
+    : [];
+
+  const data = {
+    time: document.getElementById('editTaskTime').value,
+    end_time: document.getElementById('editTaskEndTime').value,
+    title: document.getElementById('editTaskTitle').value.trim(),
+    description: document.getElementById('editTaskDescription').value.trim(),
+    recipe_ids: recipeIds,
+  };
+
+  try {
+    await api.tasks.update(id, data);
+    showToast('Task saved', 'success');
+    closeModal('taskEditModal');
+    loadCalendar();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+});
 
 // ── SHOPPING ──────────────────────────────────────────────────────
 async function loadShopping() {

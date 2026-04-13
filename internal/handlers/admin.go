@@ -535,7 +535,63 @@ func (h *AdminHandler) DeleteRecipeComment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted"})
 }
 
-// Task Recipe Management handlers
+// Task handlers
+
+// UpdateTask updates a schedule task fields and its recipe associations.
+func (h *AdminHandler) UpdateTask(c *gin.Context) {
+	id := c.Param("id")
+	var task models.ScheduleTask
+	if err := h.db.Preload("Recipes").First(&task, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
+	var input struct {
+		Time        string `json:"time"`
+		EndTime     string `json:"end_time"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		RecipeIDs   []uint `json:"recipe_ids"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	task.Time = input.Time
+	task.EndTime = input.EndTime
+	task.Title = input.Title
+	task.Description = input.Description
+
+	if err := h.db.Save(&task).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Replace recipe associations (many2many)
+	var recipes []models.Recipe
+	if len(input.RecipeIDs) > 0 {
+		if err := h.db.Find(&recipes, input.RecipeIDs).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find recipes"})
+			return
+		}
+	}
+	if err := h.db.Model(&task).Association("Recipes").Replace(recipes); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update recipes"})
+		return
+	}
+
+	// Also update the legacy RecipeID FK: set to first recipe if any
+	if len(recipes) > 0 {
+		task.RecipeID = &recipes[0].ID
+	} else {
+		task.RecipeID = nil
+	}
+	h.db.Save(&task)
+
+	h.db.Preload("Recipes").Preload("Recipe").First(&task, id)
+	c.JSON(http.StatusOK, task)
+}
 
 // GetTask returns a single task with its recipes and zones
 func (h *AdminHandler) GetTask(c *gin.Context) {

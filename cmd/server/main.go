@@ -127,6 +127,7 @@ func main() {
 
 			// Task management
 			api.GET("/tasks/:id", adminHandler.GetTask)
+			api.PUT("/tasks/:id", adminHandler.UpdateTask)
 			api.POST("/tasks/:id/recipes", adminHandler.AddRecipeToTask)
 			api.DELETE("/tasks/:id/recipes/:recipe_id", adminHandler.RemoveRecipeFromTask)
 			api.POST("/tasks/:id/zones", adminHandler.AddZoneToTask)

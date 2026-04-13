@@ -213,20 +213,24 @@ function renderTaskCard(task) {
     ? `<div class="tc-label">${esc(c.label)}</div>`
     : '';
 
-  const mainHtml = c.main
-    ? (c.mainClickId
-        ? `<div class="tc-main tc-recipe" onclick="showRecipe(${c.mainClickId}, event)">${esc(c.main)}</div>`
-        : `<div class="tc-main">${esc(c.main)}</div>`)
-    : '';
+  let mainHtml = '';
+  if (task.task_type === 'meal') {
+    const allR = getTaskRecipes(task);
+    if (allR.length > 0) {
+      mainHtml = allR.map(r =>
+        `<div class="tc-main tc-recipe" onclick="showRecipe(${r.id}, event)">${esc(r.name)}</div>`
+      ).join('');
+    } else if (c.main) {
+      mainHtml = `<div class="tc-main">${esc(c.main)}</div>`;
+    }
+  } else {
+    mainHtml = c.main
+      ? `<div class="tc-main">${esc(c.main)}</div>`
+      : '';
+  }
 
   const subHtml = c.sub
     ? `<div class="tc-sub">${esc(c.sub)}</div>`
-    : '';
-
-  const extrasHtml = c.extras.length
-    ? `<div class="tc-extras">${c.extras.map(r =>
-        `<button class="recipe-chip" onclick="showRecipe(${r.id}, event)">${esc(r.name)}</button>`
-      ).join('')}</div>`
     : '';
 
   return `
@@ -234,7 +238,7 @@ function renderTaskCard(task) {
       <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''}
         onchange="toggleTask(${task.id}, this)">
       <div class="task-info">
-        ${labelHtml}${mainHtml}${subHtml}${extrasHtml}
+        ${labelHtml}${mainHtml}${subHtml}
       </div>
     </div>
   `;
@@ -255,14 +259,20 @@ function renderWeekTask(task) {
     ? task.title   // "Breakfast - adult"
     : '';
 
-  const subHtml = c.main
-    ? (c.mainClickId
-        ? `<div class="wt-sub wt-recipe" onclick="showRecipe(${c.mainClickId}, event)">${esc(c.main)}</div>`
-        : (c.sub ? `<div class="wt-sub">${esc(c.sub)}</div>` : ''))
-    : '';
+  // For meal: show all recipes as clickable lines
+  let recipesHtml = '';
+  if (task.task_type === 'meal') {
+    const allR = getTaskRecipes(task);
+    recipesHtml = allR.map(r =>
+      `<div class="wt-sub wt-recipe" onclick="showRecipe(${r.id}, event)">${esc(r.name)}</div>`
+    ).join('');
+    if (!recipesHtml && c.sub) {
+      recipesHtml = `<div class="wt-sub">${esc(c.sub)}</div>`;
+    }
+  }
 
-  // For non-meal: sub is the description
-  const subLine = task.task_type === 'meal' ? subHtml
+  const subLine = task.task_type === 'meal'
+    ? recipesHtml
     : (c.sub ? `<div class="wt-sub">${esc(c.sub)}</div>` : '');
 
   const titleText = task.task_type === 'meal' ? contextLabel : c.main;
@@ -274,7 +284,7 @@ function renderWeekTask(task) {
       <span class="wt-time">${esc(displayTime)}</span>
       <div class="wt-body">
         <div class="wt-title">${esc(titleText)}</div>
-        ${task.task_type === 'meal' ? subHtml : subLine}
+        ${subLine}
       </div>
     </div>
   `;
