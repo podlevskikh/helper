@@ -414,11 +414,12 @@ func (h *AdminHandler) DeleteCleaningZone(c *gin.Context) {
 func (h *AdminHandler) GetChildcareSchedules(c *gin.Context) {
 	var schedules []models.ChildcareSchedule
 
-	// Get schedules for the next 30 days
-	startDate := time.Now()
-	endDate := startDate.AddDate(0, 0, 30)
+	// Normalize to UTC midnight so today's entries are always included
+	now := time.Now().UTC()
+	startDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	endDate := startDate.AddDate(0, 0, 60)
 
-	if err := h.db.Where("date BETWEEN ? AND ?", startDate, endDate).
+	if err := h.db.Where("date >= ? AND date < ?", startDate, endDate).
 		Order("date, start_time").Find(&schedules).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

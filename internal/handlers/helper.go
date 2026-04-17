@@ -18,22 +18,85 @@ func NewHelperHandler(db *gorm.DB) *HelperHandler {
 	return &HelperHandler{db: db}
 }
 
+// mergeChildcareTasks ensures all ChildcareSchedule entries for `date` have a
+// corresponding ScheduleTask in the given schedule. Missing tasks are created in
+// the DB and appended to schedule.Tasks.  `date` is the local calendar date.
+func (h *HelperHandler) mergeChildcareTasks(schedule *models.DailySchedule, date time.Time) {
+	utcDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+	nextDay := utcDate.AddDate(0, 0, 1)
+
+	var ccList []models.ChildcareSchedule
+	if err := h.db.Where("date >= ? AND date < ?", utcDate, nextDay).Find(&ccList).Error; err != nil {
+		return
+	}
+
+	// Build set of existing childcare task start times so we don't duplicate.
+	existing := make(map[string]bool)
+	for _, t := range schedule.Tasks {
+		if t.TaskType == "childcare" {
+			existing[t.Time] = true
+		}
+	}
+
+	for _, cc := range ccList {
+		if existing[cc.StartTime] {
+			continue
+		}
+		task := models.ScheduleTask{
+			ScheduleID:  schedule.ID,
+			TaskType:    "childcare",
+			Time:        cc.StartTime,
+			EndTime:     cc.EndTime,
+			Duration:    childcareDuration(cc.StartTime, cc.EndTime),
+			Title:       "Childcare",
+			Description: cc.Notes,
+			Completed:   false,
+		}
+		if err := h.db.Create(&task).Error; err == nil {
+			schedule.Tasks = append(schedule.Tasks, task)
+		}
+	}
+}
+
+// childcareDuration returns duration in minutes between two "HH:MM" strings.
+func childcareDuration(startTime, endTime string) int {
+	start, _ := time.Parse("15:04", startTime)
+	end, _ := time.Parse("15:04", endTime)
+	return int(end.Sub(start).Minutes())
+}
+
 // GetTodaySchedule returns today's schedule with all tasks
 func (h *HelperHandler) GetTodaySchedule(c *gin.Context) {
 	today := time.Now()
 	todayStart := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
 
 	var schedule models.DailySchedule
-	if err := h.db.Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
-		Where("date = ?", todayStart).First(&schedule).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	err := h.db.Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
+		Where("date = ?", todayStart).First(&schedule).Error
+
+	if err == gorm.ErrRecordNotFound {
+		// No generated schedule yet — create a minimal one if childcare entries exist.
+		utcDate := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
+		var ccCount int64
+		h.db.Model(&models.ChildcareSchedule{}).
+			Where("date >= ? AND date < ?", utcDate, utcDate.AddDate(0, 0, 1)).
+			Count(&ccCount)
+		if ccCount == 0 {
 			c.JSON(http.StatusOK, gin.H{"message": "No schedule for today", "tasks": []models.ScheduleTask{}})
 			return
 		}
+		schedule = models.DailySchedule{Date: todayStart, Generated: false}
+		if createErr := h.db.Create(&schedule).Error; createErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": createErr.Error()})
+			return
+		}
+		schedule.Tasks = []models.ScheduleTask{}
+	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.mergeChildcareTasks(&schedule, today)
 	c.JSON(http.StatusOK, schedule)
 }
 
@@ -47,16 +110,32 @@ func (h *HelperHandler) GetScheduleByDate(c *gin.Context) {
 	}
 
 	var schedule models.DailySchedule
-	if err := h.db.Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
-		Where("date = ?", date).First(&schedule).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	loadErr := h.db.Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
+		Where("date = ?", date).First(&schedule).Error
+
+	if loadErr == gorm.ErrRecordNotFound {
+		// No generated schedule yet — create a minimal one if childcare entries exist.
+		utcDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+		var ccCount int64
+		h.db.Model(&models.ChildcareSchedule{}).
+			Where("date >= ? AND date < ?", utcDate, utcDate.AddDate(0, 0, 1)).
+			Count(&ccCount)
+		if ccCount == 0 {
 			c.JSON(http.StatusOK, gin.H{"message": "No schedule for this date", "tasks": []models.ScheduleTask{}})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		schedule = models.DailySchedule{Date: date, Generated: false}
+		if createErr := h.db.Create(&schedule).Error; createErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": createErr.Error()})
+			return
+		}
+		schedule.Tasks = []models.ScheduleTask{}
+	} else if loadErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": loadErr.Error()})
 		return
 	}
 
+	h.mergeChildcareTasks(&schedule, date)
 	c.JSON(http.StatusOK, schedule)
 }
 
@@ -91,6 +170,11 @@ func (h *HelperHandler) GetUpcomingSchedules(c *gin.Context) {
 		Order("date").Find(&schedules).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Merge childcare entries into existing schedules.
+	for i := range schedules {
+		h.mergeChildcareTasks(&schedules[i], schedules[i].Date)
 	}
 
 	c.JSON(http.StatusOK, schedules)
