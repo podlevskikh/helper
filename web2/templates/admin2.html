@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Helper Admin</title>
-    <link rel="stylesheet" href="/static2/css/admin.css">
+    <link rel="stylesheet" href="/static2/css/admin.css?v=2">
 </head>
 <body>
     <header class="header">
@@ -377,6 +377,37 @@
         </div>
     </div>
 
+    <!-- Custom Task Modal -->
+    <div class="modal-overlay" id="customTaskModal">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3>Add Custom Task</h3>
+                <button class="modal-close" data-modal="customTaskModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="customTaskDate">
+                <div class="form-row">
+                    <div class="form-group" style="flex:1">
+                        <label>Time</label>
+                        <input type="time" id="customTaskTime">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Title *</label>
+                    <input type="text" id="customTaskTitle" placeholder="Prepare room for mom...">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="customTaskDescription" rows="2" style="width:100%;resize:vertical" placeholder="Details..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-modal="customTaskModal">Cancel</button>
+                <button class="btn btn-primary" id="saveCustomTaskBtn">Add</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Task Edit Modal -->
     <div class="modal-overlay" id="taskEditModal">
         <div class="modal modal-lg">
@@ -435,6 +466,6 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="/static2/js/admin.js"></script>
+    <script src="/static2/js/admin.js?v=3"></script>
 </body>
 </html>

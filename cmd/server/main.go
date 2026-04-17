@@ -133,35 +133,60 @@ func main() {
 			api.POST("/tasks/:id/zones", adminHandler.AddZoneToTask)
 			api.DELETE("/tasks/:id/zones/:zone_id", adminHandler.RemoveZoneFromTask)
 
+			// Custom one-off tasks
+			api.POST("/custom-tasks", adminHandler.CreateCustomTask)
+			api.DELETE("/custom-tasks/:id", adminHandler.DeleteCustomTask)
+
 			// Schedule management
 			api.POST("/regenerate-schedule", func(c *gin.Context) {
 				days := 7
 
-				// Delete existing schedules for the next N days
-				today := time.Now()
+				// Normalize to start of day so today's schedule is always included
+				now := time.Now()
+				today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 				endDate := today.AddDate(0, 0, days)
 
 				log.Println("Clearing schedules from", today.Format("2006-01-02"), "to", endDate.Format("2006-01-02"))
 
-				// Delete in correct order to respect foreign key constraints:
-				// 1. Delete meal_recipes (references schedule_tasks)
-				if err := db.Exec("DELETE FROM meal_recipes WHERE schedule_task_id IN (SELECT id FROM schedule_tasks WHERE schedule_id IN (SELECT id FROM daily_schedules WHERE date >= ? AND date < ?))", today, endDate).Error; err != nil {
+				// Delete in correct order, but KEEP custom tasks (task_type = 'custom')
+				// 1. Delete meal_recipes for non-custom tasks
+				if err := db.Exec(`DELETE FROM meal_recipes WHERE schedule_task_id IN (
+					SELECT st.id FROM schedule_tasks st
+					JOIN daily_schedules ds ON ds.id = st.schedule_id
+					WHERE ds.date >= ? AND ds.date < ? AND st.task_type != 'custom'
+				)`, today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to delete meal_recipes: %v", err)
 				}
 
-				// 2. Delete task_zones (references schedule_tasks)
-				if err := db.Exec("DELETE FROM task_zones WHERE schedule_task_id IN (SELECT id FROM schedule_tasks WHERE schedule_id IN (SELECT id FROM daily_schedules WHERE date >= ? AND date < ?))", today, endDate).Error; err != nil {
+				// 2. Delete task_zones for non-custom tasks
+				if err := db.Exec(`DELETE FROM task_zones WHERE schedule_task_id IN (
+					SELECT st.id FROM schedule_tasks st
+					JOIN daily_schedules ds ON ds.id = st.schedule_id
+					WHERE ds.date >= ? AND ds.date < ? AND st.task_type != 'custom'
+				)`, today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to delete task_zones: %v", err)
 				}
 
-				// 3. Delete schedule_tasks (references daily_schedules)
-				if err := db.Exec("DELETE FROM schedule_tasks WHERE schedule_id IN (SELECT id FROM daily_schedules WHERE date >= ? AND date < ?)", today, endDate).Error; err != nil {
+				// 3. Delete non-custom schedule_tasks
+				if err := db.Exec(`DELETE FROM schedule_tasks
+					WHERE task_type != 'custom'
+					AND schedule_id IN (SELECT id FROM daily_schedules WHERE date >= ? AND date < ?)`,
+					today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to delete schedule tasks: %v", err)
 				}
 
-				// 4. Delete daily_schedules
-				if err := db.Exec("DELETE FROM daily_schedules WHERE date >= ? AND date < ?", today, endDate).Error; err != nil {
-					log.Printf("Warning: Failed to delete daily schedules: %v", err)
+				// 4. Delete daily_schedules that have no tasks left
+				if err := db.Exec(`DELETE FROM daily_schedules
+					WHERE date >= ? AND date < ?
+					AND id NOT IN (SELECT DISTINCT schedule_id FROM schedule_tasks)`,
+					today, endDate).Error; err != nil {
+					log.Printf("Warning: Failed to delete empty daily schedules: %v", err)
+				}
+
+				// 5. Reset generated=false on schedules that still exist (have custom tasks only)
+				if err := db.Exec(`UPDATE daily_schedules SET generated = false
+					WHERE date >= ? AND date < ?`, today, endDate).Error; err != nil {
+					log.Printf("Warning: Failed to reset generated flag: %v", err)
 				}
 
 				log.Println("Old schedules cleared, generating new schedules...")

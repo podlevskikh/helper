@@ -49,6 +49,10 @@ const api = {
     upcoming: (startDate, days) => apiFetch(`${HELPER}/schedule/upcoming?start_date=${startDate}&days=${days}`),
     regenerate: () => apiFetch(`${ADMIN}/regenerate-schedule`, { method: 'POST' }),
   },
+  customTasks: {
+    create: d => apiFetch(`${ADMIN}/custom-tasks`, { method: 'POST', body: JSON.stringify(d) }),
+    delete: id => apiFetch(`${ADMIN}/custom-tasks/${id}`, { method: 'DELETE' }),
+  },
   tasks: {
     get: id => apiFetch(`${ADMIN}/tasks/${id}`),
     update: (id, d) => apiFetch(`${ADMIN}/tasks/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
@@ -138,7 +142,10 @@ function getMondayOfWeek(offset = 0) {
 }
 
 function fmtDateParam(d) {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function dayLabel(isoDate) {
@@ -761,6 +768,7 @@ function renderCalendar() {
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
+    if (d.getDay() === 0) continue; // skip Sunday
     days.push(d);
   }
 
@@ -774,13 +782,17 @@ function renderCalendar() {
       ? tasks.sort((a, b) => (a.time || '').localeCompare(b.time || '')).map(t => {
           const allRecipes = [...(t.recipes || [])];
           if (t.recipe && !allRecipes.some(r => r.id === t.recipe.id)) allRecipes.unshift(t.recipe);
+          const isCustom = t.task_type === 'custom';
           return `
-          <div class="day-task">
+          <div class="day-task${isCustom ? ' day-task-custom' : ''}">
             <span class="task-time">${t.time || ''}${t.end_time ? '–' + t.end_time : ''}</span>
             <div class="task-body">
               <div style="display:flex;align-items:center;gap:6px">
                 <span class="task-type type-${t.task_type}">${t.task_type}</span>
-                <button class="btn-icon" onclick="openEditTask(${t.id})" title="Edit" style="margin-left:auto">✏️</button>
+                ${isCustom
+                  ? `<button class="btn-icon danger" onclick="deleteCustomTask(${t.id})" title="Delete" style="margin-left:auto">🗑️</button>`
+                  : `<button class="btn-icon" onclick="openEditTask(${t.id})" title="Edit" style="margin-left:auto">✏️</button>`
+                }
               </div>
               <div class="task-title">${esc(t.title)}</div>
               ${t.description ? `<div class="task-sub">${esc(t.description)}</div>` : ''}
@@ -796,11 +808,51 @@ function renderCalendar() {
         <div class="day-card-header">
           <div class="day-name">${name}</div>
           <div class="day-date">${date}</div>
+          <button class="btn-icon" onclick="openAddCustomTask('${key}')" title="Add task" style="margin-left:auto">＋</button>
         </div>
         <div class="day-card-body">${tasksHtml}</div>
       </div>
     `;
   }).join('');
+}
+
+// ── CUSTOM TASKS ──────────────────────────────────────────────────
+
+function openAddCustomTask(dateStr) {
+  document.getElementById('customTaskDate').value = dateStr;
+  document.getElementById('customTaskTime').value = '';
+  document.getElementById('customTaskTitle').value = '';
+  document.getElementById('customTaskDescription').value = '';
+  openModal('customTaskModal');
+}
+
+document.getElementById('saveCustomTaskBtn').addEventListener('click', async () => {
+  const data = {
+    date: document.getElementById('customTaskDate').value,
+    time: document.getElementById('customTaskTime').value,
+    title: document.getElementById('customTaskTitle').value.trim(),
+    description: document.getElementById('customTaskDescription').value.trim(),
+  };
+  if (!data.title) { showToast('Title is required', 'error'); return; }
+  try {
+    await api.customTasks.create(data);
+    showToast('Task added', 'success');
+    closeModal('customTaskModal');
+    loadCalendar();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+});
+
+async function deleteCustomTask(id) {
+  if (!confirm('Delete this custom task?')) return;
+  try {
+    await api.customTasks.delete(id);
+    showToast('Task deleted', 'success');
+    loadCalendar();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
 }
 
 // ── TASK EDIT ─────────────────────────────────────────────────────

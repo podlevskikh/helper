@@ -50,13 +50,13 @@ func IsHoliday(db *gorm.DB, date time.Time) bool {
 		return true
 	}
 
-	// Check if it's a public holiday
+	// Check if it's a public holiday — exact date match only.
+	// Recurring logic is disabled: holidays stored with a past year date
+	// would otherwise block the same month/day in every future year.
 	var count int64
-	// PostgreSQL uses EXTRACT for date extraction
-	db.Model(&models.Holiday{}).Where(
-		"(is_recurring = ? AND EXTRACT(MONTH FROM date) = ? AND EXTRACT(DAY FROM date) = ?) OR date = ?",
-		true, int(date.Month()), date.Day(), date.Format("2006-01-02"),
-	).Count(&count)
+	db.Model(&models.Holiday{}).
+		Where("date = ?", date.Format("2006-01-02")).
+		Count(&count)
 
 	return count > 0
 }

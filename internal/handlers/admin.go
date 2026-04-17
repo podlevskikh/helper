@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -391,6 +392,16 @@ func (h *AdminHandler) UpdateCleaningZone(c *gin.Context) {
 
 func (h *AdminHandler) DeleteCleaningZone(c *gin.Context) {
 	id := c.Param("id")
+
+	// Clear many2many references in task_zones
+	if err := h.db.Exec("DELETE FROM task_zones WHERE cleaning_zone_id = ?", id).Error; err != nil {
+		log.Printf("Warning: failed to clear task_zones for zone %s: %v", id, err)
+	}
+	// Clear deprecated zone_id FK in schedule_tasks
+	if err := h.db.Exec("UPDATE schedule_tasks SET zone_id = NULL WHERE zone_id = ?", id).Error; err != nil {
+		log.Printf("Warning: failed to clear zone_id FK for zone %s: %v", id, err)
+	}
+
 	if err := h.db.Delete(&models.CleaningZone{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -768,5 +779,76 @@ func (h *AdminHandler) RemoveZoneFromTask(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, task)
+}
+
+// ── Custom Tasks ──────────────────────────────────────────────────────────────
+
+// CreateCustomTask adds a one-off task to a specific date.
+// Custom tasks survive schedule regeneration.
+func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
+	var input struct {
+		Date        string `json:"date"`
+		Time        string `json:"time"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if input.Title == "" || input.Date == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "date and title are required"})
+		return
+	}
+
+	date, err := time.Parse("2006-01-02", input.Date)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date format, use YYYY-MM-DD"})
+		return
+	}
+	date = time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+
+	// Find or create daily_schedule for this date
+	var schedule models.DailySchedule
+	if err := h.db.Where("date = ?", date).First(&schedule).Error; err != nil {
+		schedule = models.DailySchedule{Date: date, Generated: false}
+		if err := h.db.Create(&schedule).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create schedule"})
+			return
+		}
+	}
+
+	task := models.ScheduleTask{
+		ScheduleID:  schedule.ID,
+		TaskType:    "custom",
+		Time:        input.Time,
+		Title:       input.Title,
+		Description: input.Description,
+		Completed:   false,
+	}
+	if err := h.db.Create(&task).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, task)
+}
+
+// DeleteCustomTask removes a custom task by ID.
+func (h *AdminHandler) DeleteCustomTask(c *gin.Context) {
+	id := c.Param("id")
+	var task models.ScheduleTask
+	if err := h.db.First(&task, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+	if task.TaskType != "custom" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "only custom tasks can be deleted this way"})
+		return
+	}
+	if err := h.db.Delete(&task).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Custom task deleted"})
 }
 

@@ -153,6 +153,7 @@ body {
 .task-card.type-meal      { border-left-color: #3b82f6; }
 .task-card.type-cleaning  { border-left-color: #10b981; }
 .task-card.type-childcare { border-left-color: #8b5cf6; }
+.task-card.type-custom    { border-left-color: #f59e0b; }
 
 .task-checkbox {
   width: 24px;
@@ -271,6 +272,7 @@ body {
 .week-task.type-meal      { border-left-color: #93c5fd; }
 .week-task.type-cleaning  { border-left-color: #6ee7b7; }
 .week-task.type-childcare { border-left-color: #c4b5fd; }
+.week-task.type-custom    { border-left-color: #fbbf24; }
 
 .wt-check {
   width: 20px;

@@ -43,19 +43,27 @@ func (s *Scheduler) GenerateScheduleForDate(date time.Time) error {
 	var existingSchedule models.DailySchedule
 	result := s.db.Where("date = ?", date).First(&existingSchedule)
 
+	var schedule models.DailySchedule
 	if result.Error == nil {
-		log.Printf("Schedule already exists for %s, skipping", date.Format("2006-01-02"))
-		return nil
-	}
-
-	// Create new daily schedule
-	schedule := models.DailySchedule{
-		Date:      date,
-		Generated: true,
-	}
-
-	if err := s.db.Create(&schedule).Error; err != nil {
-		return fmt.Errorf("failed to create daily schedule: %w", err)
+		if existingSchedule.Generated {
+			log.Printf("Schedule already generated for %s, skipping", date.Format("2006-01-02"))
+			return nil
+		}
+		// Exists but not yet generated (e.g. holds custom tasks) — generate into it
+		schedule = existingSchedule
+		schedule.Generated = true
+		if err := s.db.Save(&schedule).Error; err != nil {
+			return fmt.Errorf("failed to update daily schedule: %w", err)
+		}
+	} else {
+		// Create new daily schedule
+		schedule = models.DailySchedule{
+			Date:      date,
+			Generated: true,
+		}
+		if err := s.db.Create(&schedule).Error; err != nil {
+			return fmt.Errorf("failed to create daily schedule: %w", err)
+		}
 	}
 
 	// Generate meal tasks

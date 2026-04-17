@@ -53,7 +53,10 @@ function getMondayOfWeek(offset = 0) {
 }
 
 function fmtDateParam(d) {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function formatDayHeader(isoDate) {
@@ -195,12 +198,12 @@ function taskContent(task) {
     };
   }
 
-  // fallback
+  // custom / fallback
   return {
-    label:       timeRange,
-    main:        task.title,
+    label:       timeStr ? timeStr + '  ' + task.title : task.title,
+    main:        task.description || '',
     mainClickId: null,
-    sub:         task.description || '',
+    sub:         '',
     extras:      [],
   };
 }
@@ -360,6 +363,7 @@ async function loadWeek(weekOffset, containerId) {
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
+      if (d.getDay() === 0) continue; // skip Sunday
       days.push(d);
     }
 
