@@ -808,7 +808,7 @@ function renderCalendar() {
         <div class="day-card-header">
           <div class="day-name">${name}</div>
           <div class="day-date">${date}</div>
-          <button class="btn-icon" onclick="openAddCustomTask('${key}')" title="Add task" style="margin-left:auto">＋</button>
+          <button class="btn-icon" onclick="openAddCustomTask('${key}')" title="Add task">＋</button>
         </div>
         <div class="day-card-body">${tasksHtml}</div>
       </div>

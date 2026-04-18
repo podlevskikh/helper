@@ -337,9 +337,14 @@ body {
   background: var(--primary);
   color: #fff;
   padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .day-card-header .day-name { font-weight: 600; font-size: 13.5px; }
 .day-card-header .day-date { opacity: 0.75; font-size: 11.5px; }
+.day-card-header .btn-icon { color: rgba(255,255,255,0.75); margin-left: auto; }
+.day-card-header .btn-icon:hover { background: rgba(255,255,255,0.18); color: #fff; }
 .day-card-body { padding: 4px 0; }
 .day-task {
   display: flex;
