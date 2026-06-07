@@ -48,6 +48,13 @@ func Initialize(databaseURL string) error {
 
 	// Run migrations
 	err = DB.AutoMigrate(
+		// Идентичность и мультиарендность (M1)
+		&models.User{},
+		&models.Organization{},
+		&models.Membership{},
+		&models.Invite{},
+		&models.RefreshToken{},
+		// Домен
 		&models.Recipe{},
 		&models.MealTime{},
 		&models.CleaningZone{},
