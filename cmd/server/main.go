@@ -111,7 +111,6 @@ func main() {
 		orgsGroup.POST("/:orgId/invites", inviteHandler.CreateInvite)
 	}
 
-	_ = orgMw // используется выше
 
 	// New UI routes
 	router.GET("/admin2/", func(c *gin.Context) {
@@ -130,8 +129,8 @@ func main() {
 			c.HTML(200, "admin.html", nil)
 		})
 
-		// API routes
-		api := admin.Group("/api")
+		// API routes (auth + org required; RBAC через Require() на уровне хендлера)
+		api := admin.Group("/api", authMw, orgMw)
 		{
 			// Recipes
 			api.GET("/recipes", adminHandler.GetRecipes)
@@ -251,8 +250,8 @@ func main() {
 			c.HTML(200, "helper.html", nil)
 		})
 
-		// API routes
-		api := helper.Group("/api")
+		// API routes (auth + org required)
+		api := helper.Group("/api", authMw, orgMw)
 		{
 			// Schedule
 			api.GET("/schedule/today", helperHandler.GetTodaySchedule)
