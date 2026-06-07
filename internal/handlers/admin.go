@@ -573,11 +573,13 @@ func (h *AdminHandler) UpdateTask(c *gin.Context) {
 	}
 
 	var input struct {
-		Time        string `json:"time"`
-		EndTime     string `json:"end_time"`
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		RecipeIDs   []uint `json:"recipe_ids"`
+		Time               string `json:"time"`
+		EndTime            string `json:"end_time"`
+		Title              string `json:"title"`
+		Description        string `json:"description"`
+		RecipeIDs          []uint `json:"recipe_ids"`
+		TaskCategoryID     *uint  `json:"task_category_id"`
+		AssignedToUserID   *uint  `json:"assigned_to_user_id"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -588,6 +590,8 @@ func (h *AdminHandler) UpdateTask(c *gin.Context) {
 	task.EndTime = input.EndTime
 	task.Title = input.Title
 	task.Description = input.Description
+	task.TaskCategoryID = input.TaskCategoryID
+	task.AssignedToUserID = input.AssignedToUserID
 
 	if err := h.db.Save(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -802,10 +806,12 @@ func (h *AdminHandler) RemoveZoneFromTask(c *gin.Context) {
 // Custom tasks survive schedule regeneration.
 func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
 	var input struct {
-		Date        string `json:"date"`
-		Time        string `json:"time"`
-		Title       string `json:"title"`
-		Description string `json:"description"`
+		Date               string `json:"date"`
+		Time               string `json:"time"`
+		Title              string `json:"title"`
+		Description        string `json:"description"`
+		TaskCategoryID     *uint  `json:"task_category_id"`
+		AssignedToUserID   *uint  `json:"assigned_to_user_id"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -825,8 +831,8 @@ func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
 
 	// Find or create daily_schedule for this date
 	var schedule models.DailySchedule
-	if err := h.db.Where("date = ?", date).First(&schedule).Error; err != nil {
-		schedule = models.DailySchedule{Date: date, Generated: false}
+	if err := h.db.Where("date = ? AND organization_id = ?", date, h.orgID(c)).First(&schedule).Error; err != nil {
+		schedule = models.DailySchedule{Date: date, Generated: false, OrganizationID: h.orgID(c)}
 		if err := h.db.Create(&schedule).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create schedule"})
 			return
@@ -834,12 +840,15 @@ func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
 	}
 
 	task := models.ScheduleTask{
-		ScheduleID:  schedule.ID,
-		TaskType:    "custom",
-		Time:        input.Time,
-		Title:       input.Title,
-		Description: input.Description,
-		Completed:   false,
+		ScheduleID:         schedule.ID,
+		OrganizationID:     h.orgID(c),
+		TaskType:           "custom",
+		Time:               input.Time,
+		Title:              input.Title,
+		Description:        input.Description,
+		TaskCategoryID:     input.TaskCategoryID,
+		AssignedToUserID:   input.AssignedToUserID,
+		Completed:          false,
 	}
 	if err := h.db.Create(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

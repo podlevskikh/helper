@@ -31,6 +31,22 @@ func (h *HelperHandler) orgID(c *gin.Context) uint {
 	return middleware.MustMembership(c).OrganizationID
 }
 
+// taskPreload возвращает функцию Preload для задач с фильтром по assigned_to_user_id.
+// Хелпер видит только свои задачи + неназначенные; owner/admin/manager — все.
+func (h *HelperHandler) taskPreload(c *gin.Context) func(*gorm.DB) *gorm.DB {
+	m := middleware.MustMembership(c)
+	userID, _ := c.Get("user_id")
+	uid, _ := userID.(uint)
+
+	return func(db *gorm.DB) *gorm.DB {
+		q := db.Preload("Recipe").Preload("Recipes").Preload("Zone").Preload("Zones").Preload("TaskCategory")
+		if m.Role == models.RoleHelper {
+			q = q.Where("assigned_to_user_id IS NULL OR assigned_to_user_id = ?", uid)
+		}
+		return q
+	}
+}
+
 // mergeChildcareTasks ensures all ChildcareSchedule entries for `date` have a
 // corresponding ScheduleTask in the given schedule. Missing tasks are created in
 // the DB and appended to schedule.Tasks.  `date` is the local calendar date.
@@ -84,7 +100,7 @@ func (h *HelperHandler) GetTodaySchedule(c *gin.Context) {
 	todayStart := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
 
 	var schedule models.DailySchedule
-	err := h.orgDB(c).Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
+	err := h.orgDB(c).Preload("Tasks", h.taskPreload(c)).
 		Where("date = ?", todayStart).First(&schedule).Error
 
 	if err == gorm.ErrRecordNotFound {
@@ -123,7 +139,7 @@ func (h *HelperHandler) GetScheduleByDate(c *gin.Context) {
 	}
 
 	var schedule models.DailySchedule
-	loadErr := h.orgDB(c).Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
+	loadErr := h.orgDB(c).Preload("Tasks", h.taskPreload(c)).
 		Where("date = ?", date).First(&schedule).Error
 
 	if loadErr == gorm.ErrRecordNotFound {
@@ -178,7 +194,7 @@ func (h *HelperHandler) GetUpcomingSchedules(c *gin.Context) {
 	endDate := startDate.AddDate(0, 0, days)
 
 	var schedules []models.DailySchedule
-	if err := h.orgDB(c).Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
+	if err := h.orgDB(c).Preload("Tasks", h.taskPreload(c)).
 		Where("date >= ? AND date < ?", startDate, endDate).
 		Order("date").Find(&schedules).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
