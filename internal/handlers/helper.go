@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"net/http"
-	"podlevskikh/awesomeProject/internal/models"
 	"strconv"
 	"time"
+
+	"podlevskikh/awesomeProject/internal/middleware"
+	"podlevskikh/awesomeProject/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -16,6 +18,17 @@ type HelperHandler struct {
 
 func NewHelperHandler(db *gorm.DB) *HelperHandler {
 	return &HelperHandler{db: db}
+}
+
+// orgDB возвращает DB-сессию, скоупленную по organization_id из контекста.
+func (h *HelperHandler) orgDB(c *gin.Context) *gorm.DB {
+	m := middleware.MustMembership(c)
+	return h.db.Where("organization_id = ?", m.OrganizationID)
+}
+
+// orgID извлекает OrganizationID из контекста.
+func (h *HelperHandler) orgID(c *gin.Context) uint {
+	return middleware.MustMembership(c).OrganizationID
 }
 
 // mergeChildcareTasks ensures all ChildcareSchedule entries for `date` have a
@@ -71,21 +84,21 @@ func (h *HelperHandler) GetTodaySchedule(c *gin.Context) {
 	todayStart := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
 
 	var schedule models.DailySchedule
-	err := h.db.Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
+	err := h.orgDB(c).Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
 		Where("date = ?", todayStart).First(&schedule).Error
 
 	if err == gorm.ErrRecordNotFound {
 		// No generated schedule yet — create a minimal one if childcare entries exist.
 		utcDate := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
 		var ccCount int64
-		h.db.Model(&models.ChildcareSchedule{}).
+		h.orgDB(c).Model(&models.ChildcareSchedule{}).
 			Where("date >= ? AND date < ?", utcDate, utcDate.AddDate(0, 0, 1)).
 			Count(&ccCount)
 		if ccCount == 0 {
 			c.JSON(http.StatusOK, gin.H{"message": "No schedule for today", "tasks": []models.ScheduleTask{}})
 			return
 		}
-		schedule = models.DailySchedule{Date: todayStart, Generated: false}
+		schedule = models.DailySchedule{Date: todayStart, Generated: false, OrganizationID: h.orgID(c)}
 		if createErr := h.db.Create(&schedule).Error; createErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": createErr.Error()})
 			return
@@ -110,21 +123,21 @@ func (h *HelperHandler) GetScheduleByDate(c *gin.Context) {
 	}
 
 	var schedule models.DailySchedule
-	loadErr := h.db.Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
+	loadErr := h.orgDB(c).Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
 		Where("date = ?", date).First(&schedule).Error
 
 	if loadErr == gorm.ErrRecordNotFound {
 		// No generated schedule yet — create a minimal one if childcare entries exist.
 		utcDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 		var ccCount int64
-		h.db.Model(&models.ChildcareSchedule{}).
+		h.orgDB(c).Model(&models.ChildcareSchedule{}).
 			Where("date >= ? AND date < ?", utcDate, utcDate.AddDate(0, 0, 1)).
 			Count(&ccCount)
 		if ccCount == 0 {
 			c.JSON(http.StatusOK, gin.H{"message": "No schedule for this date", "tasks": []models.ScheduleTask{}})
 			return
 		}
-		schedule = models.DailySchedule{Date: date, Generated: false}
+		schedule = models.DailySchedule{Date: date, Generated: false, OrganizationID: h.orgID(c)}
 		if createErr := h.db.Create(&schedule).Error; createErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": createErr.Error()})
 			return
@@ -165,7 +178,7 @@ func (h *HelperHandler) GetUpcomingSchedules(c *gin.Context) {
 	endDate := startDate.AddDate(0, 0, days)
 
 	var schedules []models.DailySchedule
-	if err := h.db.Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
+	if err := h.orgDB(c).Preload("Tasks.Recipe").Preload("Tasks.Recipes").Preload("Tasks.Zone").Preload("Tasks.Zones").
 		Where("date >= ? AND date < ?", startDate, endDate).
 		Order("date").Find(&schedules).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -183,9 +196,9 @@ func (h *HelperHandler) GetUpcomingSchedules(c *gin.Context) {
 // CompleteTask marks a task as completed
 func (h *HelperHandler) CompleteTask(c *gin.Context) {
 	taskID := c.Param("id")
-	
+
 	var task models.ScheduleTask
-	if err := h.db.First(&task, taskID).Error; err != nil {
+	if err := h.orgDB(c).First(&task, taskID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
@@ -202,9 +215,9 @@ func (h *HelperHandler) CompleteTask(c *gin.Context) {
 // UncompleteTask marks a task as not completed
 func (h *HelperHandler) UncompleteTask(c *gin.Context) {
 	taskID := c.Param("id")
-	
+
 	var task models.ScheduleTask
-	if err := h.db.First(&task, taskID).Error; err != nil {
+	if err := h.orgDB(c).First(&task, taskID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
@@ -222,7 +235,7 @@ func (h *HelperHandler) UncompleteTask(c *gin.Context) {
 
 func (h *HelperHandler) GetShoppingList(c *gin.Context) {
 	var items []models.ShoppingListItem
-	if err := h.db.Where("purchased = ?", false).Order("category, item").Find(&items).Error; err != nil {
+	if err := h.orgDB(c).Where("purchased = ?", false).Order("category, item").Find(&items).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -237,7 +250,8 @@ func (h *HelperHandler) AddShoppingListItem(c *gin.Context) {
 	}
 	
 	item.AddedBy = "helper"
-	
+	item.OrganizationID = h.orgID(c)
+
 	if err := h.db.Create(&item).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -248,9 +262,9 @@ func (h *HelperHandler) AddShoppingListItem(c *gin.Context) {
 
 func (h *HelperHandler) MarkItemPurchased(c *gin.Context) {
 	itemID := c.Param("id")
-	
+
 	var item models.ShoppingListItem
-	if err := h.db.First(&item, itemID).Error; err != nil {
+	if err := h.orgDB(c).First(&item, itemID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Item not found"})
 		return
 	}
@@ -266,7 +280,7 @@ func (h *HelperHandler) MarkItemPurchased(c *gin.Context) {
 
 func (h *HelperHandler) DeleteShoppingListItem(c *gin.Context) {
 	itemID := c.Param("id")
-	if err := h.db.Delete(&models.ShoppingListItem{}, itemID).Error; err != nil {
+	if err := h.orgDB(c).Delete(&models.ShoppingListItem{}, itemID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -278,7 +292,7 @@ func (h *HelperHandler) GetRecipeDetails(c *gin.Context) {
 	recipeID := c.Param("id")
 
 	var recipe models.Recipe
-	if err := h.db.First(&recipe, recipeID).Error; err != nil {
+	if err := h.orgDB(c).First(&recipe, recipeID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
 		return
 	}
@@ -295,7 +309,7 @@ func (h *HelperHandler) GetTodayChildcare(c *gin.Context) {
 	nextDay := todayStart.AddDate(0, 0, 1)
 
 	var schedules []models.ChildcareSchedule
-	if err := h.db.Where("date >= ? AND date < ?", todayStart, nextDay).
+	if err := h.orgDB(c).Where("date >= ? AND date < ?", todayStart, nextDay).
 		Order("start_time").Find(&schedules).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -323,15 +337,16 @@ func (h *HelperHandler) SaveTodayChildcare(c *gin.Context) {
 
 	// Check if there's already a childcare schedule for today
 	var existing models.ChildcareSchedule
-	err := h.db.Where("date >= ? AND date < ?", todayStart, nextDay).First(&existing).Error
+	err := h.orgDB(c).Where("date >= ? AND date < ?", todayStart, nextDay).First(&existing).Error
 
 	if err == gorm.ErrRecordNotFound {
 		// Create new schedule
 		schedule := models.ChildcareSchedule{
-			Date:      todayStart,
-			StartTime: input.StartTime,
-			EndTime:   input.EndTime,
-			Notes:     input.Notes,
+			OrganizationID: h.orgID(c),
+			Date:           todayStart,
+			StartTime:      input.StartTime,
+			EndTime:        input.EndTime,
+			Notes:          input.Notes,
 		}
 
 		if err := h.db.Create(&schedule).Error; err != nil {
@@ -365,7 +380,7 @@ func (h *HelperHandler) DeleteTodayChildcare(c *gin.Context) {
 	nextDay := todayStart.AddDate(0, 0, 1)
 
 	// Find and delete childcare schedule for today
-	if err := h.db.Where("date >= ? AND date < ?", todayStart, nextDay).
+	if err := h.orgDB(c).Where("date >= ? AND date < ?", todayStart, nextDay).
 		Delete(&models.ChildcareSchedule{}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
