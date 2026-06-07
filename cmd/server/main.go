@@ -87,6 +87,7 @@ func main() {
 	helperHandler := handlers.NewHelperHandler(db)
 	authHandler := handlers.NewAuthHandler(db)
 	inviteHandler := handlers.NewInviteHandler(db)
+	orgHandler := handlers.NewOrgHandler(db)
 
 	// Auth routes
 	authMw := middleware.Auth()
@@ -108,7 +109,8 @@ func main() {
 	// Org routes (auth + org context required)
 	orgsGroup := router.Group("/orgs", authMw, orgMw)
 	{
-		orgsGroup.POST("/:orgId/invites", inviteHandler.CreateInvite)
+		orgsGroup.POST("/:orgId/invites", middleware.Require(middleware.CapManageTeam), inviteHandler.CreateInvite)
+		orgsGroup.GET("/:orgId/members", middleware.Require(middleware.CapManageTeam), orgHandler.GetMembers)
 	}
 
 
