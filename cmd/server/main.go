@@ -9,6 +9,7 @@ import (
 	"podlevskikh/awesomeProject/internal/handlers"
 	"podlevskikh/awesomeProject/internal/scheduler"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -59,6 +60,19 @@ func main() {
 
 	// Initialize Gin router
 	router := gin.Default()
+
+	// CORS — разрешаем web-origin Expo (WEB_ORIGIN env, dev: http://localhost:8081)
+	webOrigin := os.Getenv("WEB_ORIGIN")
+	if webOrigin == "" {
+		webOrigin = "http://localhost:8081"
+	}
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{webOrigin},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Org-Id"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
 
 	// Load HTML templates from both web and web2 directories
 	router.LoadHTMLGlob("web*/templates/*")
