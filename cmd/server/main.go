@@ -111,6 +111,12 @@ func main() {
 	{
 		orgsGroup.POST("/:orgId/invites", middleware.Require(middleware.CapManageTeam), inviteHandler.CreateInvite)
 		orgsGroup.GET("/:orgId/members", middleware.Require(middleware.CapManageTeam), orgHandler.GetMembers)
+
+		// M2: task categories
+		orgsGroup.GET("/:orgId/task-categories", orgHandler.GetTaskCategories)
+		orgsGroup.POST("/:orgId/task-categories", middleware.Require(middleware.CapManageSettings), orgHandler.CreateTaskCategory)
+		orgsGroup.PUT("/:orgId/task-categories/:id", middleware.Require(middleware.CapManageSettings), orgHandler.UpdateTaskCategory)
+		orgsGroup.DELETE("/:orgId/task-categories/:id", middleware.Require(middleware.CapManageSettings), orgHandler.DeleteTaskCategory)
 	}
 
 
