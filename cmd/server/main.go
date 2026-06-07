@@ -86,9 +86,12 @@ func main() {
 	adminHandler := handlers.NewAdminHandler(db)
 	helperHandler := handlers.NewHelperHandler(db)
 	authHandler := handlers.NewAuthHandler(db)
+	inviteHandler := handlers.NewInviteHandler(db)
 
 	// Auth routes
 	authMw := middleware.Auth()
+	orgMw := middleware.OrgContext(db)
+
 	authGroup := router.Group("/auth")
 	{
 		authGroup.POST("/register", authHandler.Register)
@@ -97,6 +100,18 @@ func main() {
 		authGroup.POST("/logout", authHandler.Logout)
 		authGroup.GET("/me", authMw, authHandler.Me)
 	}
+
+	// Invite routes
+	router.GET("/invites/:token", inviteHandler.GetInvite)
+	router.POST("/invites/:token/accept", inviteHandler.AcceptInvite)
+
+	// Org routes (auth + org context required)
+	orgsGroup := router.Group("/orgs", authMw, orgMw)
+	{
+		orgsGroup.POST("/:orgId/invites", inviteHandler.CreateInvite)
+	}
+
+	_ = orgMw // используется выше
 
 	// New UI routes
 	router.GET("/admin2/", func(c *gin.Context) {
