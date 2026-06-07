@@ -7,6 +7,7 @@ import (
 
 	"podlevskikh/awesomeProject/internal/database"
 	"podlevskikh/awesomeProject/internal/handlers"
+	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/scheduler"
 
 	"github.com/gin-contrib/cors"
@@ -84,6 +85,18 @@ func main() {
 	// Initialize handlers
 	adminHandler := handlers.NewAdminHandler(db)
 	helperHandler := handlers.NewHelperHandler(db)
+	authHandler := handlers.NewAuthHandler(db)
+
+	// Auth routes
+	authMw := middleware.Auth()
+	authGroup := router.Group("/auth")
+	{
+		authGroup.POST("/register", authHandler.Register)
+		authGroup.POST("/login", authHandler.Login)
+		authGroup.POST("/refresh", authHandler.Refresh)
+		authGroup.POST("/logout", authHandler.Logout)
+		authGroup.GET("/me", authMw, authHandler.Me)
+	}
 
 	// New UI routes
 	router.GET("/admin2/", func(c *gin.Context) {
