@@ -82,12 +82,26 @@ type DailySchedule struct {
 	Tasks []ScheduleTask `gorm:"foreignKey:ScheduleID" json:"tasks"`
 }
 
+// TaskCategory — настраиваемая категория задач организации.
+// Системные категории (is_default=true) создаются при миграции и не могут быть удалены.
+type TaskCategory struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	OrganizationID uint      `gorm:"uniqueIndex:idx_org_category_name;index;not null" json:"organization_id"`
+	Name           string    `gorm:"uniqueIndex:idx_org_category_name;not null" json:"name"`
+	Icon           string    `json:"icon,omitempty"`            // emoji или имя иконки
+	Color          string    `json:"color,omitempty"`           // hex (#RRGGBB)
+	IsDefault      bool      `gorm:"default:false" json:"is_default"` // системная — нельзя удалить
+	SortOrder      int       `gorm:"default:0" json:"sort_order"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 // ScheduleTask represents a single task in the daily schedule
 type ScheduleTask struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
 	OrganizationID uint      `gorm:"index;not null;default:1" json:"organization_id"`
 	ScheduleID     uint      `gorm:"not null;index" json:"schedule_id"`
-	TaskType    string    `gorm:"not null" json:"task_type"` // meal, cleaning, childcare
+	TaskType    string    `gorm:"not null" json:"task_type"` // meal, cleaning, childcare, custom (legacy)
 	Time        string    `json:"time"` // HH:MM format (can be empty for flexible tasks like cleaning)
 	EndTime     string    `json:"end_time"` // HH:MM format (for childcare tasks with time range)
 	Duration    int       `json:"duration"` // in minutes
@@ -95,15 +109,19 @@ type ScheduleTask struct {
 	Description string    `json:"description"`
 	RecipeID    *uint     `json:"recipe_id,omitempty"` // if task_type is meal (deprecated, use Recipes relation)
 	ZoneID      *uint     `json:"zone_id,omitempty"`   // if task_type is cleaning (deprecated, use Zones relation)
+	// M2: категория и назначение
+	TaskCategoryID     *uint `gorm:"index" json:"task_category_id,omitempty"`
+	AssignedToUserID   *uint `gorm:"index" json:"assigned_to_user_id,omitempty"`
 	Completed   bool      `gorm:"default:false" json:"completed"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 
 	// Relations
-	Recipe  *Recipe       `gorm:"foreignKey:RecipeID" json:"recipe,omitempty"` // deprecated, use Recipes
-	Recipes []Recipe      `gorm:"many2many:meal_recipes;" json:"recipes,omitempty"` // multiple recipes for a meal
-	Zone    *CleaningZone `gorm:"foreignKey:ZoneID" json:"zone,omitempty"` // deprecated, use Zones
-	Zones   []CleaningZone `gorm:"many2many:task_zones;" json:"zones,omitempty"` // multiple zones for a cleaning task
+	Recipe       *Recipe       `gorm:"foreignKey:RecipeID" json:"recipe,omitempty"` // deprecated, use Recipes
+	Recipes      []Recipe      `gorm:"many2many:meal_recipes;" json:"recipes,omitempty"`
+	Zone         *CleaningZone `gorm:"foreignKey:ZoneID" json:"zone,omitempty"` // deprecated, use Zones
+	Zones        []CleaningZone `gorm:"many2many:task_zones;" json:"zones,omitempty"`
+	TaskCategory *TaskCategory  `gorm:"foreignKey:TaskCategoryID" json:"task_category,omitempty"`
 }
 
 // ShoppingListItem represents items needed for shopping

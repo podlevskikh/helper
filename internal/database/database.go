@@ -61,6 +61,7 @@ func Initialize(databaseURL string) error {
 		&models.CleaningZone{},
 		&models.ChildcareSchedule{},
 		&models.DailySchedule{},
+		&models.TaskCategory{}, // M2: до ScheduleTask (FK)
 		&models.ScheduleTask{},
 		&models.ShoppingListItem{},
 		&models.Settings{},
@@ -79,6 +80,9 @@ func Initialize(databaseURL string) error {
 
 	// Initialize default settings
 	initializeDefaultSettings()
+
+	// M2: seed дефолтных категорий задач для всех организаций
+	seedDefaultCategories()
 
 	// Initialize Cyprus holidays
 	if err := data.InitializeCyprusHolidays(DB); err != nil {
@@ -179,6 +183,65 @@ func seedOrgAndOwner() {
 			log.Printf("Seed: backfill %s: %v", table, res.Error)
 		} else if res.RowsAffected > 0 {
 			log.Printf("Seed: backfill %s: %d строк", table, res.RowsAffected)
+		}
+	}
+}
+
+// seedDefaultCategories создаёт системные категории задач для каждой организации
+// и делает backfill task_category_id для существующих задач по их task_type.
+func seedDefaultCategories() {
+	type defaultCat struct {
+		Name      string
+		Icon      string
+		Color     string
+		TaskType  string // соответствующий legacy task_type
+		SortOrder int
+	}
+	defaults := []defaultCat{
+		{Name: "Еда", Icon: "🍽", Color: "#F59E0B", TaskType: "meal", SortOrder: 0},
+		{Name: "Уборка", Icon: "🧹", Color: "#10B981", TaskType: "cleaning", SortOrder: 1},
+		{Name: "Уход за ребёнком", Icon: "👶", Color: "#6366F1", TaskType: "childcare", SortOrder: 2},
+		{Name: "Другое", Icon: "✏️", Color: "#6B7280", TaskType: "custom", SortOrder: 3},
+	}
+
+	var orgs []models.Organization
+	if err := DB.Find(&orgs).Error; err != nil {
+		log.Printf("seedDefaultCategories: не удалось загрузить организации: %v", err)
+		return
+	}
+
+	for _, org := range orgs {
+		for _, d := range defaults {
+			var cat models.TaskCategory
+			err := DB.Where("organization_id = ? AND name = ?", org.ID, d.Name).First(&cat).Error
+			if err == nil {
+				// уже существует — backfill задач
+				DB.Exec(
+					"UPDATE schedule_tasks SET task_category_id = ? WHERE organization_id = ? AND task_type = ? AND task_category_id IS NULL",
+					cat.ID, org.ID, d.TaskType,
+				)
+				continue
+			}
+
+			// создаём категорию
+			cat = models.TaskCategory{
+				OrganizationID: org.ID,
+				Name:           d.Name,
+				Icon:           d.Icon,
+				Color:          d.Color,
+				IsDefault:      true,
+				SortOrder:      d.SortOrder,
+			}
+			if err := DB.Create(&cat).Error; err != nil {
+				log.Printf("seedDefaultCategories: орг %d, категория '%s': %v", org.ID, d.Name, err)
+				continue
+			}
+			// backfill
+			res := DB.Exec(
+				"UPDATE schedule_tasks SET task_category_id = ? WHERE organization_id = ? AND task_type = ? AND task_category_id IS NULL",
+				cat.ID, org.ID, d.TaskType,
+			)
+			log.Printf("seedDefaultCategories: орг %d, '%s' (id=%d), backfill задач: %d", org.ID, d.Name, cat.ID, res.RowsAffected)
 		}
 	}
 }
