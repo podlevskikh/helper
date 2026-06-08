@@ -7,8 +7,10 @@ import (
 
 	"podlevskikh/awesomeProject/internal/database"
 	"podlevskikh/awesomeProject/internal/handlers"
+	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/scheduler"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -60,6 +62,19 @@ func main() {
 	// Initialize Gin router
 	router := gin.Default()
 
+	// CORS — разрешаем web-origin Expo (WEB_ORIGIN env, dev: http://localhost:8081)
+	webOrigin := os.Getenv("WEB_ORIGIN")
+	if webOrigin == "" {
+		webOrigin = "http://localhost:8081"
+	}
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{webOrigin},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Org-Id"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
+
 	// Load HTML templates from both web and web2 directories
 	router.LoadHTMLGlob("web*/templates/*")
 
@@ -70,6 +85,40 @@ func main() {
 	// Initialize handlers
 	adminHandler := handlers.NewAdminHandler(db)
 	helperHandler := handlers.NewHelperHandler(db)
+	authHandler := handlers.NewAuthHandler(db)
+	inviteHandler := handlers.NewInviteHandler(db)
+	orgHandler := handlers.NewOrgHandler(db)
+
+	// Auth routes
+	authMw := middleware.Auth()
+	orgMw := middleware.OrgContext(db)
+
+	authGroup := router.Group("/auth")
+	{
+		authGroup.POST("/register", authHandler.Register)
+		authGroup.POST("/login", authHandler.Login)
+		authGroup.POST("/refresh", authHandler.Refresh)
+		authGroup.POST("/logout", authHandler.Logout)
+		authGroup.GET("/me", authMw, authHandler.Me)
+	}
+
+	// Invite routes
+	router.GET("/invites/:token", inviteHandler.GetInvite)
+	router.POST("/invites/:token/accept", inviteHandler.AcceptInvite)
+
+	// Org routes (auth + org context required)
+	orgsGroup := router.Group("/orgs", authMw, orgMw)
+	{
+		orgsGroup.POST("/:orgId/invites", middleware.Require(middleware.CapManageTeam), inviteHandler.CreateInvite)
+		orgsGroup.GET("/:orgId/members", middleware.Require(middleware.CapManageTeam), orgHandler.GetMembers)
+
+		// M2: task categories
+		orgsGroup.GET("/:orgId/task-categories", orgHandler.GetTaskCategories)
+		orgsGroup.POST("/:orgId/task-categories", middleware.Require(middleware.CapManageSettings), orgHandler.CreateTaskCategory)
+		orgsGroup.PUT("/:orgId/task-categories/:id", middleware.Require(middleware.CapManageSettings), orgHandler.UpdateTaskCategory)
+		orgsGroup.DELETE("/:orgId/task-categories/:id", middleware.Require(middleware.CapManageSettings), orgHandler.DeleteTaskCategory)
+	}
+
 
 	// New UI routes
 	router.GET("/admin2/", func(c *gin.Context) {
@@ -88,8 +137,8 @@ func main() {
 			c.HTML(200, "admin.html", nil)
 		})
 
-		// API routes
-		api := admin.Group("/api")
+		// API routes (auth + org required; RBAC через Require() на уровне хендлера)
+		api := admin.Group("/api", authMw, orgMw)
 		{
 			// Recipes
 			api.GET("/recipes", adminHandler.GetRecipes)
@@ -209,8 +258,8 @@ func main() {
 			c.HTML(200, "helper.html", nil)
 		})
 
-		// API routes
-		api := helper.Group("/api")
+		// API routes (auth + org required)
+		api := helper.Group("/api", authMw, orgMw)
 		{
 			// Schedule
 			api.GET("/schedule/today", helperHandler.GetTodaySchedule)

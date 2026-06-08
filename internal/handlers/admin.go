@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"podlevskikh/awesomeProject/internal/models"
 	"strconv"
 	"time"
+
+	"podlevskikh/awesomeProject/internal/middleware"
+	"podlevskikh/awesomeProject/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -23,11 +25,22 @@ func NewAdminHandler(db *gorm.DB) *AdminHandler {
 	return &AdminHandler{db: db}
 }
 
+// orgDB возвращает DB-сессию, скоупленную по organization_id из контекста.
+func (h *AdminHandler) orgDB(c *gin.Context) *gorm.DB {
+	m := middleware.MustMembership(c)
+	return h.db.Where("organization_id = ?", m.OrganizationID)
+}
+
+// orgID извлекает OrganizationID из контекста.
+func (h *AdminHandler) orgID(c *gin.Context) uint {
+	return middleware.MustMembership(c).OrganizationID
+}
+
 // Recipe handlers
 
 func (h *AdminHandler) GetRecipes(c *gin.Context) {
 	var recipes []models.Recipe
-	if err := h.db.Preload("MealTimes").Order("created_at DESC").Find(&recipes).Error; err != nil {
+	if err := h.orgDB(c).Preload("MealTimes").Order("created_at DESC").Find(&recipes).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -37,7 +50,7 @@ func (h *AdminHandler) GetRecipes(c *gin.Context) {
 func (h *AdminHandler) GetRecipe(c *gin.Context) {
 	id := c.Param("id")
 	var recipe models.Recipe
-	if err := h.db.Preload("MealTimes").First(&recipe, id).Error; err != nil {
+	if err := h.orgDB(c).Preload("MealTimes").First(&recipe, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
 		return
 	}
@@ -56,6 +69,7 @@ func (h *AdminHandler) CreateRecipe(c *gin.Context) {
 	}
 
 	recipe := input.Recipe
+	recipe.OrganizationID = h.orgID(c)
 
 	// Create the recipe first
 	if err := h.db.Create(&recipe).Error; err != nil {
@@ -246,7 +260,7 @@ func (h *AdminHandler) UploadRecipeImage(c *gin.Context) {
 
 func (h *AdminHandler) GetMealTimes(c *gin.Context) {
 	var mealTimes []models.MealTime
-	if err := h.db.Preload("Recipes").Order("default_time").Find(&mealTimes).Error; err != nil {
+	if err := h.orgDB(c).Preload("Recipes").Order("default_time").Find(&mealTimes).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -334,7 +348,7 @@ func (h *AdminHandler) DeleteMealTime(c *gin.Context) {
 
 func (h *AdminHandler) GetCleaningZones(c *gin.Context) {
 	var zones []models.CleaningZone
-	if err := h.db.Order("priority DESC").Find(&zones).Error; err != nil {
+	if err := h.orgDB(c).Order("priority DESC").Find(&zones).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -419,7 +433,7 @@ func (h *AdminHandler) GetChildcareSchedules(c *gin.Context) {
 	startDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	endDate := startDate.AddDate(0, 0, 60)
 
-	if err := h.db.Where("date >= ? AND date < ?", startDate, endDate).
+	if err := h.orgDB(c).Where("date >= ? AND date < ?", startDate, endDate).
 		Order("date, start_time").Find(&schedules).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -559,11 +573,13 @@ func (h *AdminHandler) UpdateTask(c *gin.Context) {
 	}
 
 	var input struct {
-		Time        string `json:"time"`
-		EndTime     string `json:"end_time"`
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		RecipeIDs   []uint `json:"recipe_ids"`
+		Time               string `json:"time"`
+		EndTime            string `json:"end_time"`
+		Title              string `json:"title"`
+		Description        string `json:"description"`
+		RecipeIDs          []uint `json:"recipe_ids"`
+		TaskCategoryID     *uint  `json:"task_category_id"`
+		AssignedToUserID   *uint  `json:"assigned_to_user_id"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -574,6 +590,8 @@ func (h *AdminHandler) UpdateTask(c *gin.Context) {
 	task.EndTime = input.EndTime
 	task.Title = input.Title
 	task.Description = input.Description
+	task.TaskCategoryID = input.TaskCategoryID
+	task.AssignedToUserID = input.AssignedToUserID
 
 	if err := h.db.Save(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -788,10 +806,12 @@ func (h *AdminHandler) RemoveZoneFromTask(c *gin.Context) {
 // Custom tasks survive schedule regeneration.
 func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
 	var input struct {
-		Date        string `json:"date"`
-		Time        string `json:"time"`
-		Title       string `json:"title"`
-		Description string `json:"description"`
+		Date               string `json:"date"`
+		Time               string `json:"time"`
+		Title              string `json:"title"`
+		Description        string `json:"description"`
+		TaskCategoryID     *uint  `json:"task_category_id"`
+		AssignedToUserID   *uint  `json:"assigned_to_user_id"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -811,8 +831,8 @@ func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
 
 	// Find or create daily_schedule for this date
 	var schedule models.DailySchedule
-	if err := h.db.Where("date = ?", date).First(&schedule).Error; err != nil {
-		schedule = models.DailySchedule{Date: date, Generated: false}
+	if err := h.db.Where("date = ? AND organization_id = ?", date, h.orgID(c)).First(&schedule).Error; err != nil {
+		schedule = models.DailySchedule{Date: date, Generated: false, OrganizationID: h.orgID(c)}
 		if err := h.db.Create(&schedule).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create schedule"})
 			return
@@ -820,12 +840,15 @@ func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
 	}
 
 	task := models.ScheduleTask{
-		ScheduleID:  schedule.ID,
-		TaskType:    "custom",
-		Time:        input.Time,
-		Title:       input.Title,
-		Description: input.Description,
-		Completed:   false,
+		ScheduleID:         schedule.ID,
+		OrganizationID:     h.orgID(c),
+		TaskType:           "custom",
+		Time:               input.Time,
+		Title:              input.Title,
+		Description:        input.Description,
+		TaskCategoryID:     input.TaskCategoryID,
+		AssignedToUserID:   input.AssignedToUserID,
+		Completed:          false,
 	}
 	if err := h.db.Create(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
