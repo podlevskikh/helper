@@ -37,7 +37,8 @@ func generateInviteToken() (string, error) {
 }
 
 func webOrigin() string {
-	o := os.Getenv("WEB_ORIGIN")
+	// WEB_ORIGIN может содержать несколько адресов через запятую — в ссылку идёт первый.
+	o := strings.TrimSpace(strings.Split(os.Getenv("WEB_ORIGIN"), ",")[0])
 	if o == "" {
 		return "http://localhost:8081"
 	}
@@ -48,7 +49,7 @@ func webOrigin() string {
 // Требует Auth + OrgContext + RoleOwner-or-Admin.
 
 type createInviteRequest struct {
-	Email string      `json:"email"`                         // опционально
+	Email string      `json:"email"` // опционально
 	Role  models.Role `json:"role" binding:"required"`
 }
 

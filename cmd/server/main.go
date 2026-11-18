@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"podlevskikh/awesomeProject/internal/database"
@@ -62,13 +63,19 @@ func main() {
 	// Initialize Gin router
 	router := gin.Default()
 
-	// CORS — разрешаем web-origin Expo (WEB_ORIGIN env, dev: http://localhost:8081)
-	webOrigin := os.Getenv("WEB_ORIGIN")
-	if webOrigin == "" {
-		webOrigin = "http://localhost:8081"
+	// CORS — разрешаем web-origin Expo (WEB_ORIGIN env, через запятую; dev: http://localhost:8081).
+	// Первый адрес используется в ссылках-приглашениях.
+	var webOrigins []string
+	for _, o := range strings.Split(os.Getenv("WEB_ORIGIN"), ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			webOrigins = append(webOrigins, o)
+		}
+	}
+	if len(webOrigins) == 0 {
+		webOrigins = []string{"http://localhost:8081"}
 	}
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{webOrigin},
+		AllowOrigins:     webOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Org-Id"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -122,7 +129,6 @@ func main() {
 		orgsGroup.GET("/:orgId/settings", orgHandler.GetOrgSettings)
 		orgsGroup.PUT("/:orgId/settings", middleware.Require(middleware.CapManageSettings), orgHandler.UpdateOrgSettings)
 	}
-
 
 	// New UI routes
 	router.GET("/admin2/", func(c *gin.Context) {

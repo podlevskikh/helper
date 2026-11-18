@@ -47,6 +47,11 @@ func Initialize(databaseURL string) error {
 
 	log.Println("✅ Database connection established successfully")
 
+	// Редизайн v2: колонка важности категорий появляется впервые — после миграции
+	// системной «Уход за ребёнком» ставим высокую важность (один раз, выбор владельца не трогаем).
+	firstPriorityMigration := DB.Migrator().HasTable(&models.TaskCategory{}) &&
+		!DB.Migrator().HasColumn(&models.TaskCategory{}, "priority")
+
 	// Run migrations
 	err = DB.AutoMigrate(
 		// Идентичность и мультиарендность (M1)
@@ -74,6 +79,11 @@ func Initialize(databaseURL string) error {
 	}
 
 	log.Println("Database migrations completed")
+
+	if firstPriorityMigration {
+		res := DB.Exec("UPDATE task_categories SET priority = 'high' WHERE is_default = true AND name = ?", "Уход за ребёнком")
+		log.Printf("redesign-v2: важность «Уход за ребёнком» = high, категорий: %d", res.RowsAffected)
+	}
 
 	// Run data migrations
 	runDataMigrations()
