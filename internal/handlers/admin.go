@@ -580,12 +580,16 @@ func (h *AdminHandler) UpdateTask(c *gin.Context) {
 		RecipeIDs          []uint `json:"recipe_ids"`
 		TaskCategoryID     *uint  `json:"task_category_id"`
 		AssignedToUserID   *uint  `json:"assigned_to_user_id"`
+		Priority           *string `json:"priority"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	if input.Priority != nil {
+		task.Priority = *input.Priority
+	}
 	task.Time = input.Time
 	task.EndTime = input.EndTime
 	task.Title = input.Title
@@ -808,6 +812,8 @@ func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
 	var input struct {
 		Date               string `json:"date"`
 		Time               string `json:"time"`
+		EndTime            string `json:"end_time"`
+		Priority           string `json:"priority"`
 		Title              string `json:"title"`
 		Description        string `json:"description"`
 		TaskCategoryID     *uint  `json:"task_category_id"`
@@ -844,6 +850,8 @@ func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
 		OrganizationID:     h.orgID(c),
 		TaskType:           "custom",
 		Time:               input.Time,
+		EndTime:            input.EndTime,
+		Priority:           input.Priority,
 		Title:              input.Title,
 		Description:        input.Description,
 		TaskCategoryID:     input.TaskCategoryID,

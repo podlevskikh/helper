@@ -117,6 +117,10 @@ func main() {
 		orgsGroup.POST("/:orgId/task-categories", middleware.Require(middleware.CapManageSettings), orgHandler.CreateTaskCategory)
 		orgsGroup.PUT("/:orgId/task-categories/:id", middleware.Require(middleware.CapManageSettings), orgHandler.UpdateTaskCategory)
 		orgsGroup.DELETE("/:orgId/task-categories/:id", middleware.Require(middleware.CapManageSettings), orgHandler.DeleteTaskCategory)
+
+		// Redesign v2: настройки организации (лимит задач высокой важности)
+		orgsGroup.GET("/:orgId/settings", orgHandler.GetOrgSettings)
+		orgsGroup.PUT("/:orgId/settings", middleware.Require(middleware.CapManageSettings), orgHandler.UpdateOrgSettings)
 	}
 
 

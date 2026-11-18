@@ -2,6 +2,8 @@ package models
 
 import (
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // Recipe represents a meal recipe
@@ -92,6 +94,8 @@ type TaskCategory struct {
 	Color          string    `json:"color,omitempty"`           // hex (#RRGGBB)
 	IsDefault      bool      `gorm:"default:false" json:"is_default"` // системная — нельзя удалить
 	SortOrder      int       `gorm:"default:0" json:"sort_order"`
+	// Важность по умолчанию для задач категории: high | mid | normal
+	Priority       string    `gorm:"default:'normal'" json:"priority"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
@@ -113,6 +117,10 @@ type ScheduleTask struct {
 	TaskCategoryID     *uint `gorm:"index" json:"task_category_id,omitempty"`
 	AssignedToUserID   *uint `gorm:"index" json:"assigned_to_user_id,omitempty"`
 	Completed   bool      `gorm:"default:false" json:"completed"`
+	// Когда помощник отметил задачу выполненной (nil — не выполнена)
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	// Важность задачи: high | mid | normal; пусто — берётся из категории
+	Priority    string    `json:"priority,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 
@@ -168,3 +176,33 @@ type RecipeComment struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+
+// legacyTypeCategory — системная категория для задач, созданных планировщиком.
+var legacyTypeCategory = map[string]string{
+	"meal":      "Еда",
+	"cleaning":  "Уборка",
+	"childcare": "Уход за ребёнком",
+}
+
+// BeforeCreate проставляет категорию задачам планировщика (еда/уборка/ребёнок),
+// чтобы новые задачи сразу имели иконку и важность категории.
+func (t *ScheduleTask) BeforeCreate(tx *gorm.DB) error {
+	if t.TaskCategoryID != nil {
+		return nil
+	}
+	name, ok := legacyTypeCategory[t.TaskType]
+	if !ok {
+		return nil
+	}
+	orgID := t.OrganizationID
+	if orgID == 0 {
+		orgID = 1
+	}
+	var cat TaskCategory
+	if err := tx.Session(&gorm.Session{NewDB: true}).
+		Where("organization_id = ? AND name = ?", orgID, name).
+		First(&cat).Error; err == nil {
+		t.TaskCategoryID = &cat.ID
+	}
+	return nil
+}

@@ -116,6 +116,7 @@ func (h *OrgHandler) CreateTaskCategory(c *gin.Context) {
 		Icon      string `json:"icon"`
 		Color     string `json:"color"`
 		SortOrder int    `json:"sort_order"`
+		Priority  string `json:"priority"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -129,6 +130,7 @@ func (h *OrgHandler) CreateTaskCategory(c *gin.Context) {
 		Color:          input.Color,
 		IsDefault:      false,
 		SortOrder:      input.SortOrder,
+		Priority:       normalizePriority(input.Priority),
 	}
 	if err := h.db.Create(&cat).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -154,6 +156,7 @@ func (h *OrgHandler) UpdateTaskCategory(c *gin.Context) {
 		Icon      string `json:"icon"`
 		Color     string `json:"color"`
 		SortOrder *int   `json:"sort_order"`
+		Priority  string `json:"priority"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -166,6 +169,9 @@ func (h *OrgHandler) UpdateTaskCategory(c *gin.Context) {
 	cat.Color = input.Color
 	if input.SortOrder != nil {
 		cat.SortOrder = *input.SortOrder
+	}
+	if input.Priority != "" {
+		cat.Priority = normalizePriority(input.Priority)
 	}
 
 	if err := h.db.Save(&cat).Error; err != nil {
@@ -203,4 +209,52 @@ func (h *OrgHandler) DeleteTaskCategory(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusNoContent, nil)
+}
+
+// normalizePriority приводит важность к одному из high | mid | normal.
+func normalizePriority(p string) string {
+	switch p {
+	case "high", "mid":
+		return p
+	default:
+		return "normal"
+	}
+}
+
+// GetOrgSettings — настройки организации, нужные клиенту.
+// GET /orgs/:orgId/settings
+func (h *OrgHandler) GetOrgSettings(c *gin.Context) {
+	m := middleware.MustMembership(c)
+	var org models.Organization
+	if err := h.db.First(&org, m.OrganizationID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "organization not found"})
+		return
+	}
+	limit := org.HighPriorityLimit
+	if limit <= 0 {
+		limit = 3
+	}
+	c.JSON(http.StatusOK, gin.H{"name": org.Name, "high_priority_limit": limit})
+}
+
+// UpdateOrgSettings — изменить настройки организации.
+// PUT /orgs/:orgId/settings  (CapManageSettings)
+func (h *OrgHandler) UpdateOrgSettings(c *gin.Context) {
+	m := middleware.MustMembership(c)
+	var input struct {
+		HighPriorityLimit *int `json:"high_priority_limit"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if input.HighPriorityLimit != nil {
+		l := *input.HighPriorityLimit
+		if l < 1 || l > 10 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "high_priority_limit must be 1..10"})
+			return
+		}
+		h.db.Model(&models.Organization{}).Where("id = ?", m.OrganizationID).Update("high_priority_limit", l)
+	}
+	h.GetOrgSettings(c)
 }

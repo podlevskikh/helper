@@ -220,6 +220,8 @@ func (h *HelperHandler) CompleteTask(c *gin.Context) {
 	}
 	
 	task.Completed = true
+	now := time.Now()
+	task.CompletedAt = &now
 	if err := h.db.Save(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -239,6 +241,7 @@ func (h *HelperHandler) UncompleteTask(c *gin.Context) {
 	}
 	
 	task.Completed = false
+	task.CompletedAt = nil
 	if err := h.db.Save(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

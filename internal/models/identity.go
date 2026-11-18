@@ -49,6 +49,8 @@ type Organization struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	Name        string    `gorm:"not null" json:"name"`
 	OwnerUserID uint      `gorm:"index" json:"owner_user_id"`
+	// Сколько задач высокой важности можно поставить на один день
+	HighPriorityLimit int `gorm:"default:3" json:"high_priority_limit"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

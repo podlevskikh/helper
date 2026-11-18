@@ -196,11 +196,12 @@ func seedDefaultCategories() {
 		Color     string
 		TaskType  string // соответствующий legacy task_type
 		SortOrder int
+		Priority  string
 	}
 	defaults := []defaultCat{
 		{Name: "Еда", Icon: "🍽", Color: "#F59E0B", TaskType: "meal", SortOrder: 0},
 		{Name: "Уборка", Icon: "🧹", Color: "#10B981", TaskType: "cleaning", SortOrder: 1},
-		{Name: "Уход за ребёнком", Icon: "👶", Color: "#6366F1", TaskType: "childcare", SortOrder: 2},
+		{Name: "Уход за ребёнком", Icon: "👶", Color: "#6366F1", TaskType: "childcare", SortOrder: 2, Priority: "high"},
 		{Name: "Другое", Icon: "✏️", Color: "#6B7280", TaskType: "custom", SortOrder: 3},
 	}
 
@@ -231,6 +232,7 @@ func seedDefaultCategories() {
 				Color:          d.Color,
 				IsDefault:      true,
 				SortOrder:      d.SortOrder,
+				Priority:       map[bool]string{true: d.Priority, false: "normal"}[d.Priority != ""],
 			}
 			if err := DB.Create(&cat).Error; err != nil {
 				log.Printf("seedDefaultCategories: орг %d, категория '%s': %v", org.ID, d.Name, err)
