@@ -466,3 +466,27 @@ func (h *HelperHandler) DeleteShoppingList(c *gin.Context) {
 }
 
 var errAlreadyClosed = errors.New("already closed")
+
+// GET /shopping-lists/suggestions — «Часто берём»: самые частые пункты организации
+// за последние 90 дней (по тексту без учёта регистра).
+func (h *HelperHandler) GetShoppingSuggestions(c *gin.Context) {
+	type row struct {
+		Item string
+		N    int
+	}
+	var rows []row
+	since := time.Now().AddDate(0, 0, -90)
+	if err := h.db.Model(&models.ShoppingListItem{}).
+		Select("MIN(item) AS item, COUNT(*) AS n").
+		Where("organization_id = ? AND list_id IS NOT NULL AND created_at >= ?", h.orgID(c), since).
+		Group("LOWER(TRIM(item))").Order("n DESC, item ASC").Limit(12).
+		Scan(&rows).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	out := make([]string, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, r.Item)
+	}
+	c.JSON(http.StatusOK, out)
+}

@@ -294,6 +294,7 @@ func main() {
 			manageShop := middleware.Require(middleware.CapManageShopping)
 			api.GET("/shopping-lists", viewShop, helperHandler.GetShoppingLists)
 			api.POST("/shopping-lists", manageShop, helperHandler.CreateShoppingList)
+			api.GET("/shopping-lists/suggestions", viewShop, helperHandler.GetShoppingSuggestions)
 			api.GET("/shopping-lists/:id", viewShop, helperHandler.GetShoppingListByID)
 			api.DELETE("/shopping-lists/:id", manageShop, helperHandler.DeleteShoppingList)
 			api.POST("/shopping-lists/:id/send", manageShop, helperHandler.SendShoppingList)
