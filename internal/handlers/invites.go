@@ -134,6 +134,7 @@ func (h *InviteHandler) GetInvite(c *gin.Context) {
 type acceptInviteRequest struct {
 	Name     string `json:"name"     binding:"required"`
 	Password string `json:"password" binding:"required,min=8"`
+	Locale   string `json:"locale"`
 }
 
 func (h *InviteHandler) AcceptInvite(c *gin.Context) {
@@ -175,7 +176,7 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 				Email:        email,
 				PasswordHash: hash,
 				Name:         strings.TrimSpace(req.Name),
-				Locale:       "ru",
+				Locale:       pickLocale(req.Locale),
 			}
 			if txErr = tx.Create(&user).Error; txErr != nil {
 				return txErr

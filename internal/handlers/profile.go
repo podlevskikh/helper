@@ -18,6 +18,18 @@ import (
 // Языки интерфейса, которые есть в приложении.
 var supportedLocales = map[string]bool{"ru": true, "en": true}
 
+// defaultLocale — язык интерфейса по умолчанию: английский.
+const defaultLocale = "en"
+
+// pickLocale — язык, который клиент прислал при регистрации (уже выбран на устройстве),
+// иначе английский.
+func pickLocale(l string) string {
+	if supportedLocales[l] {
+		return l
+	}
+	return defaultLocale
+}
+
 func (h *AuthHandler) currentUser(c *gin.Context) (*models.User, bool) {
 	userID, _ := c.Get(middleware.ContextKeyUserID)
 	var user models.User

@@ -159,7 +159,7 @@ func seedOrgAndOwner() {
 		Email:        ownerEmail,
 		PasswordHash: string(hash),
 		Name:         "Owner",
-		Locale:       "ru",
+		Locale:       "en",
 	}
 	if err := DB.Create(&user).Error; err != nil {
 		log.Printf("Seed: не удалось создать пользователя-владельца: %v", err)
