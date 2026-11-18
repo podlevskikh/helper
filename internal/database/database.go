@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 
-	"podlevskikh/awesomeProject/internal/data"
 	"podlevskikh/awesomeProject/internal/models"
 
 	"golang.org/x/crypto/bcrypt"
@@ -73,7 +72,9 @@ func Initialize(databaseURL string) error {
 		&models.ShoppingList{}, // до ShoppingListItem (list_id)
 		&models.ShoppingListItem{},
 		&models.Settings{},
-		&models.Holiday{},
+		&models.PublicHoliday{},
+		&models.HolidaySync{},
+		&models.StaffDayOverride{},
 		&models.RecipeComment{},
 	)
 
@@ -96,13 +97,6 @@ func Initialize(databaseURL string) error {
 
 	// M2: seed дефолтных категорий задач для всех организаций
 	seedDefaultCategories()
-
-	// Initialize Cyprus holidays
-	if err := data.InitializeCyprusHolidays(DB); err != nil {
-		log.Printf("Warning: Failed to initialize holidays: %v", err)
-	} else {
-		log.Println("Cyprus holidays initialized")
-	}
 
 	return nil
 }

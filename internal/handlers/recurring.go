@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
+	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/models"
 )
 
@@ -75,6 +76,10 @@ func materializeRecurring(db *gorm.DB, orgID uint, schedule *models.DailySchedul
 		db.Model(&models.RecurringTaskSkip{}).
 			Where("recurring_task_id = ? AND date = ?", r.ID, day).Count(&n)
 		if n > 0 {
+			continue
+		}
+		// Исполнитель в этот день отдыхает — задачу на него не ставим.
+		if r.AssignedToUserID != nil && !calendar.IsWorking(db, orgID, *r.AssignedToUserID, day) {
 			continue
 		}
 		id := r.ID

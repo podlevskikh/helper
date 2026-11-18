@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/database"
 	"podlevskikh/awesomeProject/internal/handlers"
 	"podlevskikh/awesomeProject/internal/middleware"
@@ -40,6 +41,9 @@ func main() {
 
 	// Initialize scheduler
 	sched := scheduler.NewScheduler(db)
+
+	// Праздники стран: загружаем при старте (если ещё не загружены) и обновляем раз в сутки
+	calendar.StartRefresher(db)
 
 	// Generate initial schedules for the next 7 days
 	log.Println("Generating initial schedules...")
@@ -95,6 +99,12 @@ func main() {
 	authHandler := handlers.NewAuthHandler(db)
 	inviteHandler := handlers.NewInviteHandler(db)
 	orgHandler := handlers.NewOrgHandler(db)
+	staffCalHandler := handlers.NewStaffCalendarHandler(db)
+	staffCalHandler.EnsureSchedule = func(date time.Time) {
+		if err := sched.GenerateScheduleForDate(date); err != nil {
+			log.Printf("Warning: schedule for %s: %v", date.Format("2006-01-02"), err)
+		}
+	}
 
 	// Auth routes
 	authMw := middleware.Auth()
@@ -120,6 +130,15 @@ func main() {
 	{
 		orgsGroup.POST("/:orgId/invites", middleware.Require(middleware.CapManageTeam), inviteHandler.CreateInvite)
 		orgsGroup.GET("/:orgId/members", middleware.Require(middleware.CapManageTeam), orgHandler.GetMembers)
+
+		// Выходные и праздники сотрудников
+		manageTeam := middleware.Require(middleware.CapManageTeam)
+		orgsGroup.GET("/:orgId/calendar", staffCalHandler.GetCalendar)
+		orgsGroup.GET("/:orgId/members/:userId/schedule-settings", manageTeam, staffCalHandler.GetSettings)
+		orgsGroup.PATCH("/:orgId/members/:userId/schedule-settings", manageTeam, staffCalHandler.UpdateSettings)
+		orgsGroup.GET("/:orgId/members/:userId/day-overrides", manageTeam, staffCalHandler.ListOverrides)
+		orgsGroup.POST("/:orgId/members/:userId/day-overrides", manageTeam, staffCalHandler.CreateOverride)
+		orgsGroup.DELETE("/:orgId/members/:userId/day-overrides/:id", manageTeam, staffCalHandler.DeleteOverride)
 
 		// M2: task categories
 		orgsGroup.GET("/:orgId/task-categories", orgHandler.GetTaskCategories)

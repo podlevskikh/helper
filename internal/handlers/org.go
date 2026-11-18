@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
 
@@ -32,6 +33,10 @@ type MemberView struct {
 	Email          string                 `json:"email"`
 	AvatarURL      string                 `json:"avatar_url,omitempty"`
 	CreatedAt      string                 `json:"created_at"`
+	// Выходные и праздники — для подписи в списке команды
+	DaysOff             []int  `json:"days_off"`
+	HolidayCountry      string `json:"holiday_country"`
+	VacationDaysPerYear int    `json:"vacation_days_per_year"`
 }
 
 // GetMembers возвращает всех участников организации.
@@ -84,6 +89,9 @@ func (h *OrgHandler) GetMembers(c *gin.Context) {
 			Email:          u.Email,
 			AvatarURL:      u.AvatarURL,
 			CreatedAt:      mb.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			DaysOff:             daysOffList(mb.DaysOff),
+			HolidayCountry:      calendar.PersonFrom(mb).Country,
+			VacationDaysPerYear: mb.VacationDaysPerYear,
 		})
 	}
 

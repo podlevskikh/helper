@@ -64,6 +64,10 @@ type Membership struct {
 	Permissions    string           `gorm:"type:text" json:"permissions,omitempty"` // JSON-массив ключей разделов; в MVP пусто (права от роли)
 	Status         MembershipStatus `gorm:"default:'active'" json:"status"`
 	InvitedBy      *uint            `json:"invited_by,omitempty"`
+	// Выходные и праздники (настраивает наниматель в карточке сотрудника)
+	DaysOff             string `gorm:"default:'7'" json:"days_off"`                  // ISO-дни недели через запятую: 1 = Пн … 7 = Вс
+	HolidayCountry      string `gorm:"size:4;default:'CY'" json:"holiday_country"` // ISO-код страны праздников; "-" — без праздников
+	VacationDaysPerYear int    `gorm:"default:24" json:"vacation_days_per_year"`    // рабочих дней отпуска в году
 	CreatedAt      time.Time        `json:"created_at"`
 	UpdatedAt      time.Time        `json:"updated_at"`
 }

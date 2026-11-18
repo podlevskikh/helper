@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
 
@@ -100,6 +101,42 @@ func (h *HelperHandler) withRecurring(c *gin.Context, schedule *models.DailySche
 	}
 }
 
+// myDayOff — если помощник в этот день отдыхает, почему (выходной, праздник, отпуск, отгул).
+// Для нанимателя и для рабочего дня — nil.
+func (h *HelperHandler) myDayOff(c *gin.Context, date time.Time) *calendar.DayStatus {
+	m := middleware.MustMembership(c)
+	if m.Role != models.RoleHelper {
+		return nil
+	}
+	s, err := calendar.StatusOn(h.db, m.OrganizationID, m.UserID, date)
+	if err != nil || s.Working {
+		return nil
+	}
+	return &s
+}
+
+type scheduleResponse struct {
+	models.DailySchedule
+	DayOff *calendar.DayStatus `json:"day_off,omitempty"`
+}
+
+// respondSchedule отдаёт день. В выходной помощника регулярные задачи и задачи «для всех»
+// ему не показываем — остаются только разовые задачи, поставленные лично на него.
+func (h *HelperHandler) respondSchedule(c *gin.Context, schedule models.DailySchedule, date time.Time) {
+	off := h.myDayOff(c, date)
+	if off != nil {
+		uid := middleware.MustMembership(c).UserID
+		kept := make([]models.ScheduleTask, 0)
+		for _, t := range schedule.Tasks {
+			if t.TaskType == "custom" && t.RecurringTaskID == nil && t.AssignedToUserID != nil && *t.AssignedToUserID == uid {
+				kept = append(kept, t)
+			}
+		}
+		schedule.Tasks = kept
+	}
+	c.JSON(http.StatusOK, scheduleResponse{DailySchedule: schedule, DayOff: off})
+}
+
 // childcareDuration returns duration in minutes between two "HH:MM" strings.
 func childcareDuration(startTime, endTime string) int {
 	start, _ := time.Parse("15:04", startTime)
@@ -124,7 +161,7 @@ func (h *HelperHandler) GetTodaySchedule(c *gin.Context) {
 			Where("date >= ? AND date < ?", utcDate, utcDate.AddDate(0, 0, 1)).
 			Count(&ccCount)
 		if ccCount == 0 && len(recurringFor(h.db, h.orgID(c), today)) == 0 {
-			c.JSON(http.StatusOK, gin.H{"message": "No schedule for today", "tasks": []models.ScheduleTask{}})
+			c.JSON(http.StatusOK, gin.H{"message": "No schedule for today", "tasks": []models.ScheduleTask{}, "day_off": h.myDayOff(c, today)})
 			return
 		}
 		schedule = models.DailySchedule{Date: todayStart, Generated: false, OrganizationID: h.orgID(c)}
@@ -140,7 +177,7 @@ func (h *HelperHandler) GetTodaySchedule(c *gin.Context) {
 
 	h.mergeChildcareTasks(c, &schedule, today)
 	h.withRecurring(c, &schedule, today)
-	c.JSON(http.StatusOK, schedule)
+	h.respondSchedule(c, schedule, today)
 }
 
 // GetScheduleByDate returns schedule for a specific date
@@ -164,7 +201,7 @@ func (h *HelperHandler) GetScheduleByDate(c *gin.Context) {
 			Where("date >= ? AND date < ?", utcDate, utcDate.AddDate(0, 0, 1)).
 			Count(&ccCount)
 		if ccCount == 0 && len(recurringFor(h.db, h.orgID(c), date)) == 0 {
-			c.JSON(http.StatusOK, gin.H{"message": "No schedule for this date", "tasks": []models.ScheduleTask{}})
+			c.JSON(http.StatusOK, gin.H{"message": "No schedule for this date", "tasks": []models.ScheduleTask{}, "day_off": h.myDayOff(c, date)})
 			return
 		}
 		schedule = models.DailySchedule{Date: date, Generated: false, OrganizationID: h.orgID(c)}
@@ -180,7 +217,7 @@ func (h *HelperHandler) GetScheduleByDate(c *gin.Context) {
 
 	h.mergeChildcareTasks(c, &schedule, date)
 	h.withRecurring(c, &schedule, date)
-	c.JSON(http.StatusOK, schedule)
+	h.respondSchedule(c, schedule, date)
 }
 
 // GetUpcomingSchedules returns schedules for the next N days

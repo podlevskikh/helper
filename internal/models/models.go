@@ -190,15 +190,48 @@ type Settings struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-// Holiday represents a public holiday or day off
-type Holiday struct {
+// PublicHoliday — государственный праздник страны (общий справочник, без organization_id).
+// Загружается из публичного календаря Google, запасной источник — Nager.Date (см. internal/calendar).
+type PublicHoliday struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
-	Name        string    `gorm:"not null" json:"name"`
-	Date        time.Time `gorm:"not null" json:"date"` // Specific date
-	IsRecurring bool      `gorm:"default:true" json:"is_recurring"` // Repeats every year
-	Country     string    `json:"country"` // e.g., "Cyprus"
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	CountryCode string    `gorm:"size:2;not null;uniqueIndex:idx_public_holiday" json:"country_code"`
+	Date        time.Time `gorm:"type:date;not null;uniqueIndex:idx_public_holiday;index" json:"date"`
+	Name        string    `gorm:"not null;uniqueIndex:idx_public_holiday" json:"name"`
+	LocalName   string    `json:"local_name,omitempty"`
+	Source      string    `json:"source"` // google | nager
+	FetchedAt   time.Time `json:"fetched_at"`
+}
+
+// HolidaySync — когда и откуда последний раз загружали праздники страны.
+type HolidaySync struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	CountryCode string    `gorm:"size:2;uniqueIndex;not null" json:"country_code"`
+	Source      string    `json:"source"`
+	Status      string    `json:"status"` // ok | error
+	Error       string    `json:"error,omitempty"`
+	Count       int       `json:"count"`
+	FetchedAt   time.Time `json:"fetched_at"`
+}
+
+// Виды особых дней сотрудника.
+const (
+	DayOverrideVacation = "vacation" // отпуск (с–по), вычитается из дней отпуска
+	DayOverrideDayOff   = "day_off"  // отгул / выходной по договорённости
+	DayOverrideWork     = "work"     // рабочий день вместо выходного или праздника
+)
+
+// StaffDayOverride — особый день сотрудника, который отмечает наниматель.
+type StaffDayOverride struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	OrganizationID uint      `gorm:"index;not null" json:"organization_id"`
+	UserID         uint      `gorm:"index;not null" json:"user_id"`
+	Kind           string    `gorm:"not null" json:"kind"`
+	StartDate      time.Time `gorm:"type:date;not null;index" json:"start_date"`
+	EndDate        time.Time `gorm:"type:date;not null;index" json:"end_date"`
+	Note           string    `json:"note,omitempty"`
+	CreatedBy      uint      `json:"created_by"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // RecipeComment represents a comment on a recipe

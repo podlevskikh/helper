@@ -7,7 +7,7 @@ import (
 	"math/rand"
 	"time"
 
-	"podlevskikh/awesomeProject/internal/data"
+	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/models"
 
 	"gorm.io/gorm"
@@ -17,6 +17,9 @@ func init() {
 	// Initialize random number generator with current time
 	rand.Seed(time.Now().UnixNano())
 }
+
+// schedulerOrgID — организация, для которой планировщик собирает дни (DailySchedule по умолчанию — 1).
+const schedulerOrgID = 1
 
 type Scheduler struct {
 	db *gorm.DB
@@ -33,9 +36,10 @@ func (s *Scheduler) GenerateScheduleForDate(date time.Time) error {
 
 	log.Printf("Generating schedule for date: %s", date.Format("2006-01-02"))
 
-	// Check if it's a holiday or Sunday
-	if data.IsHoliday(s.db, date) {
-		log.Printf("Date %s is a holiday or Sunday, skipping schedule generation", date.Format("2006-01-02"))
+	// День не собирается, если никто из помощников не работает (выходные дни, праздники страны,
+	// отпуска и отгулы — см. internal/calendar). Расписание планировщика — организации 1.
+	if !calendar.AnyoneWorks(s.db, schedulerOrgID, date) {
+		log.Printf("Date %s: nobody works, skipping schedule generation", date.Format("2006-01-02"))
 		return nil
 	}
 
