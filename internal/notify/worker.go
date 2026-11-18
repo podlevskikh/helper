@@ -458,7 +458,7 @@ func (w *Worker) timedForOrg(orgID uint) {
 				DedupKey: fmt.Sprintf("remind:%d:%d:%s:%s", t.ID, uid, day, base),
 				Params: Params{Title: t.Title, TaskType: t.TaskType, Time: t.Time, StartAt: start,
 					Lead: p.ReminderLeadMin, Important: EffectivePriority(w.DB, t) == "high"},
-				URL: taskURL(t.ID)})
+				URL: taskURL(t.ID, day)})
 		}
 	}
 

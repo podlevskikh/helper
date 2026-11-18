@@ -254,7 +254,13 @@ func EffectivePriority(db *gorm.DB, t *models.ScheduleTask) string {
 	return "normal"
 }
 
-func taskURL(id uint) string { return fmt.Sprintf("/task/%d", id) }
+// taskURL — экран задачи; дата нужна, чтобы найти задачу в расписании дня.
+func taskURL(id uint, day string) string {
+	if day == "" {
+		return fmt.Sprintf("/task/%d", id)
+	}
+	return fmt.Sprintf("/task/%d?date=%s", id, day)
+}
 
 // ── События задач ───────────────────────────────────────────────────────────
 
@@ -272,7 +278,7 @@ func TaskCreated(db *gorm.DB, actorID uint, t *models.ScheduleTask) {
 			OrgID: t.OrganizationID, UserID: uid, Kind: KindTaskNew,
 			DedupKey: fmt.Sprintf("task-new:%d:%d", t.ID, uid),
 			Params:   Params{Actor: actor, Title: t.Title, TaskType: t.TaskType, Time: t.Time, Day: rel},
-			URL:      taskURL(t.ID),
+			URL:      taskURL(t.ID, day),
 		})
 	}
 }
@@ -281,7 +287,8 @@ func TaskCreated(db *gorm.DB, actorID uint, t *models.ScheduleTask) {
 // Правки текста пушем не присылаем.
 func TaskUpdated(db *gorm.DB, actorID uint, before, after *models.ScheduleTask) {
 	loc := OrgLocation(db, after.OrganizationID)
-	rel := relativeDay(taskDay(db, after), loc)
+	day := taskDay(db, after)
+	rel := relativeDay(day, loc)
 	if rel == "" || after.Completed {
 		return
 	}
@@ -301,10 +308,10 @@ func TaskUpdated(db *gorm.DB, actorID uint, before, after *models.ScheduleTask) 
 	for _, uid := range newTo {
 		if !in(oldTo, uid) {
 			Enqueue(db, Item{OrgID: after.OrganizationID, UserID: uid, Kind: KindTaskNew,
-				DedupKey: fmt.Sprintf("task-new:%d:%d:%d", after.ID, uid, stamp), Params: p, URL: taskURL(after.ID)})
+				DedupKey: fmt.Sprintf("task-new:%d:%d:%d", after.ID, uid, stamp), Params: p, URL: taskURL(after.ID, day)})
 		} else if before.Time != after.Time {
 			Enqueue(db, Item{OrgID: after.OrganizationID, UserID: uid, Kind: KindTaskMoved,
-				DedupKey: fmt.Sprintf("task-moved:%d:%d:%s", after.ID, uid, after.Time+"@"+fmt.Sprint(stamp)), Params: p, URL: taskURL(after.ID)})
+				DedupKey: fmt.Sprintf("task-moved:%d:%d:%s", after.ID, uid, after.Time+"@"+fmt.Sprint(stamp)), Params: p, URL: taskURL(after.ID, day)})
 		}
 	}
 	for _, uid := range oldTo {
@@ -348,7 +355,7 @@ func TaskCompleted(db *gorm.DB, actorID uint, t *models.ScheduleTask) {
 		Enqueue(db, Item{OrgID: t.OrganizationID, UserID: uid, Kind: KindImportantDone,
 			DedupKey: fmt.Sprintf("important-done:%d:%d:%s", t.ID, uid, CalendarDay(at)),
 			Params:   Params{Actor: actor, Title: t.Title, TaskType: t.TaskType, At: at.Format("15:04")},
-			URL:      taskURL(t.ID)})
+			URL:      taskURL(t.ID, taskDay(db, t))})
 	}
 }
 
@@ -360,7 +367,7 @@ func listItems(db *gorm.DB, listID uint) []models.ShoppingListItem {
 	return items
 }
 
-func listURL(id uint) string { return fmt.Sprintf("/inbox?list=%d", id) }
+func listURL(id uint) string { return fmt.Sprintf("/shopping/%d", id) }
 
 // ListSent — помощник отправил список (Н1).
 func ListSent(db *gorm.DB, actorID uint, l *models.ShoppingList) {
