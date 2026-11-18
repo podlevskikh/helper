@@ -13,6 +13,7 @@ import (
 
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
+	"podlevskikh/awesomeProject/internal/notify"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -626,6 +627,7 @@ func (h *AdminHandler) UpdateTask(c *gin.Context) {
 		return
 	}
 
+	before := task
 	if input.Priority != nil {
 		task.Priority = *input.Priority
 	}
@@ -663,6 +665,7 @@ func (h *AdminHandler) UpdateTask(c *gin.Context) {
 	h.db.Save(&task)
 
 	h.db.Preload("Recipes").Preload("Recipe").First(&task, id)
+	notify.TaskUpdated(h.db, currentUserID(c), &before, &task)
 	c.JSON(http.StatusOK, task)
 }
 
@@ -901,6 +904,7 @@ func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	notify.TaskCreated(h.db, currentUserID(c), &task)
 	c.JSON(http.StatusCreated, task)
 }
 
@@ -923,6 +927,7 @@ func (h *AdminHandler) DeleteCustomTask(c *gin.Context) {
 			h.db.Create(&models.RecurringTaskSkip{RecurringTaskID: *task.RecurringTaskID, Date: utcDay(sched.Date)})
 		}
 	}
+	notify.TaskDeleted(h.db, currentUserID(c), &task)
 	if err := h.db.Delete(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

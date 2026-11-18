@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"podlevskikh/awesomeProject/internal/database"
 	"podlevskikh/awesomeProject/internal/handlers"
 	"podlevskikh/awesomeProject/internal/middleware"
+	"podlevskikh/awesomeProject/internal/notify"
 	"podlevskikh/awesomeProject/internal/scheduler"
 
 	"github.com/gin-contrib/cors"
@@ -46,6 +48,14 @@ func main() {
 	if err := sched.GenerateScheduleForNextDays(7); err != nil {
 		log.Printf("Warning: Failed to generate initial schedules: %v", err)
 	}
+
+	// Пуш-уведомления: очередь → Expo (PUSH_DRY_RUN=1 — только в лог)
+	var pushSender notify.Sender = notify.NewExpoClientFromEnv()
+	if os.Getenv("PUSH_DRY_RUN") == "1" {
+		pushSender = notify.LogSender{Printf: log.Printf}
+	}
+	pushWorker := &notify.Worker{DB: db, Sender: pushSender, EnsureDay: handlers.EnsureDay(db)}
+	go pushWorker.Run(context.Background())
 
 	// Start daily schedule generation goroutine
 	go func() {
@@ -95,6 +105,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(db)
 	inviteHandler := handlers.NewInviteHandler(db)
 	orgHandler := handlers.NewOrgHandler(db)
+	notificationsHandler := handlers.NewNotificationsHandler(db)
 
 	// Auth routes
 	authMw := middleware.Auth()
@@ -109,6 +120,13 @@ func main() {
 		authGroup.GET("/me", authMw, authHandler.Me)
 		authGroup.PATCH("/me", authMw, authHandler.UpdateMe)
 		authGroup.POST("/password", authMw, authHandler.ChangePassword)
+	}
+
+	// Устройства для пушей (без контекста дома: токен — на пользователя)
+	meGroup := router.Group("/me", authMw)
+	{
+		meGroup.POST("/devices", notificationsHandler.RegisterDevice)
+		meGroup.DELETE("/devices/:token", notificationsHandler.UnregisterDevice)
 	}
 
 	// Invite routes
@@ -130,6 +148,11 @@ func main() {
 		// Redesign v2: настройки организации (лимит задач высокой важности)
 		orgsGroup.GET("/:orgId/settings", orgHandler.GetOrgSettings)
 		orgsGroup.PUT("/:orgId/settings", middleware.Require(middleware.CapManageSettings), orgHandler.UpdateOrgSettings)
+
+		// Уведомления: свои настройки в этом доме
+		orgsGroup.GET("/:orgId/notification-prefs", notificationsHandler.GetPrefs)
+		orgsGroup.PUT("/:orgId/notification-prefs", notificationsHandler.UpdatePrefs)
+		orgsGroup.POST("/:orgId/notification-prefs/test", notificationsHandler.SendTest)
 	}
 
 	// New UI routes

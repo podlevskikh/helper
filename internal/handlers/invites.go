@@ -12,6 +12,7 @@ import (
 	"podlevskikh/awesomeProject/internal/auth"
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
+	"podlevskikh/awesomeProject/internal/notify"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -217,6 +218,7 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to accept invite"})
 		return
 	}
+	notify.MemberJoined(h.db, invite.OrganizationID, user.ID)
 
 	// Используем authHandler helper через прямой вызов
 	ah := &AuthHandler{db: h.db}

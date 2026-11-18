@@ -75,6 +75,11 @@ func Initialize(databaseURL string) error {
 		&models.Settings{},
 		&models.Holiday{},
 		&models.RecipeComment{},
+		// Пуш-уведомления
+		&models.PushDevice{},
+		&models.NotificationPref{},
+		&models.Notification{},
+		&models.PushTicket{},
 	)
 
 	if err != nil {

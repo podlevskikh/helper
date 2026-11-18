@@ -51,6 +51,8 @@ type Organization struct {
 	OwnerUserID uint      `gorm:"index" json:"owner_user_id"`
 	// Сколько задач высокой важности можно поставить на один день
 	HighPriorityLimit int `gorm:"default:3" json:"high_priority_limit"`
+	// Часовой пояс дома (IANA): по нему считаются «сегодня», план дня, напоминания и тихие часы
+	Timezone    string    `gorm:"default:'Europe/Nicosia'" json:"timezone"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
