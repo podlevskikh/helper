@@ -107,6 +107,8 @@ func main() {
 		authGroup.POST("/refresh", authHandler.Refresh)
 		authGroup.POST("/logout", authHandler.Logout)
 		authGroup.GET("/me", authMw, authHandler.Me)
+		authGroup.PATCH("/me", authMw, authHandler.UpdateMe)
+		authGroup.POST("/password", authMw, authHandler.ChangePassword)
 	}
 
 	// Invite routes
