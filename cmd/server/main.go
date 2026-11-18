@@ -289,6 +289,20 @@ func main() {
 			api.POST("/shopping/:id/purchased", helperHandler.MarkItemPurchased)
 			api.DELETE("/shopping/:id", helperHandler.DeleteShoppingListItem)
 
+			// Списки покупок (раздел «Входящие»)
+			viewShop := middleware.Require(middleware.CapViewShopping)
+			manageShop := middleware.Require(middleware.CapManageShopping)
+			api.GET("/shopping-lists", viewShop, helperHandler.GetShoppingLists)
+			api.POST("/shopping-lists", manageShop, helperHandler.CreateShoppingList)
+			api.GET("/shopping-lists/:id", viewShop, helperHandler.GetShoppingListByID)
+			api.DELETE("/shopping-lists/:id", manageShop, helperHandler.DeleteShoppingList)
+			api.POST("/shopping-lists/:id/send", manageShop, helperHandler.SendShoppingList)
+			api.POST("/shopping-lists/:id/viewed", viewShop, helperHandler.MarkShoppingListViewed)
+			api.POST("/shopping-lists/:id/close", manageShop, helperHandler.CloseShoppingList)
+			api.POST("/shopping-lists/:id/items", manageShop, helperHandler.AddShoppingListEntry)
+			api.PATCH("/shopping-lists/:id/items/:itemId", manageShop, helperHandler.UpdateShoppingListEntry)
+			api.DELETE("/shopping-lists/:id/items/:itemId", manageShop, helperHandler.DeleteShoppingListEntry)
+
 			// Recipe details
 			api.GET("/recipes/:id", helperHandler.GetRecipeDetails)
 

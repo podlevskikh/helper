@@ -270,7 +270,12 @@ func (h *HelperHandler) UncompleteTask(c *gin.Context) {
 
 func (h *HelperHandler) GetShoppingList(c *gin.Context) {
 	var items []models.ShoppingListItem
-	if err := h.orgDB(c).Where("purchased = ?", false).Order("category, item").Find(&items).Error; err != nil {
+	// Совместимость со старым плоским списком: свободные пункты + пункты открытых списков.
+	openLists := h.db.Model(&models.ShoppingList{}).Select("id").
+		Where("organization_id = ? AND status = ?", h.orgID(c), models.ShoppingListOpen)
+	if err := h.orgDB(c).Where("purchased = ?", false).
+		Where("list_id IS NULL OR list_id IN (?)", openLists).
+		Order("category, item").Find(&items).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -286,6 +291,19 @@ func (h *HelperHandler) AddShoppingListItem(c *gin.Context) {
 	
 	item.AddedBy = "helper"
 	item.OrganizationID = h.orgID(c)
+	item.ID = 0
+	item.ListID = nil
+	// Старый клиент добавляет в самый свежий открытый список, если он есть —
+	// чтобы новые экраны «Входящих» тоже видели пункт.
+	var latest models.ShoppingList
+	if err := h.orgDB(c).Where("status = ?", models.ShoppingListOpen).
+		Order("list_date DESC, id DESC").First(&latest).Error; err == nil {
+		var maxPos int
+		h.db.Model(&models.ShoppingListItem{}).Where("list_id = ?", latest.ID).
+			Select("COALESCE(MAX(position), 0)").Scan(&maxPos)
+		item.ListID = &latest.ID
+		item.Position = maxPos + 1
+	}
 
 	if err := h.db.Create(&item).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -305,6 +323,8 @@ func (h *HelperHandler) MarkItemPurchased(c *gin.Context) {
 	}
 	
 	item.Purchased = true
+	now := time.Now()
+	item.PurchasedAt = &now
 	if err := h.db.Save(&item).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

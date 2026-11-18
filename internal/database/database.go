@@ -70,6 +70,7 @@ func Initialize(databaseURL string) error {
 		&models.ScheduleTask{},
 		&models.RecurringTask{},
 		&models.RecurringTaskSkip{},
+		&models.ShoppingList{}, // до ShoppingListItem (list_id)
 		&models.ShoppingListItem{},
 		&models.Settings{},
 		&models.Holiday{},

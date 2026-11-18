@@ -137,17 +137,47 @@ type ScheduleTask struct {
 	TaskCategory *TaskCategory  `gorm:"foreignKey:TaskCategoryID" json:"task_category,omitempty"`
 }
 
-// ShoppingListItem represents items needed for shopping
+// ShoppingListItem represents items needed for shopping.
+// Пункт либо «свободный» (старый плоский список, ListID = nil), либо входит в ShoppingList.
 type ShoppingListItem struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
 	OrganizationID uint      `gorm:"index;not null;default:1" json:"organization_id"`
+	ListID         *uint     `gorm:"index" json:"list_id,omitempty"`
 	Item           string    `gorm:"not null" json:"item"`
 	Quantity    string    `json:"quantity"`
 	Category    string    `json:"category"` // produce, dairy, meat, etc
 	Purchased   bool      `gorm:"default:false" json:"purchased"`
+	PurchasedAt *time.Time `json:"purchased_at,omitempty"`
 	AddedBy     string    `json:"added_by"` // admin or helper
+	AddedByUserID *uint   `json:"added_by_user_id,omitempty"`
+	Position    int       `gorm:"default:0" json:"position"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// Статусы списка покупок.
+const (
+	ShoppingListDraft  = "draft"  // помощник собирает, нанимателю не виден
+	ShoppingListOpen   = "open"   // во входящих у нанимателя
+	ShoppingListClosed = "closed" // съездили в магазин, список закрыт
+)
+
+// ShoppingList — чек-лист покупок с датой, автором и статусом (раздел «Входящие»).
+type ShoppingList struct {
+	ID              uint       `gorm:"primaryKey" json:"id"`
+	OrganizationID  uint       `gorm:"index;not null" json:"organization_id"`
+	ListDate        string     `gorm:"type:varchar(10);not null" json:"list_date"` // YYYY-MM-DD
+	Status          string     `gorm:"type:varchar(16);index;not null;default:'draft'" json:"status"`
+	CreatedByUserID uint       `gorm:"index" json:"created_by_user_id"`
+	SentAt          *time.Time `json:"sent_at,omitempty"`
+	ViewedAt        *time.Time `json:"viewed_at,omitempty"` // когда наниматель впервые открыл
+	ClosedAt        *time.Time `json:"closed_at,omitempty"`
+	ClosedByUserID  *uint      `json:"closed_by_user_id,omitempty"`
+	ParentListID    *uint      `gorm:"index" json:"parent_list_id,omitempty"` // список, из которого перенесены пункты
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+
+	Items []ShoppingListItem `gorm:"foreignKey:ListID" json:"items,omitempty"`
 }
 
 // Settings represents per-organisation system settings
