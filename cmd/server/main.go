@@ -155,9 +155,9 @@ func main() {
 			// Recipes
 			api.GET("/recipes", adminHandler.GetRecipes)
 			api.GET("/recipes/:id", adminHandler.GetRecipe)
-			api.POST("/recipes", adminHandler.CreateRecipe)
-			api.PUT("/recipes/:id", adminHandler.UpdateRecipe)
-			api.DELETE("/recipes/:id", adminHandler.DeleteRecipe)
+			api.POST("/recipes", middleware.Require(middleware.CapManageRecipes), adminHandler.CreateRecipe)
+			api.PUT("/recipes/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.UpdateRecipe)
+			api.DELETE("/recipes/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.DeleteRecipe)
 			api.POST("/recipes/upload-image", adminHandler.UploadRecipeImage)
 
 			// Recipe Comments

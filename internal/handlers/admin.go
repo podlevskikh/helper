@@ -81,7 +81,7 @@ func (h *AdminHandler) CreateRecipe(c *gin.Context) {
 	// Associate meal times if provided
 	if len(input.MealTimeIDs) > 0 {
 		var mealTimes []models.MealTime
-		if err := h.db.Find(&mealTimes, input.MealTimeIDs).Error; err != nil {
+		if err := h.orgDB(c).Find(&mealTimes, input.MealTimeIDs).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find meal times"})
 			return
 		}
@@ -102,7 +102,7 @@ func (h *AdminHandler) UpdateRecipe(c *gin.Context) {
 	id := c.Param("id")
 	var recipe models.Recipe
 
-	if err := h.db.First(&recipe, id).Error; err != nil {
+	if err := h.orgDB(c).First(&recipe, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
 		return
 	}
@@ -141,7 +141,7 @@ func (h *AdminHandler) UpdateRecipe(c *gin.Context) {
 	if input.MealTimeIDs != nil {
 		var mealTimes []models.MealTime
 		if len(input.MealTimeIDs) > 0 {
-			if err := h.db.Find(&mealTimes, input.MealTimeIDs).Error; err != nil {
+			if err := h.orgDB(c).Find(&mealTimes, input.MealTimeIDs).Error; err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find meal times"})
 				return
 			}
@@ -164,7 +164,7 @@ func (h *AdminHandler) DeleteRecipe(c *gin.Context) {
 
 	// First, get the recipe to ensure it exists
 	var recipe models.Recipe
-	if err := h.db.First(&recipe, id).Error; err != nil {
+	if err := h.orgDB(c).First(&recipe, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
 		return
 	}
