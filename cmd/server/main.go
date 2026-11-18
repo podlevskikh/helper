@@ -173,9 +173,9 @@ func main() {
 			// Cleaning zones
 			api.GET("/zones", adminHandler.GetCleaningZones)
 			api.GET("/zones/:id", adminHandler.GetCleaningZone)
-			api.POST("/zones", adminHandler.CreateCleaningZone)
-			api.PUT("/zones/:id", adminHandler.UpdateCleaningZone)
-			api.DELETE("/zones/:id", adminHandler.DeleteCleaningZone)
+			api.POST("/zones", middleware.Require(middleware.CapManageSchedule), adminHandler.CreateCleaningZone)
+			api.PUT("/zones/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.UpdateCleaningZone)
+			api.DELETE("/zones/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.DeleteCleaningZone)
 
 			// Childcare schedules
 			api.GET("/childcare", adminHandler.GetChildcareSchedules)

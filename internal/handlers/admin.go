@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"podlevskikh/awesomeProject/internal/middleware"
@@ -356,64 +357,102 @@ func (h *AdminHandler) GetCleaningZones(c *gin.Context) {
 }
 
 func (h *AdminHandler) GetCleaningZone(c *gin.Context) {
-	id := c.Param("id")
 	var zone models.CleaningZone
-
-	if err := h.db.First(&zone, id).Error; err != nil {
+	if err := h.orgDB(c).First(&zone, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Cleaning zone not found"})
 		return
 	}
-
 	c.JSON(http.StatusOK, zone)
 }
 
+// zoneInput — что можно задать у зоны уборки (организация и id — только с сервера).
+type zoneInput struct {
+	Name             string `json:"name"`
+	Description      string `json:"description"`
+	FrequencyPerWeek int    `json:"frequency_per_week"`
+	Priority         string `json:"priority"`
+}
+
+func (in *zoneInput) validate() string {
+	in.Name = strings.TrimSpace(in.Name)
+	if in.Name == "" {
+		return "name is required"
+	}
+	if in.FrequencyPerWeek < 1 || in.FrequencyPerWeek > 7 {
+		return "frequency_per_week must be 1..7"
+	}
+	switch in.Priority {
+	case "":
+		in.Priority = "medium"
+	case "high", "medium", "low":
+	default:
+		return "priority must be high|medium|low"
+	}
+	return ""
+}
+
 func (h *AdminHandler) CreateCleaningZone(c *gin.Context) {
-	var zone models.CleaningZone
-	if err := c.ShouldBindJSON(&zone); err != nil {
+	var in zoneInput
+	if err := c.ShouldBindJSON(&in); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+	if msg := in.validate(); msg != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": msg})
+		return
+	}
+	zone := models.CleaningZone{
+		OrganizationID:   h.orgID(c),
+		Name:             in.Name,
+		Description:      in.Description,
+		FrequencyPerWeek: in.FrequencyPerWeek,
+		Priority:         in.Priority,
+	}
 	if err := h.db.Create(&zone).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
 	c.JSON(http.StatusCreated, zone)
 }
 
 func (h *AdminHandler) UpdateCleaningZone(c *gin.Context) {
-	id := c.Param("id")
 	var zone models.CleaningZone
-	
-	if err := h.db.First(&zone, id).Error; err != nil {
+	if err := h.orgDB(c).First(&zone, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Cleaning zone not found"})
 		return
 	}
-	
-	if err := c.ShouldBindJSON(&zone); err != nil {
+	var in zoneInput
+	if err := c.ShouldBindJSON(&in); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+	if msg := in.validate(); msg != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": msg})
+		return
+	}
+	zone.Name, zone.Description, zone.FrequencyPerWeek, zone.Priority = in.Name, in.Description, in.FrequencyPerWeek, in.Priority
 	if err := h.db.Save(&zone).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
 	c.JSON(http.StatusOK, zone)
 }
 
 func (h *AdminHandler) DeleteCleaningZone(c *gin.Context) {
-	id := c.Param("id")
+	var zone models.CleaningZone
+	if err := h.orgDB(c).First(&zone, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Cleaning zone not found"})
+		return
+	}
+	id := zone.ID
 
 	// Clear many2many references in task_zones
 	if err := h.db.Exec("DELETE FROM task_zones WHERE cleaning_zone_id = ?", id).Error; err != nil {
-		log.Printf("Warning: failed to clear task_zones for zone %s: %v", id, err)
+		log.Printf("Warning: failed to clear task_zones for zone %d: %v", id, err)
 	}
 	// Clear deprecated zone_id FK in schedule_tasks
 	if err := h.db.Exec("UPDATE schedule_tasks SET zone_id = NULL WHERE zone_id = ?", id).Error; err != nil {
-		log.Printf("Warning: failed to clear zone_id FK for zone %s: %v", id, err)
+		log.Printf("Warning: failed to clear zone_id FK for zone %d: %v", id, err)
 	}
 
 	if err := h.db.Delete(&models.CleaningZone{}, id).Error; err != nil {
