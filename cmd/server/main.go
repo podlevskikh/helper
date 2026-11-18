@@ -195,6 +195,9 @@ func main() {
 			// Custom one-off tasks
 			api.POST("/custom-tasks", adminHandler.CreateCustomTask)
 			api.DELETE("/custom-tasks/:id", adminHandler.DeleteCustomTask)
+			api.GET("/recurring-tasks", adminHandler.GetRecurringTasks)
+			api.POST("/recurring-tasks", middleware.Require(middleware.CapManageSchedule), adminHandler.CreateRecurringTask)
+			api.DELETE("/recurring-tasks/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.DeleteRecurringTask)
 
 			// Schedule management
 			api.POST("/regenerate-schedule", func(c *gin.Context) {

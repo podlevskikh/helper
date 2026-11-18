@@ -68,6 +68,8 @@ func Initialize(databaseURL string) error {
 		&models.DailySchedule{},
 		&models.TaskCategory{}, // M2: до ScheduleTask (FK)
 		&models.ScheduleTask{},
+		&models.RecurringTask{},
+		&models.RecurringTaskSkip{},
 		&models.ShoppingListItem{},
 		&models.Settings{},
 		&models.Holiday{},
@@ -223,8 +225,21 @@ func seedDefaultCategories() {
 
 	for _, org := range orgs {
 		for _, d := range defaults {
+			// Ищем системную категорию по ключу; у старых данных ключа нет —
+			// узнаём её по названию или (если переименована) по месту в списке.
 			var cat models.TaskCategory
-			err := DB.Where("organization_id = ? AND name = ?", org.ID, d.Name).First(&cat).Error
+			err := DB.Where("organization_id = ? AND system_key = ?", org.ID, d.TaskType).First(&cat).Error
+			if err != nil {
+				err = DB.Where("organization_id = ? AND is_default = ? AND (system_key IS NULL OR system_key = '') AND name = ?", org.ID, true, d.Name).
+					First(&cat).Error
+				if err != nil {
+					err = DB.Where("organization_id = ? AND is_default = ? AND (system_key IS NULL OR system_key = '') AND sort_order = ?", org.ID, true, d.SortOrder).
+						First(&cat).Error
+				}
+				if err == nil {
+					DB.Model(&cat).Update("system_key", d.TaskType)
+				}
+			}
 			if err == nil {
 				// уже существует — backfill задач
 				DB.Exec(
@@ -241,6 +256,7 @@ func seedDefaultCategories() {
 				Icon:           d.Icon,
 				Color:          d.Color,
 				IsDefault:      true,
+				SystemKey:      d.TaskType,
 				SortOrder:      d.SortOrder,
 				Priority:       map[bool]string{true: d.Priority, false: "normal"}[d.Priority != ""],
 			}

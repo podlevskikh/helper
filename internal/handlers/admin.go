@@ -869,13 +869,20 @@ func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
 func (h *AdminHandler) DeleteCustomTask(c *gin.Context) {
 	id := c.Param("id")
 	var task models.ScheduleTask
-	if err := h.db.First(&task, id).Error; err != nil {
+	if err := h.orgDB(c).First(&task, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
 	if task.TaskType != "custom" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "only custom tasks can be deleted this way"})
 		return
+	}
+	// Повторяющаяся: запоминаем день, чтобы задача не появилась снова.
+	if task.RecurringTaskID != nil {
+		var sched models.DailySchedule
+		if h.db.First(&sched, task.ScheduleID).Error == nil {
+			h.db.Create(&models.RecurringTaskSkip{RecurringTaskID: *task.RecurringTaskID, Date: utcDay(sched.Date)})
+		}
 	}
 	if err := h.db.Delete(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

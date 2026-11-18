@@ -93,6 +93,9 @@ type TaskCategory struct {
 	Icon           string    `json:"icon,omitempty"`            // emoji или имя иконки
 	Color          string    `json:"color,omitempty"`           // hex (#RRGGBB)
 	IsDefault      bool      `gorm:"default:false" json:"is_default"` // системная — нельзя удалить
+	// Постоянный ключ системной категории (meal | cleaning | childcare | custom):
+	// по нему, а не по названию, планировщик находит категорию — название можно менять.
+	SystemKey      string    `gorm:"index" json:"system_key,omitempty"`
 	SortOrder      int       `gorm:"default:0" json:"sort_order"`
 	// Важность по умолчанию для задач категории: high | mid | normal
 	Priority       string    `gorm:"default:'normal'" json:"priority"`
@@ -121,6 +124,8 @@ type ScheduleTask struct {
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	// Важность задачи: high | mid | normal; пусто — берётся из категории
 	Priority    string    `json:"priority,omitempty"`
+	// Задача создана из повторяющейся (RecurringTask) — nil для разовых
+	RecurringTaskID *uint     `gorm:"index" json:"recurring_task_id,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 
@@ -177,11 +182,11 @@ type RecipeComment struct {
 }
 
 
-// legacyTypeCategory — системная категория для задач, созданных планировщиком.
-var legacyTypeCategory = map[string]string{
-	"meal":      "Еда",
-	"cleaning":  "Уборка",
-	"childcare": "Уход за ребёнком",
+// legacyTypeCategory — task_type задач планировщика, которым ставится системная категория.
+var legacyTypeCategory = map[string]bool{
+	"meal":      true,
+	"cleaning":  true,
+	"childcare": true,
 }
 
 // BeforeCreate проставляет категорию задачам планировщика (еда/уборка/ребёнок),
@@ -190,8 +195,7 @@ func (t *ScheduleTask) BeforeCreate(tx *gorm.DB) error {
 	if t.TaskCategoryID != nil {
 		return nil
 	}
-	name, ok := legacyTypeCategory[t.TaskType]
-	if !ok {
+	if !legacyTypeCategory[t.TaskType] {
 		return nil
 	}
 	orgID := t.OrganizationID
@@ -200,9 +204,40 @@ func (t *ScheduleTask) BeforeCreate(tx *gorm.DB) error {
 	}
 	var cat TaskCategory
 	if err := tx.Session(&gorm.Session{NewDB: true}).
-		Where("organization_id = ? AND name = ?", orgID, name).
+		Where("organization_id = ? AND system_key = ?", orgID, t.TaskType).
 		First(&cat).Error; err == nil {
 		t.TaskCategoryID = &cat.ID
 	}
 	return nil
+}
+
+// RecurringTask — повторяющаяся задача нанимателя («полить цветы по средам»).
+// В конкретный день она превращается в обычную ScheduleTask (task_type=custom)
+// при первом открытии этого дня (см. handlers.materializeRecurring).
+type RecurringTask struct {
+	ID               uint      `gorm:"primaryKey" json:"id"`
+	OrganizationID   uint      `gorm:"index;not null" json:"organization_id"`
+	Title            string    `gorm:"not null" json:"title"`
+	Description      string    `json:"description"`
+	Time             string    `json:"time"`     // HH:MM или пусто — «когда удобно»
+	EndTime          string    `json:"end_time"` // HH:MM — конец промежутка
+	Priority         string    `json:"priority,omitempty"`
+	TaskCategoryID   *uint     `gorm:"index" json:"task_category_id,omitempty"`
+	AssignedToUserID *uint     `gorm:"index" json:"assigned_to_user_id,omitempty"`
+	// Дни недели через запятую, ISO: 1 = Пн … 7 = Вс
+	Weekdays  string    `gorm:"not null" json:"weekdays"`
+	StartDate time.Time `gorm:"not null" json:"start_date"`
+	Active    bool      `gorm:"default:true" json:"active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	TaskCategory *TaskCategory `gorm:"foreignKey:TaskCategoryID" json:"task_category,omitempty"`
+}
+
+// RecurringTaskSkip — день, в который повторяющуюся задачу удалили вручную:
+// больше не создаём её в этот день.
+type RecurringTaskSkip struct {
+	ID              uint      `gorm:"primaryKey"`
+	RecurringTaskID uint      `gorm:"uniqueIndex:idx_recurring_skip"`
+	Date            time.Time `gorm:"uniqueIndex:idx_recurring_skip"`
 }

@@ -50,12 +50,12 @@ func (h *HelperHandler) taskPreload(c *gin.Context) func(*gorm.DB) *gorm.DB {
 // mergeChildcareTasks ensures all ChildcareSchedule entries for `date` have a
 // corresponding ScheduleTask in the given schedule. Missing tasks are created in
 // the DB and appended to schedule.Tasks.  `date` is the local calendar date.
-func (h *HelperHandler) mergeChildcareTasks(schedule *models.DailySchedule, date time.Time) {
+func (h *HelperHandler) mergeChildcareTasks(c *gin.Context, schedule *models.DailySchedule, date time.Time) {
 	utcDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 	nextDay := utcDate.AddDate(0, 0, 1)
 
 	var ccList []models.ChildcareSchedule
-	if err := h.db.Where("date >= ? AND date < ?", utcDate, nextDay).Find(&ccList).Error; err != nil {
+	if err := h.orgDB(c).Where("date >= ? AND date < ?", utcDate, nextDay).Find(&ccList).Error; err != nil {
 		return
 	}
 
@@ -72,6 +72,7 @@ func (h *HelperHandler) mergeChildcareTasks(schedule *models.DailySchedule, date
 			continue
 		}
 		task := models.ScheduleTask{
+			OrganizationID: h.orgID(c),
 			ScheduleID:  schedule.ID,
 			TaskType:    "childcare",
 			Time:        cc.StartTime,
@@ -84,6 +85,18 @@ func (h *HelperHandler) mergeChildcareTasks(schedule *models.DailySchedule, date
 		if err := h.db.Create(&task).Error; err == nil {
 			schedule.Tasks = append(schedule.Tasks, task)
 		}
+	}
+}
+
+// withRecurring добавляет в день повторяющиеся задачи и, если что-то создано,
+// перечитывает задачи дня (с категориями и фильтром помощника).
+func (h *HelperHandler) withRecurring(c *gin.Context, schedule *models.DailySchedule, date time.Time) {
+	if !materializeRecurring(h.db, h.orgID(c), schedule, date) {
+		return
+	}
+	var tasks []models.ScheduleTask
+	if err := h.taskPreload(c)(h.db.Where("schedule_id = ?", schedule.ID)).Find(&tasks).Error; err == nil {
+		schedule.Tasks = tasks
 	}
 }
 
@@ -110,7 +123,7 @@ func (h *HelperHandler) GetTodaySchedule(c *gin.Context) {
 		h.orgDB(c).Model(&models.ChildcareSchedule{}).
 			Where("date >= ? AND date < ?", utcDate, utcDate.AddDate(0, 0, 1)).
 			Count(&ccCount)
-		if ccCount == 0 {
+		if ccCount == 0 && len(recurringFor(h.db, h.orgID(c), today)) == 0 {
 			c.JSON(http.StatusOK, gin.H{"message": "No schedule for today", "tasks": []models.ScheduleTask{}})
 			return
 		}
@@ -125,7 +138,8 @@ func (h *HelperHandler) GetTodaySchedule(c *gin.Context) {
 		return
 	}
 
-	h.mergeChildcareTasks(&schedule, today)
+	h.mergeChildcareTasks(c, &schedule, today)
+	h.withRecurring(c, &schedule, today)
 	c.JSON(http.StatusOK, schedule)
 }
 
@@ -149,7 +163,7 @@ func (h *HelperHandler) GetScheduleByDate(c *gin.Context) {
 		h.orgDB(c).Model(&models.ChildcareSchedule{}).
 			Where("date >= ? AND date < ?", utcDate, utcDate.AddDate(0, 0, 1)).
 			Count(&ccCount)
-		if ccCount == 0 {
+		if ccCount == 0 && len(recurringFor(h.db, h.orgID(c), date)) == 0 {
 			c.JSON(http.StatusOK, gin.H{"message": "No schedule for this date", "tasks": []models.ScheduleTask{}})
 			return
 		}
@@ -164,7 +178,8 @@ func (h *HelperHandler) GetScheduleByDate(c *gin.Context) {
 		return
 	}
 
-	h.mergeChildcareTasks(&schedule, date)
+	h.mergeChildcareTasks(c, &schedule, date)
+	h.withRecurring(c, &schedule, date)
 	c.JSON(http.StatusOK, schedule)
 }
 
@@ -203,7 +218,8 @@ func (h *HelperHandler) GetUpcomingSchedules(c *gin.Context) {
 
 	// Merge childcare entries into existing schedules.
 	for i := range schedules {
-		h.mergeChildcareTasks(&schedules[i], schedules[i].Date)
+		h.mergeChildcareTasks(c, &schedules[i], schedules[i].Date)
+		h.withRecurring(c, &schedules[i], schedules[i].Date)
 	}
 
 	c.JSON(http.StatusOK, schedules)
