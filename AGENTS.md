@@ -15,6 +15,7 @@
 - Пароли на проде не вводим — ни в браузере, ни через API.
 - Миграции данных — только в `internal/database/migrations.go`: новый шаг с id, выполняется один раз в транзакции.
   Колонки и таблицы не удаляем в том же релизе, где перестаём использовать (expand/contract).
+- Изменения в `internal/auth`, `internal/middleware`, `internal/handlers/{auth,invites,password_reset,profile}.go`, правах в `router.go` и миграциях данных → перед пушем **независимая проверка безопасности** (отдельный агент или `/security-review` по диффу, не автор изменений); найденное — исправить или записать, почему оставлено.
 - Новый маршрут → строка в матрице прав `internal/server/rbac_test.go` (тест падает без неё).
 - Ошибки 5xx и паники — в Sentry, если задан `SENTRY_DSN` (`internal/observability`; без личных данных). Секреты без доступа к Railway — `scripts/seal-*.sh` → `secrets.sealed.json`.
 - Что настраивают люди (защита ветки, секреты, бэкап, UptimeRobot, Sentry) — `docs/ops/`.
