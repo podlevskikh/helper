@@ -40,17 +40,27 @@ type RateLimitOptions struct {
 //     X-Forwarded-For: его дописывает сам прокси, а левые части подставляет кто угодно.
 //   - Если соединение пришло из частной сети (свой reverse proxy) — так же.
 //   - Иначе (прямое подключение, локально) X-Forwarded-For игнорируется: верим только адресу соединения.
+//
+// IPv6 считается по сети /64: у одного клиента обычно целая /64, и иначе каждый адрес — новый счётчик.
 func clientKey(c *gin.Context) string {
 	peer := c.RemoteIP()
 	if behindPlatformProxy() || isPrivateIP(peer) {
 		if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
 			parts := strings.Split(xff, ",")
 			if ip := strings.TrimSpace(parts[len(parts)-1]); net.ParseIP(ip) != nil {
-				return ip
+				return ipKey(ip)
 			}
 		}
 	}
-	return peer
+	return ipKey(peer)
+}
+
+func ipKey(s string) string {
+	ip := net.ParseIP(s)
+	if ip == nil || ip.To4() != nil {
+		return s
+	}
+	return ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
 }
 
 // behindPlatformProxy — сервер работает за прокси платформы (Railway задаёт свои переменные) или TRUST_PROXY=1.
@@ -111,17 +121,17 @@ func RateLimit(opt RateLimitOptions) gin.HandlerFunc {
 			})
 			return
 		}
-		if !opt.OnlyFailures {
-			w.count++
-		}
+		// Попытка засчитывается сразу, до обработчика: иначе параллельные запросы (пока идёт bcrypt)
+		// проходят все. При OnlyFailures успешный ответ попытку возвращает.
+		w.count++
 		l.mu.Unlock()
 
 		c.Next()
 
-		if opt.OnlyFailures && c.Writer.Status() >= 400 && c.Writer.Status() < 500 {
+		if st := c.Writer.Status(); opt.OnlyFailures && (st < 400 || st >= 500) {
 			l.mu.Lock()
-			if cur := l.buckets[key]; cur != nil {
-				cur.count++
+			if l.buckets[key] == w && w.count > 0 {
+				w.count--
 			}
 			l.mu.Unlock()
 		}
