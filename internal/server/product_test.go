@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"podlevskikh/awesomeProject/internal/clock"
@@ -126,5 +127,19 @@ func TestMealChangesRefreshGeneratedDays(t *testing.T) {
 	after := titles(e, e.json(e.do(req{method: "GET", path: path, token: o.Token, org: o.Org})))
 	if !has(after, "snack - all") || has(after, "lunch - all") || !has(after, "breakfast - all") {
 		t.Errorf("после изменений: %v", after)
+	}
+}
+
+// AUTH-08: имя при регистрации; без имени — часть почты до @, а не вся почта.
+func TestRegisterName(t *testing.T) {
+	e := newEnv(t, 1000)
+	w := e.do(req{method: "POST", path: "/auth/register", body: map[string]string{"email": "anna-" + uniq() + "@test.local", "password": "pass-" + uniq(), "org_name": "Дом", "name": "Анна"}})
+	e.expect("регистрация с именем", w, 201)
+	if u := e.json(w)["user"].(map[string]any); u["name"] != "Анна" {
+		t.Errorf("имя: %v", u["name"])
+	}
+	w = e.do(req{method: "POST", path: "/auth/register", body: map[string]string{"email": "maria.k-" + uniq() + "@test.local", "password": "pass-" + uniq(), "org_name": "Дом"}})
+	if u := e.json(w)["user"].(map[string]any); fmt.Sprint(u["name"]) == "" || strings.Contains(fmt.Sprint(u["name"]), "@") {
+		t.Errorf("имя без поля: %v", u["name"])
 	}
 }

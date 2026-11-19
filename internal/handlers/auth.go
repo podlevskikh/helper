@@ -31,6 +31,7 @@ type registerRequest struct {
 	Email    string `json:"email"    binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8"`
 	OrgName  string `json:"org_name" binding:"required"`
+	Name     string `json:"name"` // как к нанимателю обращаться; не задано — часть почты до @
 	Locale   string `json:"locale"`
 }
 
@@ -135,7 +136,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	user := models.User{Email: req.Email, PasswordHash: hash, Name: req.Email, Locale: pickLocale(req.Locale)}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = strings.SplitN(req.Email, "@", 2)[0]
+	}
+	user := models.User{Email: req.Email, PasswordHash: hash, Name: name, Locale: pickLocale(req.Locale)}
 	org := models.Organization{Name: strings.TrimSpace(req.OrgName)}
 
 	// Транзакция: user + org + membership
