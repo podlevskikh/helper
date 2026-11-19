@@ -6,6 +6,7 @@ import (
 
 	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
+	"podlevskikh/awesomeProject/internal/scheduler"
 )
 
 // MEAL-01: у нового дома сразу есть завтрак, обед и ужин — рецепты попадают в меню без ручной настройки.
@@ -96,5 +97,34 @@ func TestCleaningOnlyOnWorkdays(t *testing.T) {
 		if !weekend && n != 1 {
 			t.Errorf("%s (рабочий): уборок %d, ждали 1", day.Format("2006-01-02 Mon"), n)
 		}
+	}
+}
+
+// MEAL-03: новый приём пищи попадает в уже собранные дни, удалённый — исчезает; блюда остальных не меняются.
+func TestMealChangesRefreshGeneratedDays(t *testing.T) {
+	e := newEnv(t, 1000)
+	o := e.owner("mealref")
+	day := clock.OrgToday(e.db, o.Org).AddDate(0, 0, 1)
+	if err := scheduler.NewScheduler(e.db).GenerateScheduleForOrgDate(o.Org, day); err != nil {
+		t.Fatal(err)
+	}
+	path := "/helper/api/schedule/date/" + day.Format("2006-01-02")
+	before := titles(e, e.json(e.do(req{method: "GET", path: path, token: o.Token, org: o.Org})))
+	if !has(before, "lunch - all") {
+		t.Fatalf("в собранном дне нет обеда: %v", before)
+	}
+	w := e.do(req{method: "POST", path: "/admin/api/mealtimes", token: o.Token, org: o.Org,
+		body: map[string]any{"name": "snack", "default_time": "16:00", "family_member": "all", "active": true}})
+	e.expect("перекус", w, 201)
+	var lunch float64
+	for _, m := range e.jsonList(e.do(req{method: "GET", path: "/admin/api/mealtimes", token: o.Token, org: o.Org})) {
+		if m["name"] == "lunch" {
+			lunch = m["id"].(float64)
+		}
+	}
+	e.expect("удалить обед", e.do(req{method: "DELETE", path: fmt.Sprintf("/admin/api/mealtimes/%.0f", lunch), token: o.Token, org: o.Org}), 200)
+	after := titles(e, e.json(e.do(req{method: "GET", path: path, token: o.Token, org: o.Org})))
+	if !has(after, "snack - all") || has(after, "lunch - all") || !has(after, "breakfast - all") {
+		t.Errorf("после изменений: %v", after)
 	}
 }

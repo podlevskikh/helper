@@ -77,6 +77,14 @@ func NewRouter(d Deps) *gin.Engine {
 		}
 	}
 	adminHandler.RefreshCleaning = refreshCleaning
+	adminHandler.RefreshMeals = func(orgID uint) {
+		if sched == nil {
+			return
+		}
+		if err := sched.RefreshMeals(orgID, 7); err != nil {
+			log.Printf("Warning: refresh meals for org %d: %v", orgID, err)
+		}
+	}
 	helperHandler := handlers.NewHelperHandler(db)
 	authHandler := handlers.NewAuthHandler(db)
 	inviteHandler := handlers.NewInviteHandler(db)

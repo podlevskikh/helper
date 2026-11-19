@@ -135,6 +135,13 @@ func (s *Scheduler) generateMealTasks(schedule *models.DailySchedule, date time.
 
 		// Create a task for each time slot
 		for _, timeSlot := range times {
+			// Уже есть в этом дне (пересборка после изменения приёмов пищи) — блюдо не меняем.
+			var exists int64
+			s.db.Model(&models.ScheduleTask{}).Where("schedule_id = ? AND task_type = 'meal' AND title = ? AND time = ?",
+				schedule.ID, fmt.Sprintf("%s - %s", mealTime.Name, mealTime.FamilyMember), timeSlot).Count(&exists)
+			if exists > 0 {
+				continue
+			}
 			// Find a suitable recipe for this meal
 			recipe, err := s.selectRecipeForMeal(schedule.OrganizationID, mealTime.ID, mealTime.Name, mealTime.FamilyMember, date)
 			if err != nil {
@@ -349,6 +356,43 @@ func (s *Scheduler) shouldCleanZoneToday(zone models.CleaningZone, _ int, date t
 		}
 	}
 	return false
+}
+
+// RefreshMeals обновляет еду в ближайших собранных днях после изменения приёмов пищи:
+// невыполненные задачи удалённых, выключенных или перенесённых приёмов убираются, недостающие — добавляются.
+// Уже выбранные блюда остальных приёмов не меняются.
+func (s *Scheduler) RefreshMeals(orgID uint, days int) error {
+	var mealTimes []models.MealTime
+	s.db.Where("organization_id = ? AND active = ?", orgID, true).Find(&mealTimes)
+	valid := map[string]bool{}
+	for _, mt := range mealTimes {
+		for _, slot := range s.getMealTimes(mt) {
+			valid[fmt.Sprintf("%s - %s", mt.Name, mt.FamilyMember)+"|"+slot] = true
+		}
+	}
+	today := clock.OrgToday(s.db, orgID)
+	for i := 0; i < days; i++ {
+		day := today.AddDate(0, 0, i)
+		var schedule models.DailySchedule
+		if s.db.Where("organization_id = ? AND date = ? AND generated = true", orgID, day).First(&schedule).Error != nil {
+			continue // день ещё не собран — соберётся по новым правилам сам
+		}
+		var tasks []models.ScheduleTask
+		s.db.Where("schedule_id = ? AND task_type = 'meal' AND completed = false", schedule.ID).Find(&tasks)
+		for _, t := range tasks {
+			if valid[t.Title+"|"+t.Time] {
+				continue
+			}
+			s.db.Exec("DELETE FROM meal_recipes WHERE schedule_task_id = ?", t.ID)
+			s.db.Delete(&models.ScheduleTask{}, t.ID)
+		}
+		if calendar.AnyoneWorks(s.db, orgID, day) {
+			if err := s.generateMealTasks(&schedule, day); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // RefreshCleaning пересобирает уборку в ближайших днях дома (после смены выходных или зон):

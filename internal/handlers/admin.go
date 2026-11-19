@@ -23,6 +23,8 @@ type AdminHandler struct {
 	FillDays func(orgID uint)
 	// RefreshCleaning пересобирает уборку ближайших дней (зону изменили или удалили).
 	RefreshCleaning func(orgID uint)
+	// RefreshMeals обновляет еду ближайших дней (приём пищи добавили, изменили или удалили).
+	RefreshMeals func(orgID uint)
 }
 
 func NewAdminHandler(db *gorm.DB) *AdminHandler {
@@ -246,6 +248,9 @@ func (h *AdminHandler) CreateMealTime(c *gin.Context) {
 		return
 	}
 	
+	if h.RefreshMeals != nil {
+		h.RefreshMeals(h.orgID(c))
+	}
 	c.JSON(http.StatusCreated, mealTime)
 }
 
@@ -288,6 +293,9 @@ func (h *AdminHandler) UpdateMealTime(c *gin.Context) {
 	}
 
 	h.db.Preload("Recipes").First(&input.MealTime, input.MealTime.ID)
+	if h.RefreshMeals != nil {
+		h.RefreshMeals(h.orgID(c))
+	}
 	c.JSON(http.StatusOK, input.MealTime)
 }
 
@@ -301,6 +309,9 @@ func (h *AdminHandler) DeleteMealTime(c *gin.Context) {
 	if res.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Meal time not found"})
 		return
+	}
+	if h.RefreshMeals != nil {
+		h.RefreshMeals(h.orgID(c))
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Meal time deleted"})
 }
