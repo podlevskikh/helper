@@ -64,6 +64,8 @@ func TestOrgIsolation(t *testing.T) {
 	// Данные дома 1 (его ведёт планировщик) и работающий в нём помощник.
 	mkUser(t, db, "org1-helper-"+suffix, org1)
 	day := time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, int(time.Now().UnixNano()%3000))
+	// Вторник: и day, и dayB (среда) — рабочие дни помощника, иначе планировщик законно не собирает день.
+	day = day.AddDate(0, 0, (int(time.Tuesday)-int(day.Weekday())+7)%7)
 	meal := models.MealTime{OrganizationID: org1, Name: "Breakfast " + suffix, DefaultTime: "08:00", FamilyMember: "adult", Active: true}
 	recipe := models.Recipe{OrganizationID: org1, Name: "Каша " + suffix}
 	must(t, db.Create(&meal).Error, db.Create(&recipe).Error)
