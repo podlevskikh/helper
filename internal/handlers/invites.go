@@ -37,13 +37,21 @@ func generateInviteToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func webOrigin() string {
-	// WEB_ORIGIN может содержать несколько адресов через запятую — в ссылку идёт первый.
+// webOrigin — куда ведёт ссылка-приглашение.
+// WEB_ORIGIN может содержать несколько адресов через запятую — в ссылку идёт первый.
+// Если не задан — веб-версия, которую раздаёт этот же сервер (/app).
+func webOrigin(c *gin.Context) string {
 	o := strings.TrimSpace(strings.Split(os.Getenv("WEB_ORIGIN"), ",")[0])
-	if o == "" {
-		return "http://localhost:8081"
+	if o != "" {
+		return strings.TrimRight(o, "/")
 	}
-	return o
+	scheme := "http"
+	if p := c.GetHeader("X-Forwarded-Proto"); p != "" {
+		scheme = strings.TrimSpace(strings.Split(p, ",")[0])
+	} else if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	return scheme + "://" + c.Request.Host + WebAppPrefix
 }
 
 // --- POST /orgs/:orgId/invites ---
@@ -94,7 +102,7 @@ func (h *InviteHandler) CreateInvite(c *gin.Context) {
 		return
 	}
 
-	inviteURL := fmt.Sprintf("%s/invite?token=%s", webOrigin(), token)
+	inviteURL := fmt.Sprintf("%s/invite?token=%s", webOrigin(c), token)
 	c.JSON(http.StatusCreated, gin.H{
 		"invite_url": inviteURL,
 		"token":      token,

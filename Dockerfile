@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
@@ -31,6 +31,8 @@ COPY --from=builder /app/server .
 # Copy web assets
 COPY web ./web
 COPY web2 ./web2
+# Веб-версия приложения (Expo), раздаётся по /app — собирается во фронте scripts/build-for-backend.sh
+COPY webapp ./webapp
 
 # Expose port
 EXPOSE 8080

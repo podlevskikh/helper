@@ -40,6 +40,7 @@ func main() {
 	}
 
 	db := database.GetDB()
+	database.EnsureJWTSecret(db)
 
 	// Initialize scheduler
 	sched := scheduler.NewScheduler(db)
@@ -174,14 +175,21 @@ func main() {
 		orgsGroup.POST("/:orgId/notification-prefs/test", notificationsHandler.SendTest)
 	}
 
-	// New UI routes
-	router.GET("/admin2/", func(c *gin.Context) {
-		c.HTML(200, "admin2.html", nil)
-	})
-
-	router.GET("/helper2/", func(c *gin.Context) {
-		c.HTML(200, "helper2.html", nil)
-	})
+	// Веб-версия приложения (Expo) — по адресу /app. Старые интерфейсы /admin2 и /helper2
+	// работали без входа и с новым API (нужна авторизация) уже не работают — ведём в новый.
+	hasWebApp := handlers.RegisterWebApp(router, "./webapp")
+	if hasWebApp {
+		toApp := func(c *gin.Context) { c.Redirect(302, handlers.WebAppPrefix+"/") }
+		router.GET("/admin2/", toApp)
+		router.GET("/helper2/", toApp)
+	} else {
+		router.GET("/admin2/", func(c *gin.Context) {
+			c.HTML(200, "admin2.html", nil)
+		})
+		router.GET("/helper2/", func(c *gin.Context) {
+			c.HTML(200, "helper2.html", nil)
+		})
+	}
 
 	// Admin routes
 	admin := router.Group("/admin")
@@ -360,6 +368,10 @@ func main() {
 
 	// Root redirect
 	router.GET("/", func(c *gin.Context) {
+		if hasWebApp {
+			c.Redirect(302, handlers.WebAppPrefix+"/")
+			return
+		}
 		c.Redirect(302, "/helper")
 	})
 
