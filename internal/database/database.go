@@ -212,6 +212,20 @@ func seedOrgAndOwner() {
 // seedDefaultCategories создаёт системные категории задач для каждой организации
 // и делает backfill task_category_id для существующих задач по их task_type.
 func seedDefaultCategories() {
+	var orgs []models.Organization
+	if err := DB.Find(&orgs).Error; err != nil {
+		log.Printf("seedDefaultCategories: не удалось загрузить организации: %v", err)
+		return
+	}
+	for _, org := range orgs {
+		EnsureDefaultCategories(DB, org.ID)
+	}
+}
+
+// EnsureDefaultCategories создаёт системные категории (Еда, Уборка, Уход за ребёнком, Другое)
+// одного дома, если их ещё нет, и проставляет их задачам без категории.
+// Вызывается при старте для всех домов и при регистрации — для нового дома.
+func EnsureDefaultCategories(db *gorm.DB, orgID uint) {
 	type defaultCat struct {
 		Name      string
 		Icon      string
@@ -227,32 +241,27 @@ func seedDefaultCategories() {
 		{Name: "Другое", Icon: "✏️", Color: "#6B7280", TaskType: "custom", SortOrder: 3},
 	}
 
-	var orgs []models.Organization
-	if err := DB.Find(&orgs).Error; err != nil {
-		log.Printf("seedDefaultCategories: не удалось загрузить организации: %v", err)
-		return
-	}
-
-	for _, org := range orgs {
+	org := models.Organization{ID: orgID}
+	{
 		for _, d := range defaults {
 			// Ищем системную категорию по ключу; у старых данных ключа нет —
 			// узнаём её по названию или (если переименована) по месту в списке.
 			var cat models.TaskCategory
-			err := DB.Where("organization_id = ? AND system_key = ?", org.ID, d.TaskType).First(&cat).Error
+			err := db.Where("organization_id = ? AND system_key = ?", org.ID, d.TaskType).First(&cat).Error
 			if err != nil {
-				err = DB.Where("organization_id = ? AND is_default = ? AND (system_key IS NULL OR system_key = '') AND name = ?", org.ID, true, d.Name).
+				err = db.Where("organization_id = ? AND is_default = ? AND (system_key IS NULL OR system_key = '') AND name = ?", org.ID, true, d.Name).
 					First(&cat).Error
 				if err != nil {
-					err = DB.Where("organization_id = ? AND is_default = ? AND (system_key IS NULL OR system_key = '') AND sort_order = ?", org.ID, true, d.SortOrder).
+					err = db.Where("organization_id = ? AND is_default = ? AND (system_key IS NULL OR system_key = '') AND sort_order = ?", org.ID, true, d.SortOrder).
 						First(&cat).Error
 				}
 				if err == nil {
-					DB.Model(&cat).Update("system_key", d.TaskType)
+					db.Model(&cat).Update("system_key", d.TaskType)
 				}
 			}
 			if err == nil {
 				// уже существует — backfill задач
-				DB.Exec(
+				db.Exec(
 					"UPDATE schedule_tasks SET task_category_id = ? WHERE organization_id = ? AND task_type = ? AND task_category_id IS NULL",
 					cat.ID, org.ID, d.TaskType,
 				)
@@ -270,12 +279,12 @@ func seedDefaultCategories() {
 				SortOrder:      d.SortOrder,
 				Priority:       map[bool]string{true: d.Priority, false: "normal"}[d.Priority != ""],
 			}
-			if err := DB.Create(&cat).Error; err != nil {
+			if err := db.Create(&cat).Error; err != nil {
 				log.Printf("seedDefaultCategories: орг %d, категория '%s': %v", org.ID, d.Name, err)
 				continue
 			}
 			// backfill
-			res := DB.Exec(
+			res := db.Exec(
 				"UPDATE schedule_tasks SET task_category_id = ? WHERE organization_id = ? AND task_type = ? AND task_category_id IS NULL",
 				cat.ID, org.ID, d.TaskType,
 			)

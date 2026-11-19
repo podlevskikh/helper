@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"podlevskikh/awesomeProject/internal/auth"
+	"podlevskikh/awesomeProject/internal/database"
 	"podlevskikh/awesomeProject/internal/mail"
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
@@ -148,7 +149,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			Role:           models.RoleOwner,
 			Status:         models.MembershipActive,
 		}
-		return tx.Create(&membership).Error
+		if err := tx.Create(&membership).Error; err != nil {
+			return err
+		}
+		// Системные категории задач — сразу, а не после перезапуска сервера
+		database.EnsureDefaultCategories(tx, org.ID)
+		return nil
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "registration failed"})
