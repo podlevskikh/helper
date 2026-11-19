@@ -124,18 +124,23 @@ func main() {
 	authMw := middleware.Auth()
 	orgMw := middleware.OrgContext(db)
 
+	// Защита от перебора паролей: неудачные попытки с одного адреса.
+	loginLimit := middleware.RateLimit(middleware.RateLimitOptions{Max: 10, Per: 15 * time.Minute, OnlyFailures: true})
+	registerLimit := middleware.RateLimit(middleware.RateLimitOptions{Max: 10, Per: time.Hour})
+	forgotLimit := middleware.RateLimit(middleware.RateLimitOptions{Max: 5, Per: 15 * time.Minute})
+
 	authGroup := router.Group("/auth")
 	{
-		authGroup.POST("/register", authHandler.Register)
-		authGroup.POST("/login", authHandler.Login)
+		authGroup.POST("/register", registerLimit, authHandler.Register)
+		authGroup.POST("/login", loginLimit, authHandler.Login)
 		authGroup.POST("/refresh", authHandler.Refresh)
 		authGroup.POST("/logout", authHandler.Logout)
 		authGroup.GET("/me", authMw, authHandler.Me)
 		authGroup.PATCH("/me", authMw, authHandler.UpdateMe)
-		authGroup.DELETE("/me", authMw, authHandler.DeleteMe)
-		authGroup.POST("/password", authMw, authHandler.ChangePassword)
-		authGroup.POST("/password/forgot", authHandler.ForgotPassword)
-		authGroup.POST("/password/reset", authHandler.ResetPassword)
+		authGroup.DELETE("/me", authMw, loginLimit, authHandler.DeleteMe)
+		authGroup.POST("/password", authMw, loginLimit, authHandler.ChangePassword)
+		authGroup.POST("/password/forgot", forgotLimit, authHandler.ForgotPassword)
+		authGroup.POST("/password/reset", loginLimit, authHandler.ResetPassword)
 	}
 
 	// Устройства для пушей (без контекста дома: токен — на пользователя)
@@ -152,7 +157,7 @@ func main() {
 
 	// Invite routes
 	router.GET("/invites/:token", inviteHandler.GetInvite)
-	router.POST("/invites/:token/accept", inviteHandler.AcceptInvite)
+	router.POST("/invites/:token/accept", loginLimit, inviteHandler.AcceptInvite)
 
 	// Org routes (auth + org context required)
 	orgsGroup := router.Group("/orgs", authMw, orgMw)
