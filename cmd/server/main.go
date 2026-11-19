@@ -10,6 +10,7 @@ import (
 	"podlevskikh/awesomeProject/internal/database"
 	"podlevskikh/awesomeProject/internal/handlers"
 	"podlevskikh/awesomeProject/internal/notify"
+	"podlevskikh/awesomeProject/internal/observability"
 	"podlevskikh/awesomeProject/internal/scheduler"
 	"podlevskikh/awesomeProject/internal/server"
 )
@@ -34,7 +35,8 @@ func main() {
 	db := database.GetDB()
 	database.EnsureJWTSecret(db)
 	database.EnsureSealingKeys(db)
-	database.LoadSealedSecrets(database.SealedFile) // пароль почты и т.п. — см. scripts/seal-mail.sh
+	database.LoadSealedSecrets(database.SealedFile) // пароль почты, SENTRY_DSN — см. scripts/seal-*.sh
+	defer observability.Init(server.CommitSHA())()
 
 	// Initialize scheduler
 	sched := scheduler.NewScheduler(db)

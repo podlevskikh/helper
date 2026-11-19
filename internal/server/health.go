@@ -15,6 +15,9 @@ var startedAt = time.Now().UTC()
 
 // commitSHA — коммит, из которого собран сервер. Railway при выкатке из GitHub задаёт
 // RAILWAY_GIT_COMMIT_SHA; GIT_SHA — для других окружений и локально.
+// CommitSHA — коммит, из которого собран сервер (для /version и релиза в Sentry).
+func CommitSHA() string { return commitSHA() }
+
 func commitSHA() string {
 	for _, k := range []string{"RAILWAY_GIT_COMMIT_SHA", "GIT_SHA"} {
 		if v := os.Getenv(k); v != "" {

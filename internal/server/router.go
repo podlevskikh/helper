@@ -3,6 +3,7 @@ package server
 import (
 	"log"
 	"os"
+	"podlevskikh/awesomeProject/internal/observability"
 	"strings"
 	"time"
 
@@ -31,6 +32,7 @@ func NewRouter(d Deps) *gin.Engine {
 	if err := router.SetTrustedProxies(nil); err != nil {
 		log.Printf("trusted proxies: %v", err)
 	}
+	router.Use(observability.Middleware()...)
 	router.Use(securityHeaders())
 	router.Use(middleware.AppVersion())
 	registerHealth(router, db)
