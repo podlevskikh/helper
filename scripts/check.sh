@@ -16,5 +16,5 @@ if [ -z "${TEST_DATABASE_URL:-}" ]; then
   trap 'psql -q "$PG" -c "DROP DATABASE IF EXISTS $DB WITH (FORCE)" >/dev/null' EXIT
   export TEST_DATABASE_URL="${PG%/*}/$DB?sslmode=disable"
 fi
-go test -count=1 ./... 2>&1 | grep -v "no test files"
+go test -p 1 -count=1 ./... 2>&1 | grep -v "no test files"
 echo "check: ок"
