@@ -715,9 +715,7 @@ func (h *AdminHandler) GetTask(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
-	// Помощник видит только общие задачи и свои — личные задачи нанимателя или другого сотрудника скрыты.
-	if m := middleware.MustMembership(c); !middleware.Can(m, middleware.CapManageSchedule) &&
-		task.AssignedToUserID != nil && *task.AssignedToUserID != m.UserID {
+	if hiddenFromMember(c, &task) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}

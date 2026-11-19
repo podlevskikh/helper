@@ -95,6 +95,20 @@ func TestHelperRestrictions(t *testing.T) {
 	e.expect("помощник: своя задача", e.do(req{method: "GET", path: fmt.Sprintf("/admin/api/tasks/%.0f", mine), token: h.Token, org: o.Org}), 200)
 	e.expect("помощник: общая задача", e.do(req{method: "GET", path: fmt.Sprintf("/admin/api/tasks/%.0f", common), token: h.Token, org: o.Org}), 200)
 	e.expect("наниматель: личная задача", e.do(req{method: "GET", path: fmt.Sprintf("/admin/api/tasks/%.0f", private), token: o.Token, org: o.Org}), 200)
+	// ROLE-08: и отметить «сделано» чужую личную задачу помощник не может (ответ отдавал бы её текст).
+	for _, act := range []string{"complete", "uncomplete"} {
+		e.expect("помощник: "+act+" личной задачи нанимателя",
+			e.do(req{method: "POST", path: fmt.Sprintf("/helper/api/tasks/%.0f/%s", private, act), token: h.Token, org: o.Org}), 404)
+		e.expect("помощник: "+act+" своей задачи",
+			e.do(req{method: "POST", path: fmt.Sprintf("/helper/api/tasks/%.0f/%s", mine, act), token: h.Token, org: o.Org}), 200)
+		e.expect("помощник: "+act+" общей задачи",
+			e.do(req{method: "POST", path: fmt.Sprintf("/helper/api/tasks/%.0f/%s", common, act), token: h.Token, org: o.Org}), 200)
+	}
+	var done int64
+	e.db.Model(&models.ScheduleTask{}).Where("id = ? AND completed", uint(private)).Count(&done)
+	if done != 0 {
+		t.Errorf("личная задача нанимателя отмечена помощником")
+	}
 }
 
 // SEC-05: категория и исполнитель задачи — только из своего дома.
@@ -261,5 +275,20 @@ func TestDeleteOwnerLeavesNoOrgData(t *testing.T) {
 	e.db.Raw("SELECT count(*) FROM push_devices WHERE user_id = ?", o.UserID).Scan(&devices)
 	if devices != 0 {
 		t.Errorf("остались пуш-устройства владельца: %d", devices)
+	}
+}
+
+// AUTH-10: «Забыли пароль?» отвечает одинаково и не быстрее 300 мс — и для существующей почты,
+// и для несуществующей (по времени ответа не узнать, зарегистрирован ли адрес).
+func TestForgotPasswordUniformTime(t *testing.T) {
+	e := newEnv(t, 1000)
+	o := e.owner("forgot")
+	for _, email := range []string{o.Email, "nobody-" + uniq() + "@test.local"} {
+		start := time.Now()
+		w := e.do(req{method: "POST", path: "/auth/password/forgot", body: map[string]string{"email": email}})
+		if d := time.Since(start); d < 300*time.Millisecond {
+			t.Errorf("%s: ответ за %v — быстрее 300 мс", email, d)
+		}
+		e.expect("forgot "+email, w, 200)
 	}
 }

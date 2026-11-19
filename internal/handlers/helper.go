@@ -271,7 +271,7 @@ func (h *HelperHandler) CompleteTask(c *gin.Context) {
 	taskID := c.Param("id")
 
 	var task models.ScheduleTask
-	if err := h.orgDB(c).First(&task, taskID).Error; err != nil {
+	if err := h.orgDB(c).First(&task, taskID).Error; err != nil || hiddenFromMember(c, &task) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
@@ -296,7 +296,7 @@ func (h *HelperHandler) UncompleteTask(c *gin.Context) {
 	taskID := c.Param("id")
 
 	var task models.ScheduleTask
-	if err := h.orgDB(c).First(&task, taskID).Error; err != nil {
+	if err := h.orgDB(c).First(&task, taskID).Error; err != nil || hiddenFromMember(c, &task) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}

@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
 
 	"github.com/gin-gonic/gin"
@@ -30,4 +31,12 @@ func checkTaskRefs(c *gin.Context, db *gorm.DB, orgID uint, categoryID, assignee
 		}
 	}
 	return true
+}
+
+// hiddenFromMember: помощник видит и отмечает только общие задачи и свои — личные задачи нанимателя
+// или другого сотрудника для него как будто не существуют (404). Тем, кто ведёт расписание, видно всё.
+func hiddenFromMember(c *gin.Context, task *models.ScheduleTask) bool {
+	m := middleware.MustMembership(c)
+	return !middleware.Can(m, middleware.CapManageSchedule) &&
+		task.AssignedToUserID != nil && *task.AssignedToUserID != m.UserID
 }

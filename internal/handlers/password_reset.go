@@ -21,6 +21,15 @@ const passwordResetTTL = time.Hour
 // ForgotPassword godoc
 // POST /auth/password/forgot  {email}
 // Всегда 200 — по ответу нельзя узнать, есть ли такой адрес. Если есть — уходит письмо со ссылкой.
+const forgotMinDuration = 300 * time.Millisecond
+
+// padDuration досыпает до min с момента start (вызывать через defer в начале обработчика).
+func padDuration(start time.Time, min time.Duration) {
+	if d := min - time.Since(start); d > 0 {
+		time.Sleep(d)
+	}
+}
+
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	var req struct {
 		Email string `json:"email" binding:"required,email"`
@@ -30,6 +39,9 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		return
 	}
 	ok := gin.H{"ok": true, "mail_configured": mail.Configured()}
+	// Ответ не раньше чем через forgotMinDuration — и для существующей почты (запись в базу), и для
+	// несуществующей: по времени ответа нельзя узнать, зарегистрирован ли адрес.
+	defer padDuration(time.Now(), forgotMinDuration)
 	var user models.User
 	if err := h.db.Where("email = ?", strings.ToLower(strings.TrimSpace(req.Email))).First(&user).Error; err != nil {
 		c.JSON(http.StatusOK, ok)
