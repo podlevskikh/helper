@@ -3,7 +3,6 @@ package handlers
 import (
 	"errors"
 	"net/http"
-	netmail "net/mail"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -131,54 +130,4 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	}
 	mail.SendAsync(mail.PasswordChanged(user.Email, user.Locale, webOrigin(c)))
 	c.JSON(http.StatusOK, gin.H{"access": access, "refresh": refresh})
-}
-
-// ChangeEmail — POST /auth/email {current_password, new_email}: новая почта для входа.
-// Нужен текущий пароль. Старые ссылки сброса пароля (ушли на прежнюю почту) перестают работать.
-// Почта занята → 409 (тот же ответ, что при регистрации; лимит попыток как у входа).
-func (h *AuthHandler) ChangeEmail(c *gin.Context) {
-	user, ok := h.currentUser(c)
-	if !ok {
-		return
-	}
-	var body struct {
-		Current string `json:"current_password" binding:"required"`
-		Email   string `json:"new_email"        binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid email"})
-		return
-	}
-	email := strings.ToLower(strings.TrimSpace(body.Email))
-	if a, err := netmail.ParseAddress(email); err != nil || a.Address != email || len(email) > 254 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid email"})
-		return
-	}
-	if err := auth.CheckPassword(body.Current, user.PasswordHash); err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "wrong current password"})
-		return
-	}
-	if email == user.Email {
-		c.JSON(http.StatusOK, gin.H{"user": user})
-		return
-	}
-	var taken int64
-	h.db.Model(&models.User{}).Where("email = ? AND id <> ?", email, user.ID).Count(&taken)
-	if taken > 0 {
-		c.JSON(http.StatusConflict, gin.H{"error": "email already registered"})
-		return
-	}
-	err := h.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(user).Update("email", email).Error; err != nil {
-			return err
-		}
-		return tx.Where("user_id = ? AND used_at IS NULL", user.ID).Delete(&models.PasswordReset{}).Error
-	})
-	if err != nil {
-		// Гонка с регистрацией на ту же почту — уникальный индекс.
-		c.JSON(http.StatusConflict, gin.H{"error": "email already registered"})
-		return
-	}
-	user.Email = email
-	c.JSON(http.StatusOK, gin.H{"user": user})
 }

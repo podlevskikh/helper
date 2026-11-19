@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"podlevskikh/awesomeProject/internal/auth"
 	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/scheduler"
@@ -146,39 +147,128 @@ func TestRegisterName(t *testing.T) {
 	}
 }
 
-// AUTH-09: смена почты — только с текущим паролем; занятая → 409; вход по новой почте, старая не работает;
-// неиспользованные ссылки сброса пароля (ушли на прежнюю почту) удаляются.
-func TestChangeEmail(t *testing.T) {
+// AUTH-EMAIL-01…05: смена почты с подтверждением.
+// Ссылки из писем тест не читает: подставляет в запрос свой токен (в базе хранится только хеш).
+func setEmailTokens(e *env, userID uint) (confirm, cancel string) {
+	confirm, cancel = "confirm-"+uniq(), "cancel-"+uniq()
+	var ec models.EmailChange
+	e.db.Where("user_id = ? AND confirmed_at IS NULL AND canceled_at IS NULL", userID).Order("id DESC").First(&ec)
+	e.db.Model(&ec).Updates(map[string]any{"token_hash": auth.HashToken(confirm), "cancel_token_hash": auth.HashToken(cancel)})
+	return
+}
+
+func TestEmailChangeFlow(t *testing.T) {
 	e := newEnv(t, 1000)
 	o := e.owner("email")
-	other := e.owner("email2")
+	second := e.do(req{method: "POST", path: "/auth/login", body: map[string]string{"email": o.Email, "password": o.Password}})
+	e.expect("второе устройство", second, 200)
+	secondRefresh, _ := e.json(second)["refresh"].(string)
 	e.db.Create(&models.PasswordReset{UserID: o.UserID, TokenHash: "h-" + uniq(), ExpiresAt: time.Now().Add(time.Hour)})
+	post := func(name, path string, body any, token string, code int) map[string]any {
+		w := e.do(req{method: "POST", path: path, token: token, body: body})
+		e.expect(name, w, code)
+		return e.json(w)
+	}
 
-	e.expect("неверный пароль", e.do(req{method: "POST", path: "/auth/email", token: o.Token,
-		body: map[string]string{"current_password": "nope", "new_email": "x-" + uniq() + "@test.local"}}), 403)
-	e.expect("не почта", e.do(req{method: "POST", path: "/auth/email", token: o.Token,
-		body: map[string]string{"current_password": o.Password, "new_email": "not-an-email"}}), 400)
-	e.expect("занята", e.do(req{method: "POST", path: "/auth/email", token: o.Token,
-		body: map[string]string{"current_password": o.Password, "new_email": strings.ToUpper(other.Email)}}), 409)
-	e.expect("без входа", e.do(req{method: "POST", path: "/auth/email",
-		body: map[string]string{"current_password": o.Password, "new_email": "y@test.local"}}), 401)
+	post("неверный пароль", "/auth/email", map[string]string{"current_password": "nope", "new_email": "x-" + uniq() + "@test.local"}, o.Token, 403)
+	post("не почта", "/auth/email", map[string]string{"current_password": o.Password, "new_email": "not-an-email"}, o.Token, 400)
+	post("та же почта", "/auth/email", map[string]string{"current_password": o.Password, "new_email": strings.ToUpper(o.Email)}, o.Token, 400)
+	e.expect("без входа", e.do(req{method: "POST", path: "/auth/email", body: map[string]string{"current_password": o.Password, "new_email": "y@test.local"}}), 401)
 
-	newEmail := "New-" + uniq() + "@Test.local"
-	w := e.do(req{method: "POST", path: "/auth/email", token: o.Token,
-		body: map[string]string{"current_password": o.Password, "new_email": " " + newEmail + " "}})
-	e.expect("смена", w, 200)
-	if got := e.json(w)["user"].(map[string]any)["email"]; got != strings.ToLower(newEmail) {
+	first := "First-" + uniq() + "@Test.local"
+	r := post("запрос", "/auth/email", map[string]string{"current_password": o.Password, "new_email": " " + first + " "}, o.Token, 202)
+	if p, _ := r["pending"].(map[string]any); p == nil || p["email"] != strings.ToLower(first) {
+		t.Fatalf("ожидает подтверждения: %v", r)
+	}
+	oldConfirm, oldCancel := setEmailTokens(e, o.UserID)
+
+	// Новый запрос гасит прежний.
+	newEmail := "new-" + uniq() + "@test.local"
+	post("второй запрос", "/auth/email", map[string]string{"current_password": o.Password, "new_email": newEmail}, o.Token, 202)
+	post("ссылка первого запроса не работает", "/auth/email/confirm", map[string]string{"token": oldConfirm}, "", 410)
+	post("отмена первого тоже", "/auth/email/cancel", map[string]string{"token": oldCancel}, "", 410)
+	if g := e.json(e.do(req{method: "GET", path: "/auth/email", token: o.Token})); g["pending"].(map[string]any)["email"] != newEmail {
+		t.Errorf("ожидает подтверждения: %v", g)
+	}
+	// До подтверждения почта прежняя.
+	e.expect("вход со старой до подтверждения", e.do(req{method: "POST", path: "/auth/login", body: map[string]string{"email": o.Email, "password": o.Password}}), 200)
+	e.expect("отправить ещё раз сразу", e.do(req{method: "POST", path: "/auth/email/resend", token: o.Token}), 429)
+
+	confirm, _ := setEmailTokens(e, o.UserID)
+	post("проверка ссылки", "/auth/email/check", map[string]string{"token": confirm}, "", 200)
+	post("проверка мусора", "/auth/email/check", map[string]string{"token": "garbage"}, "", 410)
+	if got := post("подтверждение без входа", "/auth/email/confirm", map[string]string{"token": confirm}, "", 200)["email"]; got != newEmail {
 		t.Errorf("почта в ответе: %v", got)
 	}
-	e.expect("вход по новой", e.do(req{method: "POST", path: "/auth/login",
-		body: map[string]string{"email": strings.ToLower(newEmail), "password": o.Password}}), 200)
-	e.expect("вход по старой", e.do(req{method: "POST", path: "/auth/login",
-		body: map[string]string{"email": o.Email, "password": o.Password}}), 401)
+	post("повторное подтверждение", "/auth/email/confirm", map[string]string{"token": confirm}, "", 410)
+
+	e.expect("вход по новой", e.do(req{method: "POST", path: "/auth/login", body: map[string]string{"email": newEmail, "password": o.Password}}), 200)
+	e.expect("вход по старой", e.do(req{method: "POST", path: "/auth/login", body: map[string]string{"email": o.Email, "password": o.Password}}), 401)
+	e.expect("старый токен после смены", e.do(req{method: "GET", path: "/auth/me", token: o.Token}), 401)
+	e.expect("refresh другого устройства", e.do(req{method: "POST", path: "/auth/refresh", body: map[string]string{"refresh": secondRefresh}}), 401)
 	var resets int64
 	e.db.Model(&models.PasswordReset{}).Where("user_id = ?", o.UserID).Count(&resets)
 	if resets != 0 {
 		t.Errorf("остались ссылки сброса на старую почту: %d", resets)
 	}
+}
+
+// AUTH-EMAIL-03: «это не я» со старого адреса — смена отменена, все входы завершены; отмена из профиля.
+func TestEmailChangeCancel(t *testing.T) {
+	e := newEnv(t, 1000)
+	o := e.owner("emailcancel")
+	target := "steal-" + uniq() + "@test.local"
+	e.expect("запрос", e.do(req{method: "POST", path: "/auth/email", token: o.Token,
+		body: map[string]string{"current_password": o.Password, "new_email": target}}), 202)
+	confirm, cancel := setEmailTokens(e, o.UserID)
+	e.expect("проверка ссылки отмены", e.do(req{method: "POST", path: "/auth/email/check", body: map[string]string{"token": cancel, "kind": "cancel"}}), 200)
+	e.expect("это не я", e.do(req{method: "POST", path: "/auth/email/cancel", body: map[string]string{"token": cancel}}), 200)
+	e.expect("подтвердить после отмены", e.do(req{method: "POST", path: "/auth/email/confirm", body: map[string]string{"token": confirm}}), 410)
+	e.expect("сессии завершены", e.do(req{method: "GET", path: "/auth/me", token: o.Token}), 401)
+	e.expect("вход по старой почте", e.do(req{method: "POST", path: "/auth/login", body: map[string]string{"email": o.Email, "password": o.Password}}), 200)
+
+	// Отмена из профиля.
+	w := e.do(req{method: "POST", path: "/auth/login", body: map[string]string{"email": o.Email, "password": o.Password}})
+	tok, _ := e.json(w)["access"].(string)
+	e.expect("запрос 2", e.do(req{method: "POST", path: "/auth/email", token: tok,
+		body: map[string]string{"current_password": o.Password, "new_email": target}}), 202)
+	confirm2, _ := setEmailTokens(e, o.UserID)
+	e.expect("отменить в профиле", e.do(req{method: "DELETE", path: "/auth/email", token: tok}), 204)
+	if g := e.json(e.do(req{method: "GET", path: "/auth/email", token: tok})); g["pending"] != nil {
+		t.Errorf("после отмены всё ещё ждёт: %v", g)
+	}
+	e.expect("подтвердить отменённое", e.do(req{method: "POST", path: "/auth/email/confirm", body: map[string]string{"token": confirm2}}), 410)
+}
+
+// AUTH-EMAIL-04: занятый адрес — ответ на запрос такой же, как на свободный (не раскрывает);
+// подтвердить нельзя; адрес, занятый уже после запроса, — понятная ошибка при подтверждении.
+func TestEmailChangeTaken(t *testing.T) {
+	e := newEnv(t, 1000)
+	o := e.owner("emailtaken")
+	other := e.owner("emailtaken2")
+	free := e.do(req{method: "POST", path: "/auth/email", token: o.Token,
+		body: map[string]string{"current_password": o.Password, "new_email": "free-" + uniq() + "@test.local"}})
+	busy := e.do(req{method: "POST", path: "/auth/email", token: o.Token,
+		body: map[string]string{"current_password": o.Password, "new_email": other.Email}})
+	if free.Code != busy.Code || free.Code != 202 {
+		t.Fatalf("занятый и свободный адрес отвечают по-разному: %d / %d", free.Code, busy.Code)
+	}
+	confirm, _ := setEmailTokens(e, o.UserID)
+	e.expect("подтверждение занятого", e.do(req{method: "POST", path: "/auth/email/confirm", body: map[string]string{"token": confirm}}), 409)
+
+	// Адрес заняли после запроса.
+	later := "later-" + uniq() + "@test.local"
+	e.expect("запрос на свободный", e.do(req{method: "POST", path: "/auth/email", token: o.Token,
+		body: map[string]string{"current_password": o.Password, "new_email": later}}), 202)
+	confirm2, _ := setEmailTokens(e, o.UserID)
+	e.expect("кто-то зарегистрировался", e.do(req{method: "POST", path: "/auth/register",
+		body: map[string]string{"email": later, "password": "pass-" + uniq(), "org_name": "x", "locale": "ru"}}), 201)
+	w := e.do(req{method: "POST", path: "/auth/email/confirm", body: map[string]string{"token": confirm2}})
+	e.expect("подтверждение занятого позже", w, 409)
+	if e.json(w)["code"] != "email_taken" {
+		t.Errorf("код ошибки: %v", e.json(w))
+	}
+	e.expect("почта не изменилась", e.do(req{method: "POST", path: "/auth/login", body: map[string]string{"email": o.Email, "password": o.Password}}), 200)
 }
 
 // INV-08: одно приглашение — один человек, даже при одновременном принятии; приглашение не понижает

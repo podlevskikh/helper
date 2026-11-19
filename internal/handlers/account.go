@@ -94,6 +94,7 @@ func DeleteAccount(tx *gorm.DB, userID uint) error {
 		func() error { return tx.Where("user_id = ?", userID).Delete(&models.Membership{}).Error },
 		func() error { return tx.Where("user_id = ?", userID).Delete(&models.RefreshToken{}).Error },
 		func() error { return tx.Where("user_id = ?", userID).Delete(&models.PasswordReset{}).Error },
+		func() error { return tx.Where("user_id = ?", userID).Delete(&models.EmailChange{}).Error },
 		func() error { return tx.Delete(&models.User{}, userID).Error },
 	}
 	for _, step := range steps {

@@ -39,7 +39,7 @@ type User struct {
 	Name         string    `json:"name"`
 	Phone        string    `json:"phone,omitempty"` // задел под P1 (магик-ссылка/OTP)
 	AvatarURL    string    `json:"avatar_url,omitempty"`
-	Locale       string    `gorm:"default:'ru'" json:"locale"` // ru|en|el
+	Locale       string    `gorm:"default:'ru'" json:"locale"`  // ru|en|el
 	TokenVersion int       `gorm:"not null;default:0" json:"-"` // +1 при смене пароля — старые access-токены недействительны
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
@@ -107,4 +107,20 @@ type PasswordReset struct {
 	ExpiresAt time.Time  `json:"expires_at"`
 	UsedAt    *time.Time `json:"used_at,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`
+}
+
+// EmailChange — запрос на смену почты для входа. Почта меняется только после перехода по ссылке
+// из письма на новый адрес (TokenHash). На старый адрес уходит уведомление со ссылкой отмены
+// (CancelTokenHash). Токены хранятся хешем, ссылка живёт 24 часа, новый запрос гасит прежний.
+type EmailChange struct {
+	ID              uint       `gorm:"primaryKey" json:"id"`
+	UserID          uint       `gorm:"index;not null" json:"user_id"`
+	NewEmail        string     `gorm:"not null" json:"new_email"`
+	TokenHash       string     `gorm:"uniqueIndex;not null" json:"-"`
+	CancelTokenHash string     `gorm:"uniqueIndex;not null" json:"-"`
+	ExpiresAt       time.Time  `json:"expires_at"`
+	SentAt          time.Time  `json:"sent_at"`
+	ConfirmedAt     *time.Time `json:"confirmed_at,omitempty"`
+	CanceledAt      *time.Time `json:"canceled_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
 }

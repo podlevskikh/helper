@@ -2,7 +2,7 @@
 """Смоук-тест Helper Day через API — без браузера и без зависимостей.
 
     python3 scripts/smoke.py http://localhost:8340 [--mail-log server.log] [--quiet]
-    python3 scripts/smoke.py https://helper-production-12b0.up.railway.app [--expect-sha <sha>] [--quiet]
+    python3 scripts/smoke.py https://www.helperday.app [--expect-sha <sha>] [--quiet]
 
 Локально (localhost / *.test): полный прогон — одноразовые учётки *@test.local, ключевые сценарии,
 удаление учёток в конце (даже при падении). Сервер для полного прогона запускать с RATE_LIMIT_SCALE=100,
@@ -290,15 +290,41 @@ try:
 
     section("Почта")
     s, _, _ = call("POST", "/auth/email", {"current_password": "wrong-pass", "new_email": email("b2")}, tokB)
-    expect("AUTH-09 смена почты с неверным паролем", s, 403)
-    s, _, _ = call("POST", "/auth/email", {"current_password": PW, "new_email": email("a")}, tokB)
-    expect("AUTH-09 чужая почта занята", s, 409)
-    s, _, _ = call("POST", "/auth/email", {"current_password": PW, "new_email": email("b2")}, tokB)
-    expect("AUTH-09 смена почты", s, 200)
-    s, _, _ = call("POST", "/auth/login", {"email": email("b2"), "password": PW})
-    expect("AUTH-09 вход по новой почте", s, 200)
+    expect("AUTH-EMAIL-01 смена почты с неверным паролем", s, 403)
+    s, js_free, _ = call("POST", "/auth/email", {"current_password": PW, "new_email": email("b-free")}, tokB)
+    s2, js_busy, _ = call("POST", "/auth/email", {"current_password": PW, "new_email": email("a")}, tokB)
+    check("AUTH-EMAIL-04 занятый адрес отвечает так же, как свободный", s == s2 == 202, f"({s} / {s2})")
+    mark = log_len()
+    s, js, _ = call("POST", "/auth/email", {"current_password": PW, "new_email": email("b2")}, tokB)
+    expect("AUTH-EMAIL-01 запрос смены почты", s, 202)
+    s, js, _ = call("GET", "/auth/email", token=tokB)
+    check("AUTH-EMAIL-02 «ожидает подтверждения»", s == 200 and ((js or {}).get("pending") or {}).get("email") == email("b2"), f"({s} {js})")
     s, _, _ = call("POST", "/auth/login", {"email": email("b"), "password": PW})
-    expect("AUTH-09 старая почта не работает", s, 401)
+    expect("AUTH-EMAIL-02 до подтверждения вход по старой почте", s, 200)
+    if args.mail_log:
+        link = mail_link("confirm-email", mark)
+        check("AUTH-EMAIL-01 ссылка подтверждения в письме", bool(link), "(в логе нет ссылки — сервер запущен с MAIL_DEV_LOG=1?)")
+        cancel = mail_link("cancel-email", mark)
+        check("AUTH-EMAIL-03 ссылка «это не я» в письме на старый адрес", bool(cancel))
+        if link:
+            token = link.split("token=")[1]
+            s, _, _ = call("POST", "/auth/email/check", {"token": token})
+            expect("AUTH-EMAIL-05 ссылка проверяется до действий", s, 200)
+            s, js, _ = call("POST", "/auth/email/confirm", {"token": token})
+            expect("AUTH-EMAIL-01 подтверждение по ссылке", s, 200)
+            s, _, _ = call("POST", "/auth/email/confirm", {"token": token})
+            expect("AUTH-EMAIL-05 ссылка одноразовая", s, 410)
+            s, js, _ = call("POST", "/auth/login", {"email": email("b2"), "password": PW})
+            expect("AUTH-EMAIL-01 вход по новой почте", s, 200)
+            s, _, _ = call("POST", "/auth/login", {"email": email("b"), "password": PW})
+            expect("AUTH-EMAIL-01 старая почта не работает", s, 401)
+            s, _, _ = call("GET", "/auth/me", token=tokB)
+            expect("AUTH-EMAIL-01 старые сессии завершены", s, 401)
+            if (js or {}).get("access"):
+                tokB = js["access"]
+                created["b"] = (tokB, PW)
+    elif not args.quiet:
+        print("  · AUTH-EMAIL полный сценарий пропущен: нужен --mail-log")
 
     section("Пароль")
     mark = log_len()

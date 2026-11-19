@@ -101,3 +101,78 @@ func PasswordChanged(to, locale, appURL string) Message {
 	foot := "If it wasn't you, reset your password on the sign-in page (“Forgot password?”)."
 	return Message{To: to, Subject: title, Text: plain(title, ps, appURL, foot), HTML: layout(title, ps, "Open the app", appURL, foot)}
 }
+
+// EmailChangeConfirm — на НОВЫЙ адрес: подтвердить, что почта ваша.
+func EmailChangeConfirm(to, locale, link string) Message {
+	if isRu(locale) {
+		title := "Подтвердите новую почту"
+		ps := []string{fmt.Sprintf("В Helper Day попросили сделать %s почтой для входа. Нажмите на кнопку, чтобы подтвердить.", to),
+			"Ссылка действует 24 часа и срабатывает один раз. До подтверждения входить нужно со старой почтой."}
+		foot := "Если вы ничего не просили — просто проигнорируйте письмо, ничего не изменится."
+		return Message{To: to, Subject: title, Text: plain(title, ps, link, foot), HTML: layout(title, ps, "Подтвердить почту", link, foot)}
+	}
+	title := "Confirm your new email"
+	ps := []string{fmt.Sprintf("Someone asked to make %s the sign-in email for a Helper Day account. Tap the button to confirm.", to),
+		"The link works once and expires in 24 hours. Until then, keep signing in with the old email."}
+	foot := "If you didn't ask for this, just ignore this email — nothing will change."
+	return Message{To: to, Subject: title, Text: plain(title, ps, link, foot), HTML: layout(title, ps, "Confirm email", link, foot)}
+}
+
+// EmailChangeTaken — на новый адрес, если он уже занят другим аккаунтом. Ответ API при этом такой же,
+// как обычно, — по нему нельзя узнать, зарегистрирован ли адрес.
+func EmailChangeTaken(to, locale, appURL string) Message {
+	if isRu(locale) {
+		title := "Эта почта уже используется"
+		ps := []string{fmt.Sprintf("В Helper Day попросили сделать %s почтой для входа в другой аккаунт, но с этой почтой уже есть аккаунт.", to),
+			"Если это были вы — войдите с этой почтой или укажите в профиле другой адрес."}
+		foot := "Если вы ничего не просили — просто проигнорируйте письмо."
+		return Message{To: to, Subject: title, Text: plain(title, ps, appURL, foot), HTML: layout(title, ps, "Открыть приложение", appURL, foot)}
+	}
+	title := "This email is already in use"
+	ps := []string{fmt.Sprintf("Someone asked to use %s as the sign-in email for a Helper Day account, but there's already an account with this email.", to),
+		"If it was you, sign in with this email or choose another address in your profile."}
+	foot := "If you didn't ask for this, just ignore this email."
+	return Message{To: to, Subject: title, Text: plain(title, ps, appURL, foot), HTML: layout(title, ps, "Open the app", appURL, foot)}
+}
+
+// EmailChangeRequested — на СТАРЫЙ адрес: запрошена смена, ссылка «это не я».
+func EmailChangeRequested(to, locale, maskedNew, cancelLink string) Message {
+	if isRu(locale) {
+		title := "Запрошена смена почты"
+		ps := []string{fmt.Sprintf("В вашем аккаунте Helper Day запросили смену почты для входа на %s.", maskedNew),
+			"Почта изменится, только когда по ссылке из письма на новый адрес перейдут в течение 24 часов."}
+		foot := "Если это были вы — ничего делать не нужно."
+		return Message{To: to, Subject: title, Text: plain(title, append(ps, "Это не вы? Отмените смену и смените пароль:"), cancelLink, foot),
+			HTML: layout(title, append(ps, "Это не вы? Отмените смену — все входы в аккаунт будут завершены, затем смените пароль."), "Это не я — отменить", cancelLink, foot)}
+	}
+	title := "Email change requested"
+	ps := []string{fmt.Sprintf("Someone asked to change the sign-in email of your Helper Day account to %s.", maskedNew),
+		"It will only change once the link sent to the new address is opened within 24 hours."}
+	foot := "If it was you, there's nothing to do."
+	return Message{To: to, Subject: title, Text: plain(title, append(ps, "Not you? Cancel the change and change your password:"), cancelLink, foot),
+		HTML: layout(title, append(ps, "Not you? Cancel the change — every session will be signed out — then change your password."), "Not me — cancel", cancelLink, foot)}
+}
+
+// EmailChanged — на СТАРЫЙ адрес после подтверждения.
+func EmailChanged(to, locale, maskedNew, appURL string) Message {
+	if isRu(locale) {
+		title := "Почта для входа изменена"
+		ps := []string{fmt.Sprintf("Почта для входа в ваш аккаунт Helper Day изменена на %s. На всех устройствах нужно войти заново.", maskedNew)}
+		foot := "Если это были не вы — напишите в поддержку (ссылка в приложении: «Настройки → Поддержка»)."
+		return Message{To: to, Subject: title, Text: plain(title, ps, appURL, foot), HTML: layout(title, ps, "Открыть приложение", appURL, foot)}
+	}
+	title := "Your sign-in email was changed"
+	ps := []string{fmt.Sprintf("The sign-in email of your Helper Day account was changed to %s. Every device will need to sign in again.", maskedNew)}
+	foot := "If it wasn't you, contact support (in the app: Settings → Support)."
+	return Message{To: to, Subject: title, Text: plain(title, ps, appURL, foot), HTML: layout(title, ps, "Open the app", appURL, foot)}
+}
+
+// MaskEmail: nikita@example.com → n***@example.com (в письмах на другой адрес полный адрес не показываем).
+func MaskEmail(email string) string {
+	at := strings.LastIndex(email, "@")
+	if at < 1 {
+		return "***"
+	}
+	r := []rune(email[:at])
+	return string(r[0]) + "***" + email[at:]
+}

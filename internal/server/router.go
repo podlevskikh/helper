@@ -115,6 +115,8 @@ func NewRouter(d Deps) *gin.Engine {
 	loginLimit := middleware.RateLimit(middleware.RateLimitOptions{Max: 10, Per: 15 * time.Minute, OnlyFailures: true})
 	registerLimit := middleware.RateLimit(middleware.RateLimitOptions{Max: 10, Per: time.Hour})
 	forgotLimit := middleware.RateLimit(middleware.RateLimitOptions{Max: 5, Per: 15 * time.Minute})
+	// Письма при смене почты (запрос и «отправить ещё раз») — отдельный счётчик.
+	emailLimit := middleware.RateLimit(middleware.RateLimitOptions{Max: 10, Per: 15 * time.Minute})
 
 	authGroup := router.Group("/auth")
 	{
@@ -126,7 +128,14 @@ func NewRouter(d Deps) *gin.Engine {
 		authGroup.PATCH("/me", authMw, authHandler.UpdateMe)
 		authGroup.DELETE("/me", authMw, loginLimit, authHandler.DeleteMe)
 		authGroup.POST("/password", authMw, loginLimit, authHandler.ChangePassword)
-		authGroup.POST("/email", authMw, loginLimit, authHandler.ChangeEmail)
+		// Смена почты — с подтверждением по ссылке (internal/handlers/email_change.go).
+		authGroup.GET("/email", authMw, authHandler.GetEmailChange)
+		authGroup.POST("/email", authMw, loginLimit, emailLimit, authHandler.RequestEmailChange)
+		authGroup.DELETE("/email", authMw, authHandler.CancelOwnEmailChange)
+		authGroup.POST("/email/resend", authMw, emailLimit, authHandler.ResendEmailChange)
+		authGroup.POST("/email/check", loginLimit, authHandler.CheckEmailChange)
+		authGroup.POST("/email/confirm", loginLimit, authHandler.ConfirmEmailChange)
+		authGroup.POST("/email/cancel", loginLimit, authHandler.CancelEmailChange)
 		authGroup.POST("/password/forgot", forgotLimit, authHandler.ForgotPassword)
 		authGroup.POST("/password/reset", loginLimit, authHandler.ResetPassword)
 		authGroup.POST("/password/reset/check", loginLimit, authHandler.CheckResetToken)
