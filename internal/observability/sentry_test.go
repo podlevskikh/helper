@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -107,5 +108,42 @@ func TestMiddlewareReports5xxAndPanics(t *testing.T) {
 	}
 	if !saw500 {
 		t.Fatalf("нет события «500 POST /items/:id»: %+v", tr.events)
+	}
+}
+
+// OBS-03: токены ссылок не попадают ни в журнал запросов, ни в Sentry.
+func TestRedactPath(t *testing.T) {
+	for in, want := range map[string]string{
+		"/invites/abc123/accept":           "/invites/:token/accept",
+		"/invites/abc123":                  "/invites/:token",
+		"/app/reset-password?token=secret": "/app/reset-password",
+		"/app/invite?token=secret#x":       "/app/invite",
+		"/orgs/5/invites/7":                "/orgs/5/invites/:token",
+		"/admin/api/tasks/12":              "/admin/api/tasks/12",
+		"https://h/invites/tok/accept?a=b": "https://h/invites/:token/accept",
+	} {
+		if got := RedactPath(in); got != want {
+			t.Errorf("RedactPath(%q) = %q, ждали %q", in, got, want)
+		}
+	}
+	ev := Scrub(&sentry.Event{Request: &sentry.Request{URL: "https://h/invites/secret-token/accept"}}, nil)
+	if strings.Contains(ev.Request.URL, "secret") {
+		t.Fatalf("токен в URL события: %s", ev.Request.URL)
+	}
+}
+
+func TestLoggerRedacts(t *testing.T) {
+	var buf strings.Builder
+	gin.DefaultWriter = &buf
+	t.Cleanup(func() { gin.DefaultWriter = os.Stdout })
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(Logger())
+	r.GET("/invites/:token", func(c *gin.Context) { c.Status(http.StatusOK) })
+	r.GET("/app/reset-password", func(c *gin.Context) { c.Status(http.StatusOK) })
+	r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/invites/secret-invite", nil))
+	r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/app/reset-password?token=secret-reset", nil))
+	if strings.Contains(buf.String(), "secret") || !strings.Contains(buf.String(), "/invites/:token") {
+		t.Fatalf("в журнале токен или нет записи: %q", buf.String())
 	}
 }

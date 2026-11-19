@@ -2,7 +2,7 @@
 // (в Railway или запечатанной в secrets.sealed.json — scripts/seal-sentry.sh). Без неё ничего не делает.
 //
 // Что уходит: паники обработчиков и ответы 5xx (метод, шаблон маршрута, код, коммит).
-// Что не уходит: тела запросов, строка запроса (в ней бывают токены ссылок), Authorization, Cookie,
+// Что не уходит: тела запросов, строка запроса и токен приглашения в пути, Authorization, Cookie,
 // IP-адреса и почты пользователей.
 package observability
 
@@ -55,6 +55,7 @@ func Enabled() bool { return enabled }
 // Scrub убирает из события всё, что может содержать личные данные или секреты.
 func Scrub(ev *sentry.Event, _ *sentry.EventHint) *sentry.Event {
 	if ev.Request != nil {
+		ev.Request.URL = RedactPath(ev.Request.URL)
 		ev.Request.Data = ""
 		ev.Request.QueryString = ""
 		ev.Request.Cookies = ""

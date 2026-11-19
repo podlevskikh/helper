@@ -27,7 +27,9 @@ type Deps struct {
 func NewRouter(d Deps) *gin.Engine {
 	db, sched := d.DB, d.Sched
 	// Initialize Gin router
-	router := gin.Default()
+	// Как gin.Default, но журнал без строки запроса и токенов приглашений (observability.Logger).
+	router := gin.New()
+	router.Use(observability.Logger(), gin.Recovery())
 	// gin.ClientIP не используем для лимитов (см. middleware.clientKey): не доверяем X-Forwarded-For по умолчанию.
 	if err := router.SetTrustedProxies(nil); err != nil {
 		log.Printf("trusted proxies: %v", err)
@@ -124,6 +126,7 @@ func NewRouter(d Deps) *gin.Engine {
 		authGroup.PATCH("/me", authMw, authHandler.UpdateMe)
 		authGroup.DELETE("/me", authMw, loginLimit, authHandler.DeleteMe)
 		authGroup.POST("/password", authMw, loginLimit, authHandler.ChangePassword)
+		authGroup.POST("/email", authMw, loginLimit, authHandler.ChangeEmail)
 		authGroup.POST("/password/forgot", forgotLimit, authHandler.ForgotPassword)
 		authGroup.POST("/password/reset", loginLimit, authHandler.ResetPassword)
 		authGroup.POST("/password/reset/check", loginLimit, authHandler.CheckResetToken)
