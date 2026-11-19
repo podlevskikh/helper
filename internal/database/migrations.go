@@ -100,8 +100,9 @@ func runMigrations(db *gorm.DB, st migrationsState) error {
 
 // dedupeDailySchedules: один день дома — одна строка.
 //  1. Дата приводится к полуночи UTC (старые строки, созданные сервером не в UTC, лежали в 21:00/22:00 UTC накануне).
-//  2. Дубли дня сливаются в самую раннюю строку: разовые и повторяющиеся задачи переносятся,
-//     собранные планировщиком (еда, уборка, ребёнок) — удаляются, если в основной строке уже есть свои.
+//  2. Дубли дня сливаются в самую раннюю строку (mergeDuplicateDay): разовые задачи переносятся,
+//     собранные планировщиком и повторяющиеся — сливаются по типу и названию без потери отметок
+//     «сделано» и выбранных блюд.
 //  3. Уникальный индекс (organization_id, date).
 func dedupeDailySchedules(tx *gorm.DB) error {
 	if err := tx.Exec(`UPDATE daily_schedules
@@ -121,24 +122,7 @@ func dedupeDailySchedules(tx *gorm.DB) error {
 		return err
 	}
 	for _, d := range dups {
-		var keepGenerated int64
-		tx.Raw(`SELECT count(*) FROM schedule_tasks WHERE schedule_id = ? AND task_type IN ('meal','cleaning','childcare')`, d.Keep).Scan(&keepGenerated)
-		if keepGenerated > 0 {
-			gen := `SELECT id FROM schedule_tasks WHERE schedule_id = ? AND task_type IN ('meal','cleaning','childcare')`
-			for _, q := range []string{
-				"DELETE FROM meal_recipes WHERE schedule_task_id IN (" + gen + ")",
-				"DELETE FROM task_zones WHERE schedule_task_id IN (" + gen + ")",
-				"DELETE FROM schedule_tasks WHERE id IN (" + gen + ")",
-			} {
-				if err := tx.Exec(q, d.Drop).Error; err != nil {
-					return err
-				}
-			}
-		}
-		// Повторяющаяся задача уже есть в основном дне — копию из дубля убираем.
-		if err := tx.Exec(`DELETE FROM schedule_tasks t WHERE t.schedule_id = ? AND t.recurring_task_id IS NOT NULL
-			AND EXISTS (SELECT 1 FROM schedule_tasks k WHERE k.schedule_id = ? AND k.recurring_task_id = t.recurring_task_id)`,
-			d.Drop, d.Keep).Error; err != nil {
+		if err := mergeDuplicateDay(tx, d.Keep, d.Drop); err != nil {
 			return err
 		}
 		if err := tx.Exec("UPDATE schedule_tasks SET schedule_id = ? WHERE schedule_id = ?", d.Keep, d.Drop).Error; err != nil {
@@ -155,4 +139,63 @@ func dedupeDailySchedules(tx *gorm.DB) error {
 		log.Printf("daily_schedules: слито дублей дней: %d", len(dups))
 	}
 	return tx.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_schedules_org_date ON daily_schedules (organization_id, date)").Error
+}
+
+// mergeDuplicateDay переносит задачи дня-дубля drop в основной день keep.
+//   - Собранные планировщиком (еда, уборка, ребёнок): если в keep задач этого типа нет — переносятся
+//     целиком. Если есть — копия из drop с тем же названием отдаёт свою отметку «сделано» и выбранные
+//     блюда задаче в keep и удаляется; несовпавшие удаляются, кроме отмеченных выполненными (переносятся).
+//   - Повторяющиеся: копия той же повторяющейся задачи сливается так же (отметка «сделано» сохраняется).
+//   - Остальные (разовые) переносятся как есть.
+func mergeDuplicateDay(tx *gorm.DB, keep, drop uint) error {
+	exec := func(q string, args ...any) error { return tx.Exec(q, args...).Error }
+	for _, typ := range []string{"meal", "cleaning", "childcare"} {
+		var inKeep int64
+		tx.Raw(`SELECT count(*) FROM schedule_tasks WHERE schedule_id = ? AND task_type = ?`, keep, typ).Scan(&inKeep)
+		if inKeep == 0 {
+			continue // переедут общим UPDATE ниже
+		}
+		steps := []struct {
+			q    string
+			args []any
+		}{
+			{`UPDATE schedule_tasks k SET completed = true, completed_at = COALESCE(k.completed_at, d.completed_at)
+				FROM schedule_tasks d
+				WHERE k.schedule_id = ? AND d.schedule_id = ? AND k.task_type = ? AND d.task_type = k.task_type
+				  AND k.title = d.title AND d.completed AND NOT k.completed`, []any{keep, drop, typ}},
+			{`UPDATE meal_recipes mr SET schedule_task_id = k.id
+				FROM schedule_tasks d, schedule_tasks k
+				WHERE mr.schedule_task_id = d.id AND d.schedule_id = ? AND k.schedule_id = ?
+				  AND d.task_type = ? AND k.task_type = d.task_type AND k.title = d.title
+				  AND NOT EXISTS (SELECT 1 FROM meal_recipes x WHERE x.schedule_task_id = k.id)`, []any{drop, keep, typ}},
+		}
+		// Удаляем копии: совпавшие по названию — всегда (их отметки уже в keep), несовпавшие — если не выполнены.
+		dropIDs := `SELECT d.id FROM schedule_tasks d WHERE d.schedule_id = ? AND d.task_type = ?
+			AND (NOT d.completed OR EXISTS (SELECT 1 FROM schedule_tasks k WHERE k.schedule_id = ? AND k.task_type = d.task_type AND k.title = d.title))`
+		for _, q := range []string{
+			"DELETE FROM meal_recipes WHERE schedule_task_id IN (" + dropIDs + ")",
+			"DELETE FROM task_zones WHERE schedule_task_id IN (" + dropIDs + ")",
+			"DELETE FROM schedule_tasks WHERE id IN (" + dropIDs + ")",
+		} {
+			steps = append(steps, struct {
+				q    string
+				args []any
+			}{q, []any{drop, typ, keep}})
+		}
+		for _, st := range steps {
+			if err := exec(st.q, st.args...); err != nil {
+				return err
+			}
+		}
+	}
+	// Повторяющаяся задача уже есть в основном дне: переносим отметку «сделано» и убираем копию.
+	if err := exec(`UPDATE schedule_tasks k SET completed = true, completed_at = COALESCE(k.completed_at, d.completed_at)
+		FROM schedule_tasks d
+		WHERE k.schedule_id = ? AND d.schedule_id = ? AND k.recurring_task_id IS NOT NULL
+		  AND d.recurring_task_id = k.recurring_task_id AND d.completed AND NOT k.completed`, keep, drop); err != nil {
+		return err
+	}
+	return exec(`DELETE FROM schedule_tasks t WHERE t.schedule_id = ? AND t.recurring_task_id IS NOT NULL
+		AND EXISTS (SELECT 1 FROM schedule_tasks k WHERE k.schedule_id = ? AND k.recurring_task_id = t.recurring_task_id)`,
+		drop, keep)
 }
