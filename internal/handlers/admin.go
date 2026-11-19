@@ -21,6 +21,8 @@ import (
 
 type AdminHandler struct {
 	db *gorm.DB
+	// FillDays дособирает ближайшие дни дома (новая зона уборки сразу попадает в расписание).
+	FillDays func(orgID uint)
 }
 
 func NewAdminHandler(db *gorm.DB) *AdminHandler {
@@ -415,6 +417,9 @@ func (h *AdminHandler) CreateCleaningZone(c *gin.Context) {
 	if err := h.db.Create(&zone).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if h.FillDays != nil {
+		h.FillDays(zone.OrganizationID)
 	}
 	c.JSON(http.StatusCreated, zone)
 }

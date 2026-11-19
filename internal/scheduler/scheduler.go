@@ -18,12 +18,8 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-// OrgID — организация, для которой планировщик собирает дни (DailySchedule по умолчанию — 1).
-// Все выборки и записи планировщика ограничены этим домом: другие дома
-// не должны получать её блюда и уборку, а их дни — помечаться собранными.
-const OrgID = 1
-
-const schedulerOrgID = OrgID
+// Планировщик собирает дни каждого дома из его приёмов пищи, зон уборки и распорядка ребёнка.
+// Все выборки и записи — только по этому дому: чужие блюда и зоны в день не попадают.
 
 type Scheduler struct {
 	db *gorm.DB
@@ -33,23 +29,47 @@ func NewScheduler(db *gorm.DB) *Scheduler {
 	return &Scheduler{db: db}
 }
 
-// GenerateScheduleForDate generates a complete schedule for a specific date
+// GenerateScheduleForDate собирает день для всех домов.
 func (s *Scheduler) GenerateScheduleForDate(date time.Time) error {
+	var orgIDs []uint
+	if err := s.db.Model(&models.Organization{}).Order("id").Pluck("id", &orgIDs).Error; err != nil {
+		return err
+	}
+	var firstErr error
+	for _, orgID := range orgIDs {
+		if err := s.GenerateScheduleForOrgDate(orgID, date); err != nil {
+			log.Printf("Error generating schedule for org %d, %s: %v", orgID, date.Format("2006-01-02"), err)
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+	return firstErr
+}
+
+// GenerateScheduleForOrgDate собирает день одного дома.
+func (s *Scheduler) GenerateScheduleForOrgDate(orgID uint, date time.Time) error {
 	// Normalize date to start of day
 	date = time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
 
-	log.Printf("Generating schedule for date: %s", date.Format("2006-01-02"))
+	log.Printf("Generating schedule for org %d, date: %s", orgID, date.Format("2006-01-02"))
 
 	// День не собирается, если никто из помощников не работает (выходные дни, праздники страны,
-	// отпуска и отгулы — см. internal/calendar). Расписание планировщика — организации 1.
-	if !calendar.AnyoneWorks(s.db, schedulerOrgID, date) {
+	// отпуска и отгулы — см. internal/calendar).
+	if !calendar.AnyoneWorks(s.db, orgID, date) {
 		log.Printf("Date %s: nobody works, skipping schedule generation", date.Format("2006-01-02"))
+		return nil
+	}
+
+	// Дому нечего собирать (нет приёмов пищи, зон уборки и ребёнка на этот день) — день не создаём,
+	// чтобы добавленные позже зоны и приёмы пищи попали в ближайшие дни.
+	if !s.hasTemplates(orgID, date) {
 		return nil
 	}
 
 	// Check if schedule already exists
 	var existingSchedule models.DailySchedule
-	result := s.db.Where("organization_id = ? AND date = ?", schedulerOrgID, date).First(&existingSchedule)
+	result := s.db.Where("organization_id = ? AND date = ?", orgID, date).First(&existingSchedule)
 
 	var schedule models.DailySchedule
 	if result.Error == nil {
@@ -66,7 +86,7 @@ func (s *Scheduler) GenerateScheduleForDate(date time.Time) error {
 	} else {
 		// Create new daily schedule
 		schedule = models.DailySchedule{
-			OrganizationID: schedulerOrgID,
+			OrganizationID: orgID,
 			Date:           date,
 			Generated:      true,
 		}
@@ -97,7 +117,7 @@ func (s *Scheduler) GenerateScheduleForDate(date time.Time) error {
 // generateMealTasks creates meal tasks based on configured meal times
 func (s *Scheduler) generateMealTasks(schedule *models.DailySchedule, date time.Time) error {
 	var mealTimes []models.MealTime
-	if err := s.db.Where("organization_id = ? AND active = ?", schedulerOrgID, true).Find(&mealTimes).Error; err != nil {
+	if err := s.db.Where("organization_id = ? AND active = ?", schedule.OrganizationID, true).Find(&mealTimes).Error; err != nil {
 		return err
 	}
 
@@ -113,13 +133,13 @@ func (s *Scheduler) generateMealTasks(schedule *models.DailySchedule, date time.
 		// Create a task for each time slot
 		for _, timeSlot := range times {
 			// Find a suitable recipe for this meal
-			recipe, err := s.selectRecipeForMeal(mealTime.ID, mealTime.Name, mealTime.FamilyMember, date)
+			recipe, err := s.selectRecipeForMeal(schedule.OrganizationID, mealTime.ID, mealTime.Name, mealTime.FamilyMember, date)
 			if err != nil {
 				log.Printf("Warning: No recipe found for %s (%s), creating task without recipe", mealTime.Name, mealTime.FamilyMember)
 			}
 
 			task := models.ScheduleTask{
-				OrganizationID: schedulerOrgID,
+				OrganizationID: schedule.OrganizationID,
 				ScheduleID:     schedule.ID,
 				TaskType:       "meal",
 				Time:           timeSlot,
@@ -167,8 +187,8 @@ func (s *Scheduler) getMealTimes(mealTime models.MealTime) []string {
 //     only counting recipes used for THIS specific meal slot (by title)
 //   - pick randomly from recipes NOT in the used set ("fresh" pool)
 //   - if all recipes have been used (end of cycle), reset and pick from all
-func (s *Scheduler) selectRecipeForMeal(mealTimeID uint, mealTimeName, familyMember string, currentDate time.Time) (*models.Recipe, error) {
-	recipes, err := s.eligibleRecipes(mealTimeID, mealTimeName)
+func (s *Scheduler) selectRecipeForMeal(orgID, mealTimeID uint, mealTimeName, familyMember string, currentDate time.Time) (*models.Recipe, error) {
+	recipes, err := s.eligibleRecipes(orgID, mealTimeID, mealTimeName)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +209,7 @@ func (s *Scheduler) selectRecipeForMeal(mealTimeID uint, mealTimeName, familyMem
 
 	// Filter used recipes only for this specific meal slot (title = "MealName - FamilyMember")
 	taskTitle := fmt.Sprintf("%s - %s", mealTimeName, familyMember)
-	usedIDs := s.usedRecipeIDsSince(currentDate, lookback, taskTitle)
+	usedIDs := s.usedRecipeIDsSince(orgID, currentDate, lookback, taskTitle)
 
 	// Partition into fresh (not used recently) and stale
 	var fresh []models.Recipe
@@ -215,12 +235,12 @@ func (s *Scheduler) selectRecipeForMeal(mealTimeID uint, mealTimeName, familyMem
 
 // eligibleRecipes returns active recipes linked to the given meal time via recipe_meal_times.
 // Only recipes explicitly assigned to this meal time are considered.
-func (s *Scheduler) eligibleRecipes(mealTimeID uint, mealTimeName string) ([]models.Recipe, error) {
+func (s *Scheduler) eligibleRecipes(orgID, mealTimeID uint, mealTimeName string) ([]models.Recipe, error) {
 	var recipes []models.Recipe
 	err := s.db.
 		Joins("JOIN recipe_meal_times ON recipe_meal_times.recipe_id = recipes.id").
 		Where("recipe_meal_times.meal_time_id = ?", mealTimeID).
-		Where("recipes.is_active = ? AND recipes.organization_id = ?", true, schedulerOrgID).
+		Where("recipes.is_active = ? AND recipes.organization_id = ?", true, orgID).
 		Find(&recipes).Error
 	if err != nil {
 		return nil, err
@@ -233,7 +253,7 @@ func (s *Scheduler) eligibleRecipes(mealTimeID uint, mealTimeName string) ([]mod
 // within the last `days` days before `before`.
 // Filtering by title (e.g. "Breakfast - adult") ensures we only consider the same meal slot,
 // so recipes used at lunch don't block breakfast choices.
-func (s *Scheduler) usedRecipeIDsSince(before time.Time, days int, taskTitle string) map[uint]bool {
+func (s *Scheduler) usedRecipeIDsSince(orgID uint, before time.Time, days int, taskTitle string) map[uint]bool {
 	used := make(map[uint]bool)
 
 	startDate := before.AddDate(0, 0, -days)
@@ -241,7 +261,7 @@ func (s *Scheduler) usedRecipeIDsSince(before time.Time, days int, taskTitle str
 	var tasks []models.ScheduleTask
 	err := s.db.
 		Joins("JOIN daily_schedules ON daily_schedules.id = schedule_tasks.schedule_id").
-		Where("daily_schedules.organization_id = ?", schedulerOrgID).
+		Where("daily_schedules.organization_id = ?", orgID).
 		Where("daily_schedules.date >= ? AND daily_schedules.date < ?", startDate, before).
 		Where("schedule_tasks.task_type = 'meal'").
 		Where("schedule_tasks.title = ?", taskTitle).
@@ -268,7 +288,7 @@ func (s *Scheduler) generateCleaningTasks(schedule *models.DailySchedule, date t
 	var zones []models.CleaningZone
 	// Order by priority: high > medium > low
 	priorityOrder := "CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END"
-	if err := s.db.Where("organization_id = ?", schedulerOrgID).Order(priorityOrder).Find(&zones).Error; err != nil {
+	if err := s.db.Where("organization_id = ?", schedule.OrganizationID).Order(priorityOrder).Find(&zones).Error; err != nil {
 		return err
 	}
 
@@ -288,7 +308,7 @@ func (s *Scheduler) generateCleaningTasks(schedule *models.DailySchedule, date t
 		// Determine if this zone should be cleaned today based on frequency
 		if s.shouldCleanZoneToday(zone, dayOfWeek, date) {
 			task := models.ScheduleTask{
-				OrganizationID: schedulerOrgID,
+				OrganizationID: schedule.OrganizationID,
 				ScheduleID:     schedule.ID,
 				TaskType:       "cleaning",
 				Time:           "", // No specific time for cleaning tasks
@@ -378,7 +398,7 @@ func (s *Scheduler) addChildcareTasks(schedule *models.DailySchedule, date time.
 	normalizedDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 	nextDay := normalizedDate.AddDate(0, 0, 1)
 
-	if err := s.db.Where("organization_id = ? AND date >= ? AND date < ?", schedulerOrgID, normalizedDate, nextDay).Find(&childcareSchedules).Error; err != nil {
+	if err := s.db.Where("organization_id = ? AND date >= ? AND date < ?", schedule.OrganizationID, normalizedDate, nextDay).Find(&childcareSchedules).Error; err != nil {
 		return err
 	}
 
@@ -386,7 +406,7 @@ func (s *Scheduler) addChildcareTasks(schedule *models.DailySchedule, date time.
 
 	for _, cc := range childcareSchedules {
 		task := models.ScheduleTask{
-			OrganizationID: schedulerOrgID,
+			OrganizationID: schedule.OrganizationID,
 			ScheduleID:     schedule.ID,
 			TaskType:       "childcare",
 			Time:           cc.StartTime,
@@ -414,6 +434,35 @@ func (s *Scheduler) calculateDuration(startTime, endTime string) int {
 
 	duration := end.Sub(start)
 	return int(duration.Minutes())
+}
+
+// hasTemplates — есть ли у дома из чего собрать день.
+func (s *Scheduler) hasTemplates(orgID uint, date time.Time) bool {
+	var n int64
+	s.db.Model(&models.MealTime{}).Where("organization_id = ? AND active = ?", orgID, true).Count(&n)
+	if n > 0 {
+		return true
+	}
+	s.db.Model(&models.CleaningZone{}).Where("organization_id = ?", orgID).Count(&n)
+	if n > 0 {
+		return true
+	}
+	day := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+	s.db.Model(&models.ChildcareSchedule{}).
+		Where("organization_id = ? AND date >= ? AND date < ?", orgID, day, day.AddDate(0, 0, 1)).Count(&n)
+	return n > 0
+}
+
+// GenerateScheduleForOrgNextDays собирает ближайшие дни одного дома.
+func (s *Scheduler) GenerateScheduleForOrgNextDays(orgID uint, days int) error {
+	today := time.Now()
+	for i := 0; i < days; i++ {
+		date := today.AddDate(0, 0, i)
+		if err := s.GenerateScheduleForOrgDate(orgID, date); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // GenerateScheduleForNextDays generates schedules for the next N days

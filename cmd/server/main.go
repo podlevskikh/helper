@@ -108,6 +108,11 @@ func main() {
 
 	// Initialize handlers
 	adminHandler := handlers.NewAdminHandler(db)
+	adminHandler.FillDays = func(orgID uint) {
+		if err := sched.GenerateScheduleForOrgNextDays(orgID, 7); err != nil {
+			log.Printf("Warning: schedule for org %d: %v", orgID, err)
+		}
+	}
 	helperHandler := handlers.NewHelperHandler(db)
 	authHandler := handlers.NewAuthHandler(db)
 	inviteHandler := handlers.NewInviteHandler(db)
@@ -267,13 +272,9 @@ func main() {
 			api.DELETE("/recurring-tasks/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.DeleteRecurringTask)
 
 			// Schedule management
-			// Пересборка дней — только для дома, который ведёт планировщик (организация 1),
-			// и только для его данных: раньше любой вошедший стирал задачи всех домов.
+			// Пересборка ближайших дней своего дома (раньше любой вошедший стирал задачи всех домов).
 			api.POST("/regenerate-schedule", middleware.Require(middleware.CapManageSchedule), func(c *gin.Context) {
-				if middleware.MustMembership(c).OrganizationID != scheduler.OrgID {
-					c.JSON(403, gin.H{"error": "schedule regeneration is not available for this home"})
-					return
-				}
+				orgID := middleware.MustMembership(c).OrganizationID
 				days := 7
 
 				// Normalize to start of day so today's schedule is always included
@@ -288,8 +289,8 @@ func main() {
 				if err := db.Exec(`DELETE FROM meal_recipes WHERE schedule_task_id IN (
 					SELECT st.id FROM schedule_tasks st
 					JOIN daily_schedules ds ON ds.id = st.schedule_id
-					WHERE ds.organization_id = 1 AND ds.date >= ? AND ds.date < ? AND st.task_type != 'custom'
-				)`, today, endDate).Error; err != nil {
+					WHERE ds.organization_id = ? AND ds.date >= ? AND ds.date < ? AND st.task_type != 'custom'
+				)`, orgID, today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to delete meal_recipes: %v", err)
 				}
 
@@ -297,37 +298,37 @@ func main() {
 				if err := db.Exec(`DELETE FROM task_zones WHERE schedule_task_id IN (
 					SELECT st.id FROM schedule_tasks st
 					JOIN daily_schedules ds ON ds.id = st.schedule_id
-					WHERE ds.organization_id = 1 AND ds.date >= ? AND ds.date < ? AND st.task_type != 'custom'
-				)`, today, endDate).Error; err != nil {
+					WHERE ds.organization_id = ? AND ds.date >= ? AND ds.date < ? AND st.task_type != 'custom'
+				)`, orgID, today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to delete task_zones: %v", err)
 				}
 
 				// 3. Delete non-custom schedule_tasks
 				if err := db.Exec(`DELETE FROM schedule_tasks
 					WHERE task_type != 'custom'
-					AND schedule_id IN (SELECT id FROM daily_schedules WHERE organization_id = 1 AND date >= ? AND date < ?)`,
-					today, endDate).Error; err != nil {
+					AND schedule_id IN (SELECT id FROM daily_schedules WHERE organization_id = ? AND date >= ? AND date < ?)`,
+					orgID, today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to delete schedule tasks: %v", err)
 				}
 
 				// 4. Delete daily_schedules that have no tasks left
 				if err := db.Exec(`DELETE FROM daily_schedules
-					WHERE organization_id = 1 AND date >= ? AND date < ?
+					WHERE organization_id = ? AND date >= ? AND date < ?
 					AND id NOT IN (SELECT DISTINCT schedule_id FROM schedule_tasks)`,
-					today, endDate).Error; err != nil {
+					orgID, today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to delete empty daily schedules: %v", err)
 				}
 
 				// 5. Reset generated=false on schedules that still exist (have custom tasks only)
 				if err := db.Exec(`UPDATE daily_schedules SET generated = false
-					WHERE organization_id = 1 AND date >= ? AND date < ?`, today, endDate).Error; err != nil {
+					WHERE organization_id = ? AND date >= ? AND date < ?`, orgID, today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to reset generated flag: %v", err)
 				}
 
 				log.Println("Old schedules cleared, generating new schedules...")
 
 				// Generate new schedules
-				if err := sched.GenerateScheduleForNextDays(days); err != nil {
+				if err := sched.GenerateScheduleForOrgNextDays(orgID, days); err != nil {
 					c.JSON(500, gin.H{"error": err.Error()})
 					return
 				}

@@ -18,7 +18,7 @@ import (
 	"podlevskikh/awesomeProject/internal/scheduler"
 )
 
-// Дома не видят и не меняют чужие данные по id, а планировщик дома 1 не трогает дни других домов.
+// Дома не видят и не меняют чужие данные по id, а планировщик собирает каждому дому только его задачи.
 // Нужна отдельная база: TEST_DATABASE_URL=... go test ./internal/handlers -run Isolation
 func TestOrgIsolation(t *testing.T) {
 	url := os.Getenv("TEST_DATABASE_URL")
@@ -43,6 +43,7 @@ func TestOrgIsolation(t *testing.T) {
 	api.GET("/childcare/:id", admin.GetChildcareSchedule)
 	api.POST("/recipes/:id/comments", admin.CreateRecipeComment)
 
+	const org1 = uint(1)
 	suffix := fmt.Sprint(time.Now().UnixNano())
 	call := func(method, path, token string, orgID uint, body any) *httptest.ResponseRecorder {
 		b, _ := json.Marshal(body)
@@ -58,15 +59,15 @@ func TestOrgIsolation(t *testing.T) {
 	}
 
 	// Данные дома 1 (его ведёт планировщик) и работающий в нём помощник.
-	mkUser(t, db, "org1-helper-"+suffix, scheduler.OrgID)
+	mkUser(t, db, "org1-helper-"+suffix, org1)
 	day := time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, int(time.Now().UnixNano()%3000))
-	meal := models.MealTime{OrganizationID: scheduler.OrgID, Name: "Breakfast " + suffix, DefaultTime: "08:00", FamilyMember: "adult", Active: true}
-	recipe := models.Recipe{OrganizationID: scheduler.OrgID, Name: "Каша " + suffix}
+	meal := models.MealTime{OrganizationID: org1, Name: "Breakfast " + suffix, DefaultTime: "08:00", FamilyMember: "adult", Active: true}
+	recipe := models.Recipe{OrganizationID: org1, Name: "Каша " + suffix}
 	must(t, db.Create(&meal).Error, db.Create(&recipe).Error)
-	sched1 := models.DailySchedule{OrganizationID: scheduler.OrgID, Date: day.AddDate(0, 0, -1)}
+	sched1 := models.DailySchedule{OrganizationID: org1, Date: day.AddDate(0, 0, -1)}
 	must(t, db.Create(&sched1).Error)
-	task1 := models.ScheduleTask{OrganizationID: scheduler.OrgID, ScheduleID: sched1.ID, TaskType: "custom", Title: "Секрет"}
-	cc := models.ChildcareSchedule{OrganizationID: scheduler.OrgID, Date: day, StartTime: "10:00", EndTime: "11:00"}
+	task1 := models.ScheduleTask{OrganizationID: org1, ScheduleID: sched1.ID, TaskType: "custom", Title: "Секрет"}
+	cc := models.ChildcareSchedule{OrganizationID: org1, Date: day, StartTime: "10:00", EndTime: "11:00"}
 	must(t, db.Create(&task1).Error, db.Create(&cc).Error)
 
 	// Другой дом.
@@ -106,20 +107,35 @@ func TestOrgIsolation(t *testing.T) {
 		t.Errorf("чужой дом изменил задачу: %q", after.Title)
 	}
 
-	// День другого дома без дня дома 1: планировщик собирает свой день, а чужой не трогает.
+	// День другого дома без дня дома 1: планировщик собирает день дома 1, а в чужой его задачи не кладёт.
 	schedB := models.DailySchedule{OrganizationID: orgB, Date: day}
 	must(t, db.Create(&schedB).Error)
 	if err := scheduler.NewScheduler(db).GenerateScheduleForDate(day); err != nil {
 		t.Fatal(err)
 	}
-	if n := count(db, &models.ScheduleTask{}, "schedule_id = ?", schedB.ID); n != 0 {
-		t.Errorf("в день другого дома попало %d задач дома 1", n)
+	if n := count(db, &models.ScheduleTask{}, "schedule_id = ? AND organization_id <> ?", schedB.ID, orgB); n != 0 {
+		t.Errorf("в день другого дома попало %d чужих задач", n)
 	}
-	db.First(&schedB, schedB.ID)
-	if schedB.Generated {
-		t.Errorf("день другого дома помечен собранным")
-	}
-	if count(db, &models.DailySchedule{}, "organization_id = ? AND date = ?", scheduler.OrgID, day) != 1 {
+	if count(db, &models.DailySchedule{}, "organization_id = ? AND date = ?", org1, day) != 1 {
 		t.Errorf("планировщик не собрал день дома 1")
+	}
+
+	// Свои зоны уборки дом получает в своё расписание (раньше планировщик собирал только дом 1).
+	mkUser(t, db, "orgB-helper-"+suffix, orgB)
+	zone := models.CleaningZone{OrganizationID: orgB, Name: "Кухня " + suffix, FrequencyPerWeek: 7}
+	must(t, db.Create(&zone).Error)
+	dayB := day.AddDate(0, 0, 1)
+	if err := scheduler.NewScheduler(db).GenerateScheduleForDate(dayB); err != nil {
+		t.Fatal(err)
+	}
+	var got models.DailySchedule
+	if err := db.Where("organization_id = ? AND date = ?", orgB, dayB).First(&got).Error; err != nil {
+		t.Fatalf("день дома B не собран: %v", err)
+	}
+	if count(db, &models.ScheduleTask{}, "schedule_id = ? AND organization_id = ? AND title = ?", got.ID, orgB, zone.Name) != 1 {
+		t.Errorf("в дне дома B нет его зоны уборки")
+	}
+	if count(db, &models.ScheduleTask{}, "schedule_id = ? AND organization_id <> ?", got.ID, orgB) != 0 {
+		t.Errorf("в дне дома B чужие задачи")
 	}
 }
