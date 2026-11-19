@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"podlevskikh/awesomeProject/internal/middleware"
+	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/notify"
 )
@@ -170,7 +171,7 @@ func (h *HelperHandler) CreateShoppingList(c *gin.Context) {
 		return
 	}
 	if body.ListDate == "" {
-		body.ListDate = time.Now().Format("2006-01-02")
+		body.ListDate = clock.OrgToday(h.db, middleware.MustMembership(c).OrganizationID).Format("2006-01-02")
 	}
 	if !validListDate(body.ListDate) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "list_date must be YYYY-MM-DD"})

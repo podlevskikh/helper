@@ -93,13 +93,13 @@ func Initialize(databaseURL string) error {
 
 	log.Println("Database migrations completed")
 
-	if firstPriorityMigration {
-		res := DB.Exec("UPDATE task_categories SET priority = 'high' WHERE is_default = true AND name = ?", "Уход за ребёнком")
-		log.Printf("redesign-v2: важность «Уход за ребёнком» = high, категорий: %d", res.RowsAffected)
-	}
-
-	// Run data migrations
+	// Сид и владельцы домов — до версионированных шагов (они проверяют, есть ли дома).
 	runDataMigrations()
+
+	// Версионированные шаги, меняющие данные: один раз, в транзакции; ошибка — сервер не стартует.
+	if err := runMigrations(DB, migrationsState{categoryPriorityAppeared: firstPriorityMigration}); err != nil {
+		return err
+	}
 
 	// Initialize default settings
 	initializeDefaultSettings()
@@ -112,12 +112,6 @@ func Initialize(databaseURL string) error {
 
 // runDataMigrations runs data migrations after schema migrations
 func runDataMigrations() {
-	// Set is_active to true for all existing recipes that don't have it set
-	DB.Exec("UPDATE recipes SET is_active = true WHERE is_active IS NULL")
-
-	// Settings: drop old single-column unique index (replaced by composite org+key)
-	DB.Exec("DROP INDEX IF EXISTS uni_settings_key")
-
 	// M1: seed organisation + owner user if none exist, then backfill organization_id
 	seedOrgAndOwner()
 	warnDefaultOwnerPassword()

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"podlevskikh/awesomeProject/internal/calendar"
+	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
 
 	"gorm.io/gorm"
@@ -49,8 +50,8 @@ func (s *Scheduler) GenerateScheduleForDate(date time.Time) error {
 
 // GenerateScheduleForOrgDate собирает день одного дома.
 func (s *Scheduler) GenerateScheduleForOrgDate(orgID uint, date time.Time) error {
-	// Normalize date to start of day
-	date = time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	// День — полночь UTC календарной даты (как во всех daily_schedules).
+	date = clock.Day(date)
 
 	log.Printf("Generating schedule for org %d, date: %s", orgID, date.Format("2006-01-02"))
 
@@ -85,13 +86,15 @@ func (s *Scheduler) GenerateScheduleForOrgDate(orgID uint, date time.Time) error
 		}
 	} else {
 		// Create new daily schedule
-		schedule = models.DailySchedule{
-			OrganizationID: orgID,
-			Date:           date,
-			Generated:      true,
-		}
-		if err := s.db.Create(&schedule).Error; err != nil {
+		var err error
+		if schedule, err = models.EnsureDailySchedule(s.db, orgID, date, true); err != nil {
 			return fmt.Errorf("failed to create daily schedule: %w", err)
+		}
+		if !schedule.Generated { // параллельно день успел создать запрос пользователя
+			schedule.Generated = true
+			if err := s.db.Save(&schedule).Error; err != nil {
+				return fmt.Errorf("failed to update daily schedule: %w", err)
+			}
 		}
 	}
 
@@ -455,7 +458,7 @@ func (s *Scheduler) hasTemplates(orgID uint, date time.Time) bool {
 
 // GenerateScheduleForOrgNextDays собирает ближайшие дни одного дома.
 func (s *Scheduler) GenerateScheduleForOrgNextDays(orgID uint, days int) error {
-	today := time.Now()
+	today := clock.OrgToday(s.db, orgID)
 	for i := 0; i < days; i++ {
 		date := today.AddDate(0, 0, i)
 		if err := s.GenerateScheduleForOrgDate(orgID, date); err != nil {
@@ -467,14 +470,15 @@ func (s *Scheduler) GenerateScheduleForOrgNextDays(orgID uint, days int) error {
 
 // GenerateScheduleForNextDays generates schedules for the next N days
 func (s *Scheduler) GenerateScheduleForNextDays(days int) error {
-	today := time.Now()
-
-	for i := 0; i < days; i++ {
-		date := today.AddDate(0, 0, i)
-		if err := s.GenerateScheduleForDate(date); err != nil {
-			log.Printf("Error generating schedule for %s: %v", date.Format("2006-01-02"), err)
+	// У каждого дома своё «сегодня» (часовой пояс дома).
+	var orgIDs []uint
+	if err := s.db.Model(&models.Organization{}).Order("id").Pluck("id", &orgIDs).Error; err != nil {
+		return err
+	}
+	for _, orgID := range orgIDs {
+		if err := s.GenerateScheduleForOrgNextDays(orgID, days); err != nil {
+			log.Printf("Error generating schedule for org %d: %v", orgID, err)
 		}
 	}
-
 	return nil
 }

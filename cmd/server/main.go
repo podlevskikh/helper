@@ -58,7 +58,8 @@ func main() {
 
 	// Start daily schedule generation goroutine
 	go func() {
-		ticker := time.NewTicker(24 * time.Hour)
+		// Каждый час: у домов разные часовые пояса, новый день дома собирается вскоре после его полуночи.
+		ticker := time.NewTicker(time.Hour)
 		defer ticker.Stop()
 
 		for range ticker.C {

@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"podlevskikh/awesomeProject/internal/calendar"
+	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
 )
 
@@ -156,7 +157,7 @@ func (h *AdminHandler) CreateRecurringTask(c *gin.Context) {
 		parts[i] = strconv.Itoa(d)
 	}
 
-	start := utcDay(time.Now())
+	start := clock.OrgToday(h.db, h.orgID(c))
 	if input.StartDate != "" {
 		d, err := time.Parse("2006-01-02", input.StartDate)
 		if err != nil {
@@ -214,7 +215,7 @@ func (h *AdminHandler) DeleteRecurringTask(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	today := utcDay(time.Now())
+	today := clock.OrgToday(h.db, r.OrganizationID)
 	h.db.Exec(`DELETE FROM schedule_tasks WHERE recurring_task_id = ? AND completed = false
 		AND schedule_id IN (SELECT id FROM daily_schedules WHERE date >= ?)`, r.ID, today)
 	c.JSON(http.StatusOK, gin.H{"message": "Recurring task stopped"})

@@ -32,6 +32,7 @@ func NewRouter(d Deps) *gin.Engine {
 		log.Printf("trusted proxies: %v", err)
 	}
 	router.Use(securityHeaders())
+	registerHealth(router, db)
 
 	// CORS — разрешаем web-origin Expo (WEB_ORIGIN env, через запятую; dev: http://localhost:8081).
 	// Первый адрес используется в ссылках-приглашениях.

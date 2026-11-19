@@ -3,6 +3,9 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
+# Трафик на новую версию — только когда она ответила 200 на /healthz (сервер поднялся, база доступна).
+# Иначе Railway оставит работать предыдущую версию.
+healthcheckPath = "/healthz"
+healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
-

@@ -7,6 +7,7 @@ import (
 
 	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/middleware"
+	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/notify"
 
@@ -147,8 +148,9 @@ func childcareDuration(startTime, endTime string) int {
 
 // GetTodaySchedule returns today's schedule with all tasks
 func (h *HelperHandler) GetTodaySchedule(c *gin.Context) {
-	today := time.Now()
-	todayStart := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
+	// «Сегодня» — по часовому поясу дома, а не по часам сервера.
+	today := clock.OrgToday(h.db, h.orgID(c))
+	todayStart := today
 
 	var schedule models.DailySchedule
 	err := h.orgDB(c).Preload("Tasks", h.taskPreload(c)).
@@ -165,8 +167,8 @@ func (h *HelperHandler) GetTodaySchedule(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"message": "No schedule for today", "tasks": []models.ScheduleTask{}, "day_off": h.myDayOff(c, today)})
 			return
 		}
-		schedule = models.DailySchedule{Date: todayStart, Generated: false, OrganizationID: h.orgID(c)}
-		if createErr := h.db.Create(&schedule).Error; createErr != nil {
+		var createErr error
+		if schedule, createErr = models.EnsureDailySchedule(h.db, h.orgID(c), todayStart, false); createErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": createErr.Error()})
 			return
 		}
@@ -205,8 +207,8 @@ func (h *HelperHandler) GetScheduleByDate(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"message": "No schedule for this date", "tasks": []models.ScheduleTask{}, "day_off": h.myDayOff(c, date)})
 			return
 		}
-		schedule = models.DailySchedule{Date: date, Generated: false, OrganizationID: h.orgID(c)}
-		if createErr := h.db.Create(&schedule).Error; createErr != nil {
+		var createErr error
+		if schedule, createErr = models.EnsureDailySchedule(h.db, h.orgID(c), date, false); createErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": createErr.Error()})
 			return
 		}
@@ -239,12 +241,10 @@ func (h *HelperHandler) GetUpcomingSchedules(c *gin.Context) {
 		if parsed, err := time.Parse("2006-01-02", startDateParam); err == nil {
 			startDate = time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, time.UTC)
 		} else {
-			today := time.Now()
-			startDate = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
+			startDate = clock.OrgToday(h.db, h.orgID(c))
 		}
 	} else {
-		today := time.Now()
-		startDate = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
+		startDate = clock.OrgToday(h.db, h.orgID(c))
 	}
 
 	endDate := startDate.AddDate(0, 0, days)
@@ -404,8 +404,7 @@ func (h *HelperHandler) GetRecipeDetails(c *gin.Context) {
 
 // GetTodayChildcare returns childcare schedule for today
 func (h *HelperHandler) GetTodayChildcare(c *gin.Context) {
-	today := time.Now()
-	todayStart := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
+	todayStart := clock.OrgToday(h.db, h.orgID(c))
 	nextDay := todayStart.AddDate(0, 0, 1)
 
 	var schedules []models.ChildcareSchedule
@@ -431,8 +430,7 @@ func (h *HelperHandler) SaveTodayChildcare(c *gin.Context) {
 		return
 	}
 
-	today := time.Now()
-	todayStart := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
+	todayStart := clock.OrgToday(h.db, h.orgID(c))
 	nextDay := todayStart.AddDate(0, 0, 1)
 
 	// Check if there's already a childcare schedule for today
@@ -475,8 +473,7 @@ func (h *HelperHandler) SaveTodayChildcare(c *gin.Context) {
 
 // DeleteTodayChildcare deletes childcare schedule for today
 func (h *HelperHandler) DeleteTodayChildcare(c *gin.Context) {
-	today := time.Now()
-	todayStart := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
+	todayStart := clock.OrgToday(h.db, h.orgID(c))
 	nextDay := todayStart.AddDate(0, 0, 1)
 
 	// Find and delete childcare schedule for today

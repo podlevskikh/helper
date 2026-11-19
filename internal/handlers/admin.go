@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"podlevskikh/awesomeProject/internal/middleware"
+	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/notify"
 
@@ -422,8 +423,7 @@ func (h *AdminHandler) GetChildcareSchedules(c *gin.Context) {
 	var schedules []models.ChildcareSchedule
 
 	// Normalize to UTC midnight so today's entries are always included
-	now := time.Now().UTC()
-	startDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	startDate := clock.OrgToday(h.db, h.orgID(c))
 	endDate := startDate.AddDate(0, 0, 60)
 
 	if err := h.orgDB(c).Where("date >= ? AND date < ?", startDate, endDate).
@@ -857,13 +857,10 @@ func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
 	}
 
 	// Find or create daily_schedule for this date
-	var schedule models.DailySchedule
-	if err := h.db.Where("date = ? AND organization_id = ?", date, h.orgID(c)).First(&schedule).Error; err != nil {
-		schedule = models.DailySchedule{Date: date, Generated: false, OrganizationID: h.orgID(c)}
-		if err := h.db.Create(&schedule).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create schedule"})
-			return
-		}
+	schedule, err := models.EnsureDailySchedule(h.db, h.orgID(c), date, false)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create schedule"})
+		return
 	}
 
 	task := models.ScheduleTask{

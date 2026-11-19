@@ -139,8 +139,8 @@ func EnsureDay(db *gorm.DB) func(orgID uint, day time.Time) {
 		from, to := day.Add(-12*time.Hour), day.Add(12*time.Hour)
 		var schedule models.DailySchedule
 		if db.Where("organization_id = ? AND date >= ? AND date < ?", orgID, from, to).First(&schedule).Error != nil {
-			schedule = models.DailySchedule{Date: utcDay(day), OrganizationID: orgID}
-			if db.Create(&schedule).Error != nil {
+			var err error
+			if schedule, err = models.EnsureDailySchedule(db, orgID, utcDay(day), false); err != nil {
 				return
 			}
 		}

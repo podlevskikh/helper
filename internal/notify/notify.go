@@ -13,6 +13,7 @@ import (
 	"time"
 	_ "time/tzdata" // часовые пояса домов и в контейнере без системной tzdata
 
+	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
 
 	"gorm.io/gorm"
@@ -192,16 +193,7 @@ const defaultTZ = "Europe/Nicosia"
 
 // OrgLocation — часовой пояс дома.
 func OrgLocation(db *gorm.DB, orgID uint) *time.Location {
-	var org models.Organization
-	name := defaultTZ
-	if db.Select("id", "timezone").First(&org, orgID).Error == nil && org.Timezone != "" {
-		name = org.Timezone
-	}
-	loc, err := time.LoadLocation(name)
-	if err != nil {
-		loc, _ = time.LoadLocation(defaultTZ)
-	}
-	return loc
+	return clock.OrgLocation(db, orgID)
 }
 
 // CalendarDay — календарная дата daily_schedules.date. В базе встречается и полночь UTC,
