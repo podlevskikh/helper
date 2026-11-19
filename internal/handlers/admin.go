@@ -290,8 +290,13 @@ func (h *AdminHandler) UpdateMealTime(c *gin.Context) {
 
 func (h *AdminHandler) DeleteMealTime(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.orgDB(c).Delete(&models.MealTime{}, id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	res := h.orgDB(c).Delete(&models.MealTime{}, id)
+	if res.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": res.Error.Error()})
+		return
+	}
+	if res.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Meal time not found"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Meal time deleted"})
@@ -488,8 +493,13 @@ func (h *AdminHandler) UpdateChildcareSchedule(c *gin.Context) {
 
 func (h *AdminHandler) DeleteChildcareSchedule(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.orgDB(c).Delete(&models.ChildcareSchedule{}, id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	res := h.orgDB(c).Delete(&models.ChildcareSchedule{}, id)
+	if res.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": res.Error.Error()})
+		return
+	}
+	if res.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Childcare schedule not found"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Childcare schedule deleted"})
@@ -512,6 +522,12 @@ func (h *AdminHandler) RegenerateSchedule(c *gin.Context) {
 
 func (h *AdminHandler) GetRecipeComments(c *gin.Context) {
 	recipeID := c.Param("id")
+	var n int64
+	h.orgDB(c).Model(&models.Recipe{}).Where("id = ?", recipeID).Count(&n)
+	if n == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
+		return
+	}
 	var comments []models.RecipeComment
 	if err := h.orgDB(c).Where("recipe_id = ?", recipeID).Order("created_at DESC").Find(&comments).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

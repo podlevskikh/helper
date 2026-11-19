@@ -231,3 +231,35 @@ func dbName(url string) string {
 	}
 	return s
 }
+
+// DEL-05: после удаления владельца в базе не остаётся данных его дома — ни в одной таблице с organization_id.
+func TestDeleteOwnerLeavesNoOrgData(t *testing.T) {
+	e := newEnv(t, 1000)
+	o := e.owner("del5")
+	h := e.member(o, "helper", "del5")
+	today := time.Now().UTC().Format("2006-01-02")
+	e.expect("задача", e.do(req{method: "POST", path: "/admin/api/custom-tasks", token: o.Token, org: o.Org, body: map[string]any{"date": today, "title": "x"}}), 201)
+	e.expect("зона", e.do(req{method: "POST", path: "/admin/api/zones", token: o.Token, org: o.Org, body: map[string]any{"name": "кухня", "frequency_per_week": 3}}), 201)
+	e.expect("список", e.do(req{method: "POST", path: "/helper/api/shopping-lists", token: h.Token, org: o.Org, body: map[string]any{}}), 201)
+	e.expect("пуш", e.do(req{method: "POST", path: "/me/devices", token: o.Token, body: map[string]string{"token": "ExponentPushToken[" + uniq() + "]", "platform": "ios"}}), 200)
+	e.expect("удаление владельца", e.do(req{method: "DELETE", path: "/auth/me", token: o.Token, body: map[string]string{"password": o.Password}}), 204)
+
+	var tables []string
+	e.db.Raw(`SELECT table_name FROM information_schema.columns
+		WHERE table_schema = current_schema() AND column_name = 'organization_id'`).Scan(&tables)
+	if len(tables) < 10 {
+		t.Fatalf("таблиц с organization_id: %d — подозрительно мало", len(tables))
+	}
+	for _, tbl := range tables {
+		var n int64
+		e.db.Raw("SELECT count(*) FROM "+tbl+" WHERE organization_id = ?", o.Org).Scan(&n)
+		if n != 0 {
+			t.Errorf("после удаления дома в %s осталось строк: %d", tbl, n)
+		}
+	}
+	var devices int64
+	e.db.Raw("SELECT count(*) FROM push_devices WHERE user_id = ?", o.UserID).Scan(&devices)
+	if devices != 0 {
+		t.Errorf("остались пуш-устройства владельца: %d", devices)
+	}
+}

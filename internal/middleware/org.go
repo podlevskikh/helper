@@ -27,6 +27,12 @@ func OrgContext(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// /orgs/:orgId/… — дом в адресе должен совпадать с X-Org-Id, иначе непонятно, к чьим данным запрос.
+		if p := c.Param("orgId"); p != "" && p != strconv.FormatUint(orgID, 10) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "orgId in path does not match X-Org-Id"})
+			return
+		}
+
 		userID, exists := c.Get(ContextKeyUserID)
 		if !exists {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
