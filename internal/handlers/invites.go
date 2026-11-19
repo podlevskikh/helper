@@ -3,9 +3,9 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"net/http"
+	netmail "net/mail"
 	"os"
 	"strings"
 	"time"
@@ -143,29 +143,60 @@ func (h *InviteHandler) GetInvite(c *gin.Context) {
 // --- POST /invites/:token/accept ---
 
 type acceptInviteRequest struct {
-	Name     string `json:"name"     binding:"required"`
-	Password string `json:"password" binding:"required,min=8"`
+	Name     string `json:"name"`
+	Email    string `json:"email"` // нужен, если в приглашении email не указан
+	Password string `json:"password"`
 	Locale   string `json:"locale"`
 }
 
-var errAccountExists = errors.New("account exists")
+// inviteError — ответ с машинным кодом: экран приглашения показывает по нему понятный текст.
+func inviteError(c *gin.Context, status int, code, msg string) {
+	c.JSON(status, gin.H{"error": msg, "code": code})
+}
 
 func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 	token := c.Param("token")
 
 	var req acceptInviteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		inviteError(c, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	if req.Name == "" {
+		inviteError(c, http.StatusBadRequest, "name_required", "name is required")
+		return
+	}
+	if len([]rune(req.Password)) < 8 {
+		inviteError(c, http.StatusBadRequest, "password_too_short", "password must be at least 8 characters")
 		return
 	}
 
 	var invite models.Invite
 	if err := h.db.Where("token = ?", token).First(&invite).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "invite not found"})
+		inviteError(c, http.StatusNotFound, "invite_not_found", "invite not found")
 		return
 	}
 	if invite.Status != models.InvitePending || time.Now().After(invite.ExpiresAt) {
-		c.JSON(http.StatusGone, gin.H{"error": "invite expired or already used"})
+		inviteError(c, http.StatusGone, "invite_used", "invite expired or already used")
+		return
+	}
+
+	// Email для входа: из приглашения, а если там пусто — тот, что ввёл сам приглашённый.
+	email := invite.Email
+	if email == "" {
+		email = strings.ToLower(strings.TrimSpace(req.Email))
+		if _, err := netmail.ParseAddress(email); err != nil || !strings.Contains(email, "@") || strings.ContainsAny(email, " <>") {
+			inviteError(c, http.StatusBadRequest, "email_invalid", "a valid email is required")
+			return
+		}
+	}
+
+	// Уже есть аккаунт с этим email — присоединяем только с его паролем, чужой пароль не перезаписываем.
+	var user models.User
+	existing := h.db.Where("LOWER(email) = ?", email).First(&user).Error == nil
+	if existing && auth.CheckPassword(req.Password, user.PasswordHash) != nil {
+		inviteError(c, http.StatusConflict, "account_exists", "this email is already registered; use its password")
 		return
 	}
 
@@ -175,32 +206,19 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 		return
 	}
 
-	var user models.User
 	err = h.db.Transaction(func(tx *gorm.DB) error {
-		// Ищем существующего пользователя по email инвайта (или создаём нового)
-		email := invite.Email
-		if email == "" {
-			// инвайт без email — новый пользователь
-			email = req.Name + "@invite.local" // заглушка, пользователь сможет изменить позже
-		}
-		if txErr := tx.Where("email = ?", email).First(&user).Error; txErr != nil {
-			// Создаём нового
+		if !existing {
 			user = models.User{
 				Email:        email,
 				PasswordHash: hash,
-				Name:         strings.TrimSpace(req.Name),
+				Name:         req.Name,
 				Locale:       pickLocale(req.Locale),
 			}
-			if txErr = tx.Create(&user).Error; txErr != nil {
+			if txErr := tx.Create(&user).Error; txErr != nil {
 				return txErr
 			}
-		} else {
-			// Аккаунт с этим адресом уже есть (например, работает в другом доме).
-			// Пароль не перезаписываем — иначе ссылка-приглашение позволяла бы угнать чужой аккаунт:
-			// нужно ввести пароль от этого аккаунта.
-			if auth.CheckPassword(req.Password, user.PasswordHash) != nil {
-				return errAccountExists
-			}
+		} else if strings.TrimSpace(user.Name) == "" {
+			tx.Model(&user).Update("name", req.Name)
 		}
 
 		// Проверяем, нет ли уже членства в этой орге
@@ -227,10 +245,6 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 		// Помечаем инвайт как принятый
 		return tx.Model(&invite).Update("status", models.InviteAccepted).Error
 	})
-	if errors.Is(err, errAccountExists) {
-		c.JSON(http.StatusConflict, gin.H{"error": "account exists", "code": "account_exists"})
-		return
-	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to accept invite"})
 		return
