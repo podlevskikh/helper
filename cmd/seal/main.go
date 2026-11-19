@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	server := flag.String("server", "https://helper-production-12b0.up.railway.app", "адрес сервера")
+	server := flag.String("server", "https://www.helperday.app", "адрес сервера")
 	out := flag.String("out", "secrets.sealed.json", "файл с запечатанными значениями")
 	flag.Parse()
 

@@ -22,7 +22,7 @@ func TestLinksIgnoreHostHeader(t *testing.T) {
 		body:    map[string]string{"email": "x-" + uniq() + "@test.local", "role": "helper"},
 		headers: map[string]string{"Host": "evil.attacker.example", "X-Forwarded-Proto": "https", "X-Forwarded-Host": "evil.attacker.example"}})
 	e.expect("приглашение", w, 201)
-	if u, _ := e.json(w)["invite_url"].(string); !strings.HasPrefix(u, "https://helper-production-12b0.up.railway.app/app/invite?token=") {
+	if u, _ := e.json(w)["invite_url"].(string); !strings.HasPrefix(u, "https://www.helperday.app/app/invite?token=") {
 		t.Errorf("ссылка из чужого Host: %s", u)
 	}
 	w = e.do(req{method: "POST", path: fmt.Sprintf("/orgs/%d/invites", o.Org), token: o.Token, org: o.Org,

@@ -6,7 +6,7 @@
 # Проверка после выкатки: в логе Railway строка «sentry: включён (окружение production)».
 set -euo pipefail
 cd "$(dirname "$0")/.."
-SERVER="${1:-https://helper-production-12b0.up.railway.app}"
+SERVER="${1:-https://www.helperday.app}"
 read -r -s -p "SENTRY_DSN (https://…@…ingest.sentry.io/…, ввод скрыт): " SENTRY_DSN
 echo
 case "$SENTRY_DSN" in https://*@*) ;; *) echo "Это не похоже на DSN Sentry" >&2; exit 1 ;; esac

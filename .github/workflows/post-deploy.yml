@@ -13,7 +13,9 @@ concurrency:
   group: post-deploy
   cancel-in-progress: true
 env:
-  PROD_URL: https://helper-production-12b0.up.railway.app
+  PROD_URL: https://www.helperday.app
+  # Старый адрес Railway тоже работает (на него ведут старые ссылки и сборки приложения).
+  RAILWAY_URL: https://helper-production-12b0.up.railway.app
 jobs:
   smoke:
     runs-on: ubuntu-latest
@@ -25,7 +27,10 @@ jobs:
           python-version: "3.12"
       - name: Смоук прода (ждёт коммит в /version)
         id: smoke
-        run: python3 scripts/smoke.py "$PROD_URL" --expect-sha "$GITHUB_SHA" --quiet | tee smoke.txt
+        run: |
+          set -o pipefail
+          python3 scripts/smoke.py "$PROD_URL" --expect-sha "$GITHUB_SHA" --quiet | tee smoke.txt
+          python3 scripts/smoke.py "$RAILWAY_URL" --expect-sha "$GITHUB_SHA" --quiet | tee -a smoke.txt
       - name: Issue при провале
         if: failure()
         env:

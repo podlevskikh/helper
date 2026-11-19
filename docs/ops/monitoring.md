@@ -13,7 +13,7 @@
 2. **+ New monitor**:
    - Monitor type: **HTTP(s)**;
    - Friendly name: `Helper прод`;
-   - URL: `https://helper-production-12b0.up.railway.app/healthz`;
+   - URL: `https://www.helperday.app/healthz`;
    - Monitoring interval: **5 minutes**.
 3. Ниже **Advanced settings → Keyword** (если доступно): тип *Keyword exists*, слово `ok` — так монитор поймёт и случай «страница открылась, но база недоступна» (тогда ответ 503 `db_unavailable`).
 4. **Integrations & Team** → включить уведомления на почту и поставить мобильное приложение UptimeRobot (пуш на телефон).

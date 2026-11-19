@@ -43,7 +43,7 @@ func generateInviteToken() (string, error) {
 
 // DefaultPublicAppURL — адрес веб-версии на проде, если ничего не задано.
 // Когда подключим свой домен — PUBLIC_APP_URL=https://helperday.app/app (переменная или запечатанный секрет).
-const DefaultPublicAppURL = "https://helper-production-12b0.up.railway.app/app"
+const DefaultPublicAppURL = "https://www.helperday.app/app"
 
 // webOrigin — куда ведут ссылки в письмах и приглашениях.
 // Только из доверенных источников: WEB_ORIGIN (первый адрес), PUBLIC_APP_URL, константа прода.
