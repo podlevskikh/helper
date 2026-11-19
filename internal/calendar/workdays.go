@@ -1,6 +1,7 @@
 package calendar
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -233,4 +234,58 @@ func CountVacationDays(db *gorm.DB, p *Person, start, end time.Time) int {
 		}
 	}
 	return n
+}
+
+// OrgWorkdays — дни недели (ISO 1..7), в которые работает хотя бы один сотрудник дома (не владелец).
+// По ним раскладывается уборка: зона не должна попадать на общий выходной.
+// Если сотрудников нет — Пн–Сб.
+func OrgWorkdays(db *gorm.DB, orgID uint) []int {
+	var ms []models.Membership
+	db.Where("organization_id = ? AND status = ? AND role <> ?", orgID, models.MembershipActive, models.RoleOwner).Find(&ms)
+	if len(ms) == 0 {
+		return []int{1, 2, 3, 4, 5, 6}
+	}
+	works := map[int]bool{}
+	for _, m := range ms {
+		off := ParseDaysOff(m.DaysOff)
+		for d := 1; d <= 7; d++ {
+			if !off[d] {
+				works[d] = true
+			}
+		}
+	}
+	var out []int
+	for d := 1; d <= 7; d++ {
+		if works[d] {
+			out = append(out, d)
+		}
+	}
+	if len(out) == 0 {
+		return []int{1, 2, 3, 4, 5, 6}
+	}
+	return out
+}
+
+// CleaningDays — в какие дни недели (ISO) убирается зона: frequency раз в неделю, равномерно
+// по рабочим дням дома; сдвиг по id зоны, чтобы зоны не собирались в один день.
+func CleaningDays(frequency int, zoneID uint, workdays []int) []int {
+	n := len(workdays)
+	if frequency <= 0 || n == 0 {
+		return []int{}
+	}
+	if frequency >= n {
+		return append([]int{}, workdays...)
+	}
+	start := int(zoneID) % n
+	seen := map[int]bool{}
+	var out []int
+	for i := 0; i < frequency; i++ {
+		d := workdays[(start+i*n/frequency)%n]
+		if !seen[d] {
+			seen[d] = true
+			out = append(out, d)
+		}
+	}
+	sort.Ints(out)
+	return out
 }

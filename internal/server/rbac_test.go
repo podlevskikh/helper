@@ -47,6 +47,8 @@ var routePolicy = map[string]policy{
 	"POST /me/devices": authOnly(), "DELETE /me/devices/:token": authOnly(),
 	// дом
 	"POST /orgs/:orgId/invites": org(team), "GET /orgs/:orgId/members": org(team),
+	"GET /orgs/:orgId/invites": org(team), "DELETE /orgs/:orgId/invites/:id": org(team),
+	"POST /auth/password/reset/check": pub(),
 	"GET /orgs/:orgId/calendar":                          org(all),
 	"GET /orgs/:orgId/members/:userId/schedule-settings": org(team), "PATCH /orgs/:orgId/members/:userId/schedule-settings": org(team),
 	"GET /orgs/:orgId/members/:userId/day-overrides": org(team), "POST /orgs/:orgId/members/:userId/day-overrides": org(team),

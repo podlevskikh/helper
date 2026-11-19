@@ -111,3 +111,21 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	memberships, _ := h.loadMemberships(user.ID)
 	c.JSON(http.StatusOK, authResponse{Access: access, Refresh: refresh, User: &user, Memberships: memberships})
 }
+
+// CheckResetToken — POST /auth/password/reset/check {token}: действует ли ссылка (до ввода нового пароля).
+func (h *AuthHandler) CheckResetToken(c *gin.Context) {
+	var req struct {
+		Token string `json:"token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var reset models.PasswordReset
+	if err := h.db.Where("token_hash = ?", auth.HashToken(strings.TrimSpace(req.Token))).First(&reset).Error; err != nil ||
+		reset.UsedAt != nil || time.Now().After(reset.ExpiresAt) {
+		c.JSON(http.StatusGone, gin.H{"error": "link expired or already used"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}

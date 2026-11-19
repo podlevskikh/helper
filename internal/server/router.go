@@ -68,6 +68,15 @@ func NewRouter(d Deps) *gin.Engine {
 			log.Printf("Warning: schedule for org %d: %v", orgID, err)
 		}
 	}
+	refreshCleaning := func(orgID uint) {
+		if sched == nil {
+			return
+		}
+		if err := sched.RefreshCleaning(orgID, 7); err != nil {
+			log.Printf("Warning: refresh cleaning for org %d: %v", orgID, err)
+		}
+	}
+	adminHandler.RefreshCleaning = refreshCleaning
 	helperHandler := handlers.NewHelperHandler(db)
 	authHandler := handlers.NewAuthHandler(db)
 	inviteHandler := handlers.NewInviteHandler(db)
@@ -78,6 +87,7 @@ func NewRouter(d Deps) *gin.Engine {
 			log.Printf("Warning: schedule for %s: %v", date.Format("2006-01-02"), err)
 		}
 	}
+	staffCalHandler.RefreshCleaning = refreshCleaning
 	notificationsHandler := handlers.NewNotificationsHandler(db)
 
 	// Auth routes
@@ -106,6 +116,7 @@ func NewRouter(d Deps) *gin.Engine {
 		authGroup.POST("/password", authMw, loginLimit, authHandler.ChangePassword)
 		authGroup.POST("/password/forgot", forgotLimit, authHandler.ForgotPassword)
 		authGroup.POST("/password/reset", loginLimit, authHandler.ResetPassword)
+		authGroup.POST("/password/reset/check", loginLimit, authHandler.CheckResetToken)
 	}
 
 	// Устройства для пушей (без контекста дома: токен — на пользователя)
@@ -129,6 +140,8 @@ func NewRouter(d Deps) *gin.Engine {
 	{
 		orgsGroup.POST("/:orgId/invites", middleware.Require(middleware.CapManageTeam), inviteHandler.CreateInvite)
 		orgsGroup.GET("/:orgId/members", middleware.Require(middleware.CapManageTeam), orgHandler.GetMembers)
+		orgsGroup.GET("/:orgId/invites", middleware.Require(middleware.CapManageTeam), inviteHandler.ListInvites)
+		orgsGroup.DELETE("/:orgId/invites/:id", middleware.Require(middleware.CapManageTeam), inviteHandler.RevokeInvite)
 
 		// Выходные и праздники сотрудников
 		manageTeam := middleware.Require(middleware.CapManageTeam)

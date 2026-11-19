@@ -21,6 +21,8 @@ type StaffCalendarHandler struct {
 	db *gorm.DB
 	// EnsureSchedule собирает расписание дня, если его ещё нет (день стал рабочим по договорённости).
 	EnsureSchedule func(date time.Time)
+	// RefreshCleaning пересобирает уборку ближайших дней (сменились выходные сотрудника).
+	RefreshCleaning func(orgID uint)
 }
 
 func NewStaffCalendarHandler(db *gorm.DB) *StaffCalendarHandler {
@@ -153,6 +155,9 @@ func (h *StaffCalendarHandler) UpdateSettings(c *gin.Context) {
 	h.db.First(m, m.ID)
 	if code, ok := upd["holiday_country"].(string); ok {
 		calendar.EnsureFresh(h.db, code)
+	}
+	if h.RefreshCleaning != nil {
+		h.RefreshCleaning(m.OrganizationID)
 	}
 	c.JSON(http.StatusOK, h.settingsView(*m))
 }

@@ -158,6 +158,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		}
 		// Системные категории задач — сразу, а не после перезапуска сервера
 		database.EnsureDefaultCategories(tx, org.ID)
+		if err := database.EnsureDefaultMealTimes(tx, org.ID); err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {

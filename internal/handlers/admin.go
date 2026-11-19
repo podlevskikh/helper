@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"podlevskikh/awesomeProject/internal/middleware"
+	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/notify"
@@ -20,6 +21,8 @@ type AdminHandler struct {
 	db *gorm.DB
 	// FillDays дособирает ближайшие дни дома (новая зона уборки сразу попадает в расписание).
 	FillDays func(orgID uint)
+	// RefreshCleaning пересобирает уборку ближайших дней (зону изменили или удалили).
+	RefreshCleaning func(orgID uint)
 }
 
 func NewAdminHandler(db *gorm.DB) *AdminHandler {
@@ -310,7 +313,19 @@ func (h *AdminHandler) GetCleaningZones(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, zones)
+	// days — в какие дни недели (ISO 1..7) зона попадёт в расписание; workdays — рабочие дни дома.
+	// Фронт показывает их как есть, а не считает сам.
+	workdays := calendar.OrgWorkdays(h.db, h.orgID(c))
+	type zoneView struct {
+		models.CleaningZone
+		Days     []int `json:"days"`
+		Workdays []int `json:"workdays"`
+	}
+	out := make([]zoneView, len(zones))
+	for i, z := range zones {
+		out[i] = zoneView{z, calendar.CleaningDays(z.FrequencyPerWeek, z.ID, workdays), workdays}
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 func (h *AdminHandler) GetCleaningZone(c *gin.Context) {
@@ -395,6 +410,9 @@ func (h *AdminHandler) UpdateCleaningZone(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	if h.RefreshCleaning != nil {
+		h.RefreshCleaning(zone.OrganizationID)
+	}
 	c.JSON(http.StatusOK, zone)
 }
 
@@ -418,6 +436,9 @@ func (h *AdminHandler) DeleteCleaningZone(c *gin.Context) {
 	if err := h.db.Delete(&models.CleaningZone{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if h.RefreshCleaning != nil {
+		h.RefreshCleaning(h.orgID(c))
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Cleaning zone deleted"})
 }
@@ -604,6 +625,8 @@ func (h *AdminHandler) UpdateTask(c *gin.Context) {
 		TaskCategoryID     *uint  `json:"task_category_id"`
 		AssignedToUserID   *uint  `json:"assigned_to_user_id"`
 		Priority           *string `json:"priority"`
+		// Date — перенести разовую задачу на другой день (YYYY-MM-DD).
+		Date *string `json:"date"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -612,6 +635,23 @@ func (h *AdminHandler) UpdateTask(c *gin.Context) {
 
 	if !checkTaskRefs(c, h.db, h.orgID(c), input.TaskCategoryID, input.AssignedToUserID) {
 		return
+	}
+	if input.Date != nil && *input.Date != "" {
+		if task.TaskType != "custom" || task.RecurringTaskID != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "only one-off tasks can be moved", "code": "not_movable"})
+			return
+		}
+		d, err := time.Parse("2006-01-02", *input.Date)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date, use YYYY-MM-DD"})
+			return
+		}
+		day, err := models.EnsureDailySchedule(h.db, h.orgID(c), clock.Day(d), false)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create schedule"})
+			return
+		}
+		task.ScheduleID = day.ID
 	}
 	before := task
 	if input.Priority != nil {

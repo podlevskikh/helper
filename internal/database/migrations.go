@@ -44,6 +44,18 @@ func dataMigrations(st migrationsState) []dataMigration {
 			return tx.Exec("UPDATE task_categories SET priority = 'high' WHERE is_default = true AND name = ?", "Уход за ребёнком").Error
 		}},
 		{id: "2026-11-daily-schedules-unique-day", run: dedupeDailySchedules},
+		// Дома, зарегистрированные без приёмов пищи, получают завтрак, обед и ужин (иначе меню пустое).
+		{id: "2026-11-default-meal-times", run: func(tx *gorm.DB) error {
+			var orgIDs []uint
+			tx.Raw(`SELECT o.id FROM organizations o WHERE NOT EXISTS
+				(SELECT 1 FROM meal_times m WHERE m.organization_id = o.id)`).Scan(&orgIDs)
+			for _, id := range orgIDs {
+				if err := EnsureDefaultMealTimes(tx, id); err != nil {
+					return err
+				}
+			}
+			return nil
+		}},
 	}
 }
 

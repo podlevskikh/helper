@@ -283,3 +283,32 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 		Memberships: memberships,
 	})
 }
+
+// ListInvites — GET /orgs/:orgId/invites: отправленные, но ещё не принятые приглашения дома
+// (чтобы наниматель видел, кого ждёт, и мог переслать ссылку или отозвать).
+func (h *InviteHandler) ListInvites(c *gin.Context) {
+	orgID := middleware.MustMembership(c).OrganizationID
+	var invites []models.Invite
+	h.db.Where("organization_id = ? AND status = ? AND expires_at > ?", orgID, models.InvitePending, time.Now()).
+		Order("created_at DESC").Find(&invites)
+	out := make([]gin.H, 0, len(invites))
+	for _, inv := range invites {
+		out = append(out, gin.H{
+			"id": inv.ID, "email": inv.Email, "role": inv.Role, "expires_at": inv.ExpiresAt, "created_at": inv.CreatedAt,
+			"invite_url": fmt.Sprintf("%s/invite?token=%s", webOrigin(c), inv.Token),
+		})
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+// RevokeInvite — DELETE /orgs/:orgId/invites/:id: ссылка перестаёт работать.
+func (h *InviteHandler) RevokeInvite(c *gin.Context) {
+	orgID := middleware.MustMembership(c).OrganizationID
+	res := h.db.Model(&models.Invite{}).Where("id = ? AND organization_id = ? AND status = ?", c.Param("id"), orgID, models.InvitePending).
+		Update("status", models.InviteRevoked)
+	if res.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "invite not found"})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}

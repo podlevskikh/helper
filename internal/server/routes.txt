@@ -12,6 +12,7 @@ DELETE /helper/api/childcare/today
 DELETE /helper/api/shopping-lists/:id
 DELETE /helper/api/shopping-lists/:id/items/:itemId
 DELETE /me/devices/:token
+DELETE /orgs/:orgId/invites/:id
 DELETE /orgs/:orgId/members/:userId/day-overrides/:id
 DELETE /orgs/:orgId/task-categories/:id
 GET /
@@ -44,6 +45,7 @@ GET /helper/api/shopping-lists/suggestions
 GET /helper2/
 GET /invites/:token
 GET /orgs/:orgId/calendar
+GET /orgs/:orgId/invites
 GET /orgs/:orgId/members
 GET /orgs/:orgId/members/:userId/day-overrides
 GET /orgs/:orgId/members/:userId/schedule-settings
@@ -75,6 +77,7 @@ POST /auth/logout
 POST /auth/password
 POST /auth/password/forgot
 POST /auth/password/reset
+POST /auth/password/reset/check
 POST /auth/refresh
 POST /auth/register
 POST /helper/api/childcare/today

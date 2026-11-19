@@ -403,3 +403,24 @@ func warnDefaultOwnerPassword() {
 		log.Println("⚠️  SECURITY: у owner@example.com пароль по умолчанию из публичного кода — смените его в профиле!")
 	}
 }
+
+// EnsureDefaultMealTimes — завтрак, обед и ужин у нового дома: без приёмов пищи рецепты не попадают в меню.
+// Наниматель потом меняет время, выключает или добавляет свои («Регулярное → Еда»).
+func EnsureDefaultMealTimes(db *gorm.DB, orgID uint) error {
+	var n int64
+	db.Model(&models.MealTime{}).Where("organization_id = ?", orgID).Count(&n)
+	if n > 0 {
+		return nil
+	}
+	for _, m := range []models.MealTime{
+		{OrganizationID: orgID, Name: "breakfast", DefaultTime: "08:30", FamilyMember: "all", Active: true},
+		{OrganizationID: orgID, Name: "lunch", DefaultTime: "13:00", FamilyMember: "all", Active: true},
+		{OrganizationID: orgID, Name: "dinner", DefaultTime: "18:30", FamilyMember: "all", Active: true},
+	} {
+		m := m
+		if err := db.Create(&m).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}

@@ -308,6 +308,13 @@ func (s *Scheduler) generateCleaningTasks(schedule *models.DailySchedule, date t
 			break
 		}
 
+		// Уже есть в этом дне (например, выполнена до пересборки) — второй раз не ставим.
+		var exists int64
+		s.db.Model(&models.ScheduleTask{}).Where("schedule_id = ? AND zone_id = ?", schedule.ID, zone.ID).Count(&exists)
+		if exists > 0 {
+			zonesAddedToday++
+			continue
+		}
 		// Determine if this zone should be cleaned today based on frequency
 		if s.shouldCleanZoneToday(zone, dayOfWeek, date) {
 			task := models.ScheduleTask{
@@ -333,47 +340,49 @@ func (s *Scheduler) generateCleaningTasks(schedule *models.DailySchedule, date t
 	return nil
 }
 
-// shouldCleanZoneToday determines if a zone should be cleaned on this day
-func (s *Scheduler) shouldCleanZoneToday(zone models.CleaningZone, dayOfWeek int, date time.Time) bool {
-	// Simple distribution algorithm: spread cleanings across the week
-	// For frequency_per_week = 1: clean on specific day based on zone ID
-	// For frequency_per_week = 2: clean on 2 specific days
-	// etc.
-
-	if zone.FrequencyPerWeek >= 7 {
-		return true // clean every day
-	}
-
-	// Use zone ID to determine which days to clean
-	// This ensures consistent scheduling
-	daysToClean := s.calculateCleaningDays(zone.FrequencyPerWeek, int(zone.ID))
-
-	for _, day := range daysToClean {
-		if dayOfWeek == day {
+// shouldCleanZoneToday: зона убирается в свои дни недели — по рабочим дням дома (calendar.CleaningDays).
+func (s *Scheduler) shouldCleanZoneToday(zone models.CleaningZone, _ int, date time.Time) bool {
+	iso := calendar.ISOWeekday(date)
+	for _, d := range calendar.CleaningDays(zone.FrequencyPerWeek, zone.ID, calendar.OrgWorkdays(s.db, zone.OrganizationID)) {
+		if d == iso {
 			return true
 		}
 	}
-
 	return false
 }
 
-// calculateCleaningDays returns which days of the week to clean based on frequency
-func (s *Scheduler) calculateCleaningDays(frequency, zoneID int) []int {
-	if frequency <= 0 {
-		return []int{}
+// RefreshCleaning пересобирает уборку в ближайших днях дома (после смены выходных или зон):
+// невыполненные задачи уборки удаляются и создаются заново по текущим правилам. Выполненные остаются.
+func (s *Scheduler) RefreshCleaning(orgID uint, days int) error {
+	today := clock.OrgToday(s.db, orgID)
+	for i := 0; i < days; i++ {
+		day := today.AddDate(0, 0, i)
+		var schedule models.DailySchedule
+		if s.db.Where("organization_id = ? AND date = ?", orgID, day).First(&schedule).Error != nil {
+			if err := s.GenerateScheduleForOrgDate(orgID, day); err != nil {
+				return err
+			}
+			continue
+		}
+		err := s.db.Transaction(func(tx *gorm.DB) error {
+			ids := tx.Model(&models.ScheduleTask{}).Select("id").
+				Where("schedule_id = ? AND task_type = 'cleaning' AND completed = false", schedule.ID)
+			if err := tx.Exec("DELETE FROM task_zones WHERE schedule_task_id IN (?)", ids).Error; err != nil {
+				return err
+			}
+			return tx.Where("schedule_id = ? AND task_type = 'cleaning' AND completed = false", schedule.ID).
+				Delete(&models.ScheduleTask{}).Error
+		})
+		if err != nil {
+			return err
+		}
+		if calendar.AnyoneWorks(s.db, orgID, day) {
+			if err := s.generateCleaningTasks(&schedule, day); err != nil {
+				return err
+			}
+		}
 	}
-
-	// Distribute days evenly across the week
-	interval := 7 / frequency
-	startDay := zoneID % 7 // offset based on zone ID for variety
-
-	days := make([]int, 0, frequency)
-	for i := 0; i < frequency; i++ {
-		day := (startDay + (i * interval)) % 7
-		days = append(days, day)
-	}
-
-	return days
+	return nil
 }
 
 // findAvailableTimeSlot finds a suitable time slot for a task
