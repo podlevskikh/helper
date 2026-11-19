@@ -1,6 +1,8 @@
 package database
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -37,7 +39,7 @@ func Initialize(databaseURL string) error {
 	log.Println("Attempting to connect to PostgreSQL database...")
 
 	DB, err = gorm.Open(postgres.Open(databaseURL), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: dbLogger(),
 	})
 
 	if err != nil {
@@ -118,6 +120,7 @@ func runDataMigrations() {
 
 	// M1: seed organisation + owner user if none exist, then backfill organization_id
 	seedOrgAndOwner()
+	warnDefaultOwnerPassword()
 
 	// Владелец дома — у старых домов owner_user_id мог остаться пустым: берём его из членства owner.
 	res := DB.Exec(`UPDATE organizations o SET owner_user_id = m.user_id
@@ -203,9 +206,17 @@ func seedOrgAndOwner() {
 	if ownerEmail == "" {
 		ownerEmail = "owner@example.com"
 	}
+	// Пароль по умолчанию из публичного кода = чужой вход в дом. Без SEED_OWNER_PASSWORD
+	// владельцу ставится случайный пароль (в лог не пишется): войти — через «Забыли пароль?».
 	ownerPassword := os.Getenv("SEED_OWNER_PASSWORD")
 	if ownerPassword == "" {
-		ownerPassword = "changeme123"
+		b := make([]byte, 24)
+		if _, err := rand.Read(b); err != nil {
+			log.Printf("Seed: не удалось создать пароль: %v", err)
+			return
+		}
+		ownerPassword = hex.EncodeToString(b)
+		log.Printf("Seed: SEED_OWNER_PASSWORD не задан — у %s случайный пароль, войти через «Забыли пароль?»", ownerEmail)
 	}
 
 	// 1. Создаём организацию
@@ -371,4 +382,30 @@ func initializeDefaultSettings() {
 // GetDB returns the database instance
 func GetDB() *gorm.DB {
 	return DB
+}
+
+// dbLogger — SQL в лог без значений параметров (там почты, хэши, детские заметки) и только
+// медленные запросы и ошибки. DB_LOG=info — подробный лог для локальной отладки.
+func dbLogger() logger.Interface {
+	level := logger.Warn
+	if os.Getenv("DB_LOG") == "info" {
+		level = logger.Info
+	}
+	return logger.New(log.New(os.Stdout, "", log.LstdFlags), logger.Config{
+		SlowThreshold:             500 * time.Millisecond,
+		LogLevel:                  level,
+		IgnoreRecordNotFoundError: true,
+		ParameterizedQueries:      true,
+	})
+}
+
+// warnDefaultOwnerPassword: громкое предупреждение, если у owner@example.com всё ещё пароль из старого кода.
+func warnDefaultOwnerPassword() {
+	var u models.User
+	if DB.Where("email = ?", "owner@example.com").First(&u).Error != nil {
+		return
+	}
+	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte("changeme123")) == nil {
+		log.Println("⚠️  SECURITY: у owner@example.com пароль по умолчанию из публичного кода — смените его в профиле!")
+	}
 }

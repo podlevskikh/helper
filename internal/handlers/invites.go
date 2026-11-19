@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"net/http"
 	netmail "net/mail"
 	"os"
@@ -39,21 +40,34 @@ func generateInviteToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// webOrigin — куда ведёт ссылка-приглашение.
-// WEB_ORIGIN может содержать несколько адресов через запятую — в ссылку идёт первый.
-// Если не задан — веб-версия, которую раздаёт этот же сервер (/app).
+// DefaultPublicAppURL — адрес веб-версии на проде, если ничего не задано.
+// Когда подключим свой домен — PUBLIC_APP_URL=https://helperday.app/app (переменная или запечатанный секрет).
+const DefaultPublicAppURL = "https://helper-production-12b0.up.railway.app/app"
+
+// webOrigin — куда ведут ссылки в письмах и приглашениях.
+// Только из доверенных источников: WEB_ORIGIN (первый адрес), PUBLIC_APP_URL, константа прода.
+// Заголовки Host / X-Forwarded-* атакующий подставляет сам — по ним строим ссылку только для
+// локального адреса (localhost), чтобы работали локальные проверки.
 func webOrigin(c *gin.Context) string {
-	o := strings.TrimSpace(strings.Split(os.Getenv("WEB_ORIGIN"), ",")[0])
-	if o != "" {
+	if o := strings.TrimSpace(strings.Split(os.Getenv("WEB_ORIGIN"), ",")[0]); o != "" {
 		return strings.TrimRight(o, "/")
 	}
-	scheme := "http"
-	if p := c.GetHeader("X-Forwarded-Proto"); p != "" {
-		scheme = strings.TrimSpace(strings.Split(p, ",")[0])
-	} else if c.Request.TLS != nil {
-		scheme = "https"
+	if u := strings.TrimSpace(os.Getenv("PUBLIC_APP_URL")); u != "" {
+		return strings.TrimRight(u, "/")
 	}
-	return scheme + "://" + c.Request.Host + WebAppPrefix
+	if c != nil && isLocalHost(c.Request.Host) {
+		return "http://" + c.Request.Host + WebAppPrefix
+	}
+	return DefaultPublicAppURL
+}
+
+func isLocalHost(hostport string) bool {
+	h := hostport
+	if host, _, err := net.SplitHostPort(hostport); err == nil {
+		h = host
+	}
+	h = strings.Trim(strings.ToLower(h), "[]")
+	return h == "localhost" || h == "127.0.0.1" || h == "::1" || strings.HasSuffix(h, ".localhost")
 }
 
 // --- POST /orgs/:orgId/invites ---
