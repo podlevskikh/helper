@@ -32,6 +32,7 @@ func NewRouter(d Deps) *gin.Engine {
 		log.Printf("trusted proxies: %v", err)
 	}
 	router.Use(securityHeaders())
+	router.Use(middleware.AppVersion())
 	registerHealth(router, db)
 
 	// CORS — разрешаем web-origin Expo (WEB_ORIGIN env, через запятую; dev: http://localhost:8081).
@@ -48,7 +49,7 @@ func NewRouter(d Deps) *gin.Engine {
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     webOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Org-Id"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Org-Id", "X-App-Version"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
