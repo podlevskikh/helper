@@ -200,7 +200,7 @@ try:
     expect("RECUR-01 повторяющаяся задача", s, 201)
     s, _, _ = call("POST", "/admin/api/recurring-tasks", {"title": "Smoke другой день", "weekdays": [other], "start_date": today}, tokA, orgA)
     expect("RECUR-01 повторяющаяся на другой день", s, 201)
-    s, _, _ = call("POST", "/admin/api/mealtimes", {"name": "lunch", "default_time": "13:00", "family_member": "all"}, tokA, orgA)
+    s, _, _ = call("POST", "/admin/api/mealtimes", {"name": "Smoke перекус", "default_time": "16:00", "family_member": "all"}, tokA, orgA)
     expect("MEAL-02 приём пищи", s, 201)
     s, _, _ = call("POST", "/admin/api/zones", {"name": "Smoke кухня", "frequency_per_week": 7, "priority": "high"}, tokA, orgA)
     expect("ZONE-01 зона уборки", s, 201)
@@ -270,16 +270,23 @@ try:
     expect("SEC-02 чужой дом через X-Org-Id", s, 403)
     s, _, _ = call("GET", f"/orgs/{orgA}/settings", token=tokB, org=orgB)
     expect("SEC-06 чужой дом в адресе", s, 403)
-    # В доме A есть приём пищи и зона — им есть куда «протечь». Дом B — пустой.
+    # В доме A есть свой приём пищи и зона — им есть куда «протечь». У дома B — только приёмы пищи по умолчанию.
     s, _, _ = call("POST", "/admin/api/regenerate-schedule", {}, tokA, orgA)
     expect("SCHED-04 пересборка дней своего дома", s, 200)
     call("POST", "/admin/api/regenerate-schedule", {}, tokB, orgB)
     s, js, _ = call("GET", "/helper/api/schedule/today", token=tokB, org=orgB)
-    titlesB = [t.get("title") for t in (js or {}).get("tasks", [])]
+    tasksB = (js or {}).get("tasks", [])
+    titlesB = [t.get("title") or "" for t in tasksB]
     _, jsA, _ = call("GET", "/helper/api/schedule/today", token=tokA, org=orgA)
-    titlesA = [t.get("title") for t in (jsA or {}).get("tasks", [])]
-    check("SEC-03 в расписании B нет еды и уборки A, у A они есть",
-          s == 200 and not titlesB and any("кухня" in (t or "").lower() for t in titlesA), f"(B={titlesB}, A={titlesA})")
+    tasksA = (jsA or {}).get("tasks", [])
+    titlesA = [t.get("title") or "" for t in tasksA]
+    shared_ids = {t.get("id") for t in tasksA} & {t.get("id") for t in tasksB}
+    check("SEC-03 в расписании B нет задач, еды и уборки A, у A они есть",
+          s == 200 and not shared_ids and not any("smoke" in t.lower() for t in titlesB)
+          and any("кухня" in t.lower() for t in titlesA) and any("перекус" in t.lower() for t in titlesA),
+          f"(B={titlesB}, A={titlesA}, общие id={shared_ids})")
+    s, js, _ = call("GET", "/admin/api/mealtimes", token=tokB, org=orgB)
+    check("MEAL-01 у нового дома завтрак, обед и ужин", s == 200 and len(js or []) == 3, f"({s} {js})")
 
     section("Пароль")
     mark = log_len()
