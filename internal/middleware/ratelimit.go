@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,20 +35,46 @@ type RateLimitOptions struct {
 	OnlyFailures bool
 }
 
-// clientKey — адрес клиента. За прокси Railway настоящий адрес — последний в X-Forwarded-For
-// (левые части клиент может подставить сам).
+// clientKey — адрес клиента для лимитов.
+//   - За прокси платформы (Railway: напрямую к контейнеру не подключиться) — последний адрес в
+//     X-Forwarded-For: его дописывает сам прокси, а левые части подставляет кто угодно.
+//   - Если соединение пришло из частной сети (свой reverse proxy) — так же.
+//   - Иначе (прямое подключение, локально) X-Forwarded-For игнорируется: верим только адресу соединения.
 func clientKey(c *gin.Context) string {
-	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		if ip := strings.TrimSpace(parts[len(parts)-1]); ip != "" {
-			return ip
+	peer := c.RemoteIP()
+	if behindPlatformProxy() || isPrivateIP(peer) {
+		if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
+			parts := strings.Split(xff, ",")
+			if ip := strings.TrimSpace(parts[len(parts)-1]); net.ParseIP(ip) != nil {
+				return ip
+			}
 		}
 	}
-	return c.RemoteIP()
+	return peer
+}
+
+// behindPlatformProxy — сервер работает за прокси платформы (Railway задаёт свои переменные) или TRUST_PROXY=1.
+func behindPlatformProxy() bool {
+	return os.Getenv("TRUST_PROXY") == "1" || os.Getenv("RAILWAY_ENVIRONMENT_ID") != "" ||
+		os.Getenv("RAILWAY_PROJECT_ID") != "" || os.Getenv("RAILWAY_ENVIRONMENT") != ""
+}
+
+func isPrivateIP(s string) bool {
+	ip := net.ParseIP(s)
+	return ip != nil && !ip.IsLoopback() && ip.IsPrivate()
+}
+
+// rateLimitScale — множитель лимитов только для локальных прогонов смоука и тестов
+// (RATE_LIMIT_SCALE=100). На проде переменная не задаётся.
+func rateLimitScale() int {
+	if n, err := strconv.Atoi(os.Getenv("RATE_LIMIT_SCALE")); err == nil && n > 1 {
+		return n
+	}
+	return 1
 }
 
 func RateLimit(opt RateLimitOptions) gin.HandlerFunc {
-	l := &limiter{max: opt.Max, per: opt.Per, buckets: map[string]*window{}}
+	l := &limiter{max: opt.Max * rateLimitScale(), per: opt.Per, buckets: map[string]*window{}}
 	go func() { // старые записи — не копим
 		for range time.Tick(opt.Per) {
 			l.mu.Lock()

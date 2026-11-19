@@ -27,6 +27,11 @@ func NewRouter(d Deps) *gin.Engine {
 	db, sched := d.DB, d.Sched
 	// Initialize Gin router
 	router := gin.Default()
+	// gin.ClientIP не используем для лимитов (см. middleware.clientKey): не доверяем X-Forwarded-For по умолчанию.
+	if err := router.SetTrustedProxies(nil); err != nil {
+		log.Printf("trusted proxies: %v", err)
+	}
+	router.Use(securityHeaders())
 
 	// CORS — разрешаем web-origin Expo (WEB_ORIGIN env, через запятую; dev: http://localhost:8081).
 	// Первый адрес используется в ссылках-приглашениях.
@@ -74,6 +79,11 @@ func NewRouter(d Deps) *gin.Engine {
 	notificationsHandler := handlers.NewNotificationsHandler(db)
 
 	// Auth routes
+	middleware.TokenVersionLookup = func(userID uint) (int, bool) {
+		var v int
+		res := db.Raw("SELECT token_version FROM users WHERE id = ?", userID).Scan(&v)
+		return v, res.Error == nil && res.RowsAffected > 0
+	}
 	authMw := middleware.Auth()
 	orgMw := middleware.OrgContext(db)
 
@@ -140,7 +150,7 @@ func NewRouter(d Deps) *gin.Engine {
 		// Уведомления: свои настройки в этом доме
 		orgsGroup.GET("/:orgId/notification-prefs", notificationsHandler.GetPrefs)
 		orgsGroup.PUT("/:orgId/notification-prefs", notificationsHandler.UpdatePrefs)
-		orgsGroup.POST("/:orgId/notification-prefs/test", notificationsHandler.SendTest)
+		orgsGroup.POST("/:orgId/notification-prefs/test", middleware.RateLimit(middleware.RateLimitOptions{Max: 5, Per: 10 * time.Minute}), notificationsHandler.SendTest)
 	}
 
 	// Веб-версия приложения (Expo) — по адресу /app. Старые интерфейсы /admin2 и /helper2
@@ -176,12 +186,12 @@ func NewRouter(d Deps) *gin.Engine {
 			api.POST("/recipes", middleware.Require(middleware.CapManageRecipes), adminHandler.CreateRecipe)
 			api.PUT("/recipes/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.UpdateRecipe)
 			api.DELETE("/recipes/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.DeleteRecipe)
-			api.POST("/recipes/upload-image", middleware.Require(middleware.CapManageRecipes), adminHandler.UploadRecipeImage)
+			// Загрузка фото рецептов убрана: рецепты без фото (решение владелицы), а старый обработчик не проверял размер и содержимое.
 
 			// Recipe Comments
 			api.GET("/recipes/:id/comments", adminHandler.GetRecipeComments)
 			api.POST("/recipes/:id/comments", adminHandler.CreateRecipeComment)
-			api.DELETE("/comments/:id", adminHandler.DeleteRecipeComment)
+			api.DELETE("/comments/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.DeleteRecipeComment)
 
 			// Meal times
 			api.GET("/mealtimes", adminHandler.GetMealTimes)
@@ -306,10 +316,7 @@ func NewRouter(d Deps) *gin.Engine {
 			api.POST("/tasks/:id/uncomplete", helperHandler.UncompleteTask)
 
 			// Shopping list
-			api.GET("/shopping", helperHandler.GetShoppingList)
-			api.POST("/shopping", helperHandler.AddShoppingListItem)
-			api.POST("/shopping/:id/purchased", helperHandler.MarkItemPurchased)
-			api.DELETE("/shopping/:id", helperHandler.DeleteShoppingListItem)
+			// Старые /helper/api/shopping* (без списков и без проверки прав) удалены: клиент давно на /shopping-lists.
 
 			// Списки покупок (раздел «Входящие»)
 			viewShop := middleware.Require(middleware.CapViewShopping)
@@ -331,8 +338,8 @@ func NewRouter(d Deps) *gin.Engine {
 
 			// Childcare
 			api.GET("/childcare/today", helperHandler.GetTodayChildcare)
-			api.POST("/childcare/today", helperHandler.SaveTodayChildcare)
-			api.DELETE("/childcare/today", helperHandler.DeleteTodayChildcare)
+			api.POST("/childcare/today", middleware.Require(middleware.CapManageSchedule), helperHandler.SaveTodayChildcare)
+			api.DELETE("/childcare/today", middleware.Require(middleware.CapManageSchedule), helperHandler.DeleteTodayChildcare)
 		}
 	}
 
@@ -346,4 +353,19 @@ func NewRouter(d Deps) *gin.Engine {
 	})
 
 	return router
+}
+
+// securityHeaders — защита от встраивания в чужие сайты (кликджекинг), подмены типа и http.
+func securityHeaders() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		h := c.Writer.Header()
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Content-Security-Policy", "frame-ancestors 'none'")
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+			h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+		c.Next()
+	}
 }

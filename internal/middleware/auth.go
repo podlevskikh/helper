@@ -11,6 +11,10 @@ import (
 
 const ContextKeyUserID = "user_id"
 
+// TokenVersionLookup — текущая версия токенов пользователя (ok=false — пользователя нет).
+// Ставит server.NewRouter; без неё проверка версии пропускается.
+var TokenVersionLookup func(userID uint) (version int, ok bool)
+
 // Auth проверяет Bearer-токен и кладёт user_id (uint) в контекст.
 // Возвращает 401 если токен отсутствует, невалиден или истёк.
 func Auth() gin.HandlerFunc {
@@ -25,6 +29,12 @@ func Auth() gin.HandlerFunc {
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 			return
+		}
+		if TokenVersionLookup != nil {
+			if v, ok := TokenVersionLookup(claims.UserID); !ok || v != claims.TokenVersion {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+				return
+			}
 		}
 		c.Set(ContextKeyUserID, claims.UserID)
 		c.Next()
