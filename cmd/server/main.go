@@ -132,6 +132,7 @@ func main() {
 		authGroup.POST("/logout", authHandler.Logout)
 		authGroup.GET("/me", authMw, authHandler.Me)
 		authGroup.PATCH("/me", authMw, authHandler.UpdateMe)
+		authGroup.DELETE("/me", authMw, authHandler.DeleteMe)
 		authGroup.POST("/password", authMw, authHandler.ChangePassword)
 		authGroup.POST("/password/forgot", authHandler.ForgotPassword)
 		authGroup.POST("/password/reset", authHandler.ResetPassword)
