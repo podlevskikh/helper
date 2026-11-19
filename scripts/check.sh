@@ -4,6 +4,8 @@
 # Свою базу можно передать: TEST_DATABASE_URL=postgres://... ./scripts/check.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# Как на проде: сервер в UTC. REQUIRE_DB=1 — интеграционные тесты падают без базы, а не пропускаются молча.
+export TZ=UTC REQUIRE_DB=1
 PG="${PG_ADMIN_URL:-postgres://helper:helper_password@localhost:5432/helper_db?sslmode=disable}"
 go build ./...
 CGO_ENABLED=0 GOOS=linux go build -o /dev/null ./cmd/server   # как в Dockerfile
