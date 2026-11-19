@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -163,6 +164,9 @@ type acceptInviteRequest struct {
 	Locale   string `json:"locale"`
 }
 
+// errInviteGone — приглашение успели принять или отозвать, пока шёл запрос.
+var errInviteGone = errors.New("invite gone")
+
 // inviteError — ответ с машинным кодом: экран приглашения показывает по нему понятный текст.
 func inviteError(c *gin.Context, status int, code, msg string) {
 	c.JSON(status, gin.H{"error": msg, "code": code})
@@ -221,6 +225,17 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 	}
 
 	err = h.db.Transaction(func(tx *gorm.DB) error {
+		// Приглашение «забираем» одним условным UPDATE: два параллельных принятия или отзыв между
+		// проверкой выше и этой строкой не пройдут.
+		claim := tx.Model(&models.Invite{}).
+			Where("id = ? AND status = ? AND expires_at > ?", invite.ID, models.InvitePending, time.Now()).
+			Update("status", models.InviteAccepted)
+		if claim.Error != nil {
+			return claim.Error
+		}
+		if claim.RowsAffected != 1 {
+			return errInviteGone
+		}
 		if !existing {
 			user = models.User{
 				Email:        email,
@@ -238,11 +253,16 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 		// Проверяем, нет ли уже членства в этой орге
 		var existing models.Membership
 		if tx.Where("user_id = ? AND organization_id = ?", user.ID, invite.OrganizationID).First(&existing).Error == nil {
-			// Уже есть — только активируем
-			tx.Model(&existing).Updates(map[string]interface{}{
-				"role":   invite.Role,
-				"status": models.MembershipActive,
-			})
+			// Уже в доме — роль не трогаем (иначе владелец, открыв ссылку «помощник», понизил бы себя сам;
+			// роль меняют в «Команде»). Ушедшего раньше — возвращаем с ролью из приглашения.
+			if existing.Status != models.MembershipActive {
+				if txErr := tx.Model(&existing).Updates(map[string]interface{}{
+					"role":   invite.Role,
+					"status": models.MembershipActive,
+				}).Error; txErr != nil {
+					return txErr
+				}
+			}
 		} else {
 			membership := models.Membership{
 				UserID:         user.ID,
@@ -256,9 +276,12 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 			}
 		}
 
-		// Помечаем инвайт как принятый
-		return tx.Model(&invite).Update("status", models.InviteAccepted).Error
+		return nil
 	})
+	if errors.Is(err, errInviteGone) {
+		inviteError(c, http.StatusGone, "invite_used", "invite expired or already used")
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to accept invite"})
 		return
