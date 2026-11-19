@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"podlevskikh/awesomeProject/internal/models"
 
@@ -125,6 +126,62 @@ func runDataMigrations() {
 		WHERE m.organization_id = o.id AND COALESCE(o.owner_user_id, 0) = 0`)
 	if res.Error == nil && res.RowsAffected > 0 {
 		log.Printf("organizations: заполнен владелец у %d домов", res.RowsAffected)
+	}
+
+	repairLeakedSchedulerTasks()
+}
+
+// repairLeakedSchedulerTasks: планировщик (он собирает дни только дома 1) раньше искал день
+// без учёта дома и мог положить блюда, уборку и ребёнка дома 1 в день другого дома —
+// чужие рецепты и зоны были видны в другой семье. Возвращаем такие задачи в день дома 1
+// (или удаляем, если у дома 1 этот день уже собран). Идемпотентно.
+func repairLeakedSchedulerTasks() {
+	const leaked = "organization_id = 1 AND task_type IN ('meal','cleaning','childcare')"
+	type row struct {
+		ScheduleID uint
+		Date       time.Time
+	}
+	var rows []row
+	DB.Raw(`SELECT DISTINCT ds.id AS schedule_id, ds.date FROM daily_schedules ds
+		JOIN schedule_tasks st ON st.schedule_id = ds.id
+		WHERE ds.organization_id <> 1 AND st.organization_id = 1
+		  AND st.task_type IN ('meal','cleaning','childcare')`).Scan(&rows)
+	for _, r := range rows {
+		err := DB.Transaction(func(tx *gorm.DB) error {
+			var own models.DailySchedule
+			found := tx.Where("organization_id = 1 AND date = ?", r.Date).First(&own).Error == nil
+			if found && own.Generated {
+				ids := tx.Model(&models.ScheduleTask{}).Select("id").Where("schedule_id = ? AND "+leaked, r.ScheduleID)
+				if err := tx.Exec("DELETE FROM meal_recipes WHERE schedule_task_id IN (?)", ids).Error; err != nil {
+					return err
+				}
+				if err := tx.Exec("DELETE FROM task_zones WHERE schedule_task_id IN (?)", ids).Error; err != nil {
+					return err
+				}
+				if err := tx.Where("schedule_id = ? AND "+leaked, r.ScheduleID).Delete(&models.ScheduleTask{}).Error; err != nil {
+					return err
+				}
+			} else {
+				if !found {
+					own = models.DailySchedule{OrganizationID: 1, Date: r.Date, Generated: true}
+					if err := tx.Create(&own).Error; err != nil {
+						return err
+					}
+				} else if err := tx.Model(&own).Update("generated", true).Error; err != nil {
+					return err
+				}
+				if err := tx.Model(&models.ScheduleTask{}).Where("schedule_id = ? AND "+leaked, r.ScheduleID).
+					Update("schedule_id", own.ID).Error; err != nil {
+					return err
+				}
+			}
+			return tx.Model(&models.DailySchedule{}).Where("id = ?", r.ScheduleID).Update("generated", false).Error
+		})
+		if err != nil {
+			log.Printf("repairLeakedSchedulerTasks: день %d (%s): %v", r.ScheduleID, r.Date.Format("2006-01-02"), err)
+		} else {
+			log.Printf("repairLeakedSchedulerTasks: задачи дома 1 убраны из дня %d (%s)", r.ScheduleID, r.Date.Format("2006-01-02"))
+		}
 	}
 }
 

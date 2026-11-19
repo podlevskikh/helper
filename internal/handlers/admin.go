@@ -273,7 +273,7 @@ func (h *AdminHandler) GetMealTime(c *gin.Context) {
 	id := c.Param("id")
 	var mealTime models.MealTime
 
-	if err := h.db.Preload("Recipes").First(&mealTime, id).Error; err != nil {
+	if err := h.orgDB(c).Preload("Recipes").First(&mealTime, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Meal time not found"})
 		return
 	}
@@ -287,6 +287,8 @@ func (h *AdminHandler) CreateMealTime(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	mealTime.ID = 0
+	mealTime.OrganizationID = h.orgID(c)
 	
 	if err := h.db.Create(&mealTime).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -300,7 +302,7 @@ func (h *AdminHandler) UpdateMealTime(c *gin.Context) {
 	id := c.Param("id")
 	var mealTime models.MealTime
 
-	if err := h.db.First(&mealTime, id).Error; err != nil {
+	if err := h.orgDB(c).First(&mealTime, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Meal time not found"})
 		return
 	}
@@ -315,6 +317,7 @@ func (h *AdminHandler) UpdateMealTime(c *gin.Context) {
 	}
 
 	input.MealTime.ID = mealTime.ID
+	input.MealTime.OrganizationID = mealTime.OrganizationID
 	if err := h.db.Save(&input.MealTime).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -323,7 +326,7 @@ func (h *AdminHandler) UpdateMealTime(c *gin.Context) {
 	// Update recipe associations
 	var recipes []models.Recipe
 	if len(input.RecipeIDs) > 0 {
-		if err := h.db.Find(&recipes, input.RecipeIDs).Error; err != nil {
+		if err := h.orgDB(c).Find(&recipes, input.RecipeIDs).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find recipes"})
 			return
 		}
@@ -339,7 +342,7 @@ func (h *AdminHandler) UpdateMealTime(c *gin.Context) {
 
 func (h *AdminHandler) DeleteMealTime(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.db.Delete(&models.MealTime{}, id).Error; err != nil {
+	if err := h.orgDB(c).Delete(&models.MealTime{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -485,7 +488,7 @@ func (h *AdminHandler) GetChildcareSchedule(c *gin.Context) {
 	id := c.Param("id")
 	var schedule models.ChildcareSchedule
 
-	if err := h.db.First(&schedule, id).Error; err != nil {
+	if err := h.orgDB(c).First(&schedule, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Childcare schedule not found"})
 		return
 	}
@@ -499,6 +502,8 @@ func (h *AdminHandler) CreateChildcareSchedule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	schedule.ID = 0
+	schedule.OrganizationID = h.orgID(c)
 	
 	if err := h.db.Create(&schedule).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -512,15 +517,16 @@ func (h *AdminHandler) UpdateChildcareSchedule(c *gin.Context) {
 	id := c.Param("id")
 	var schedule models.ChildcareSchedule
 	
-	if err := h.db.First(&schedule, id).Error; err != nil {
+	if err := h.orgDB(c).First(&schedule, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Childcare schedule not found"})
 		return
 	}
-	
+	keepID, keepOrg := schedule.ID, schedule.OrganizationID
 	if err := c.ShouldBindJSON(&schedule); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	schedule.ID, schedule.OrganizationID = keepID, keepOrg
 	
 	if err := h.db.Save(&schedule).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -532,7 +538,7 @@ func (h *AdminHandler) UpdateChildcareSchedule(c *gin.Context) {
 
 func (h *AdminHandler) DeleteChildcareSchedule(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.db.Delete(&models.ChildcareSchedule{}, id).Error; err != nil {
+	if err := h.orgDB(c).Delete(&models.ChildcareSchedule{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -557,7 +563,7 @@ func (h *AdminHandler) RegenerateSchedule(c *gin.Context) {
 func (h *AdminHandler) GetRecipeComments(c *gin.Context) {
 	recipeID := c.Param("id")
 	var comments []models.RecipeComment
-	if err := h.db.Where("recipe_id = ?", recipeID).Order("created_at DESC").Find(&comments).Error; err != nil {
+	if err := h.orgDB(c).Where("recipe_id = ?", recipeID).Order("created_at DESC").Find(&comments).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -580,9 +586,15 @@ func (h *AdminHandler) CreateRecipeComment(c *gin.Context) {
 		return
 	}
 
+	var recipe models.Recipe
+	if err := h.orgDB(c).First(&recipe, recipeIDInt).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
+		return
+	}
 	comment := models.RecipeComment{
-		RecipeID: uint(recipeIDInt),
-		Comment:  input.Comment,
+		OrganizationID: h.orgID(c),
+		RecipeID:       uint(recipeIDInt),
+		Comment:        input.Comment,
 	}
 
 	if err := h.db.Create(&comment).Error; err != nil {
@@ -594,7 +606,7 @@ func (h *AdminHandler) CreateRecipeComment(c *gin.Context) {
 
 func (h *AdminHandler) DeleteRecipeComment(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.db.Delete(&models.RecipeComment{}, id).Error; err != nil {
+	if err := h.orgDB(c).Delete(&models.RecipeComment{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -607,7 +619,7 @@ func (h *AdminHandler) DeleteRecipeComment(c *gin.Context) {
 func (h *AdminHandler) UpdateTask(c *gin.Context) {
 	id := c.Param("id")
 	var task models.ScheduleTask
-	if err := h.db.Preload("Recipes").First(&task, id).Error; err != nil {
+	if err := h.orgDB(c).Preload("Recipes").First(&task, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
@@ -646,7 +658,7 @@ func (h *AdminHandler) UpdateTask(c *gin.Context) {
 	// Replace recipe associations (many2many)
 	var recipes []models.Recipe
 	if len(input.RecipeIDs) > 0 {
-		if err := h.db.Find(&recipes, input.RecipeIDs).Error; err != nil {
+		if err := h.orgDB(c).Find(&recipes, input.RecipeIDs).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find recipes"})
 			return
 		}
@@ -674,7 +686,7 @@ func (h *AdminHandler) GetTask(c *gin.Context) {
 	id := c.Param("id")
 	var task models.ScheduleTask
 
-	if err := h.db.Preload("Recipes").Preload("Recipe").Preload("Zone").Preload("Zones").First(&task, id).Error; err != nil {
+	if err := h.orgDB(c).Preload("Recipes").Preload("Recipe").Preload("Zone").Preload("Zones").First(&task, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
@@ -697,7 +709,7 @@ func (h *AdminHandler) AddRecipeToTask(c *gin.Context) {
 
 	// Get the task
 	var task models.ScheduleTask
-	if err := h.db.Preload("Recipes").First(&task, taskID).Error; err != nil {
+	if err := h.orgDB(c).Preload("Recipes").First(&task, taskID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
@@ -710,7 +722,7 @@ func (h *AdminHandler) AddRecipeToTask(c *gin.Context) {
 
 	// Get the recipe
 	var recipe models.Recipe
-	if err := h.db.First(&recipe, input.RecipeID).Error; err != nil {
+	if err := h.orgDB(c).First(&recipe, input.RecipeID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
 		return
 	}
@@ -737,14 +749,14 @@ func (h *AdminHandler) RemoveRecipeFromTask(c *gin.Context) {
 
 	// Get the task
 	var task models.ScheduleTask
-	if err := h.db.Preload("Recipes").First(&task, taskID).Error; err != nil {
+	if err := h.orgDB(c).Preload("Recipes").First(&task, taskID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
 
 	// Get the recipe
 	var recipe models.Recipe
-	if err := h.db.First(&recipe, recipeID).Error; err != nil {
+	if err := h.orgDB(c).First(&recipe, recipeID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
 		return
 	}
@@ -779,7 +791,7 @@ func (h *AdminHandler) AddZoneToTask(c *gin.Context) {
 
 	// Get the task
 	var task models.ScheduleTask
-	if err := h.db.Preload("Zones").First(&task, taskID).Error; err != nil {
+	if err := h.orgDB(c).Preload("Zones").First(&task, taskID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
@@ -792,7 +804,7 @@ func (h *AdminHandler) AddZoneToTask(c *gin.Context) {
 
 	// Get the zone
 	var zone models.CleaningZone
-	if err := h.db.First(&zone, input.ZoneID).Error; err != nil {
+	if err := h.orgDB(c).First(&zone, input.ZoneID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Zone not found"})
 		return
 	}
@@ -819,14 +831,14 @@ func (h *AdminHandler) RemoveZoneFromTask(c *gin.Context) {
 
 	// Get the task
 	var task models.ScheduleTask
-	if err := h.db.Preload("Zones").First(&task, taskID).Error; err != nil {
+	if err := h.orgDB(c).Preload("Zones").First(&task, taskID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
 
 	// Get the zone
 	var zone models.CleaningZone
-	if err := h.db.First(&zone, zoneID).Error; err != nil {
+	if err := h.orgDB(c).First(&zone, zoneID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Zone not found"})
 		return
 	}

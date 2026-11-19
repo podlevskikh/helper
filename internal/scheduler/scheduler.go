@@ -18,8 +18,12 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-// schedulerOrgID — организация, для которой планировщик собирает дни (DailySchedule по умолчанию — 1).
-const schedulerOrgID = 1
+// OrgID — организация, для которой планировщик собирает дни (DailySchedule по умолчанию — 1).
+// Все выборки и записи планировщика ограничены этим домом: другие дома
+// не должны получать её блюда и уборку, а их дни — помечаться собранными.
+const OrgID = 1
+
+const schedulerOrgID = OrgID
 
 type Scheduler struct {
 	db *gorm.DB
@@ -45,7 +49,7 @@ func (s *Scheduler) GenerateScheduleForDate(date time.Time) error {
 
 	// Check if schedule already exists
 	var existingSchedule models.DailySchedule
-	result := s.db.Where("date = ?", date).First(&existingSchedule)
+	result := s.db.Where("organization_id = ? AND date = ?", schedulerOrgID, date).First(&existingSchedule)
 
 	var schedule models.DailySchedule
 	if result.Error == nil {
@@ -62,8 +66,9 @@ func (s *Scheduler) GenerateScheduleForDate(date time.Time) error {
 	} else {
 		// Create new daily schedule
 		schedule = models.DailySchedule{
-			Date:      date,
-			Generated: true,
+			OrganizationID: schedulerOrgID,
+			Date:           date,
+			Generated:      true,
 		}
 		if err := s.db.Create(&schedule).Error; err != nil {
 			return fmt.Errorf("failed to create daily schedule: %w", err)
@@ -92,7 +97,7 @@ func (s *Scheduler) GenerateScheduleForDate(date time.Time) error {
 // generateMealTasks creates meal tasks based on configured meal times
 func (s *Scheduler) generateMealTasks(schedule *models.DailySchedule, date time.Time) error {
 	var mealTimes []models.MealTime
-	if err := s.db.Where("active = ?", true).Find(&mealTimes).Error; err != nil {
+	if err := s.db.Where("organization_id = ? AND active = ?", schedulerOrgID, true).Find(&mealTimes).Error; err != nil {
 		return err
 	}
 
@@ -114,12 +119,13 @@ func (s *Scheduler) generateMealTasks(schedule *models.DailySchedule, date time.
 			}
 
 			task := models.ScheduleTask{
-				ScheduleID:  schedule.ID,
-				TaskType:    "meal",
-				Time:        timeSlot,
-				Title:       fmt.Sprintf("%s - %s", mealTime.Name, mealTime.FamilyMember),
-				Description: "",
-				Completed:   false,
+				OrganizationID: schedulerOrgID,
+				ScheduleID:     schedule.ID,
+				TaskType:       "meal",
+				Time:           timeSlot,
+				Title:          fmt.Sprintf("%s - %s", mealTime.Name, mealTime.FamilyMember),
+				Description:    "",
+				Completed:      false,
 			}
 
 			if recipe != nil {
@@ -214,7 +220,7 @@ func (s *Scheduler) eligibleRecipes(mealTimeID uint, mealTimeName string) ([]mod
 	err := s.db.
 		Joins("JOIN recipe_meal_times ON recipe_meal_times.recipe_id = recipes.id").
 		Where("recipe_meal_times.meal_time_id = ?", mealTimeID).
-		Where("recipes.is_active = ?", true).
+		Where("recipes.is_active = ? AND recipes.organization_id = ?", true, schedulerOrgID).
 		Find(&recipes).Error
 	if err != nil {
 		return nil, err
@@ -235,6 +241,7 @@ func (s *Scheduler) usedRecipeIDsSince(before time.Time, days int, taskTitle str
 	var tasks []models.ScheduleTask
 	err := s.db.
 		Joins("JOIN daily_schedules ON daily_schedules.id = schedule_tasks.schedule_id").
+		Where("daily_schedules.organization_id = ?", schedulerOrgID).
 		Where("daily_schedules.date >= ? AND daily_schedules.date < ?", startDate, before).
 		Where("schedule_tasks.task_type = 'meal'").
 		Where("schedule_tasks.title = ?", taskTitle).
@@ -261,7 +268,7 @@ func (s *Scheduler) generateCleaningTasks(schedule *models.DailySchedule, date t
 	var zones []models.CleaningZone
 	// Order by priority: high > medium > low
 	priorityOrder := "CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END"
-	if err := s.db.Order(priorityOrder).Find(&zones).Error; err != nil {
+	if err := s.db.Where("organization_id = ?", schedulerOrgID).Order(priorityOrder).Find(&zones).Error; err != nil {
 		return err
 	}
 
@@ -281,14 +288,15 @@ func (s *Scheduler) generateCleaningTasks(schedule *models.DailySchedule, date t
 		// Determine if this zone should be cleaned today based on frequency
 		if s.shouldCleanZoneToday(zone, dayOfWeek, date) {
 			task := models.ScheduleTask{
-				ScheduleID:  schedule.ID,
-				TaskType:    "cleaning",
-				Time:        "", // No specific time for cleaning tasks
-				Duration:    30, // Default 30 minutes for cleaning
-				Title:       zone.Name,
-				Description: zone.Description,
-				ZoneID:      &zone.ID,
-				Completed:   false,
+				OrganizationID: schedulerOrgID,
+				ScheduleID:     schedule.ID,
+				TaskType:       "cleaning",
+				Time:           "", // No specific time for cleaning tasks
+				Duration:       30, // Default 30 minutes for cleaning
+				Title:          zone.Name,
+				Description:    zone.Description,
+				ZoneID:         &zone.ID,
+				Completed:      false,
 			}
 
 			if err := s.db.Create(&task).Error; err != nil {
@@ -370,7 +378,7 @@ func (s *Scheduler) addChildcareTasks(schedule *models.DailySchedule, date time.
 	normalizedDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 	nextDay := normalizedDate.AddDate(0, 0, 1)
 
-	if err := s.db.Where("date >= ? AND date < ?", normalizedDate, nextDay).Find(&childcareSchedules).Error; err != nil {
+	if err := s.db.Where("organization_id = ? AND date >= ? AND date < ?", schedulerOrgID, normalizedDate, nextDay).Find(&childcareSchedules).Error; err != nil {
 		return err
 	}
 
@@ -378,14 +386,15 @@ func (s *Scheduler) addChildcareTasks(schedule *models.DailySchedule, date time.
 
 	for _, cc := range childcareSchedules {
 		task := models.ScheduleTask{
-			ScheduleID:  schedule.ID,
-			TaskType:    "childcare",
-			Time:        cc.StartTime,
-			EndTime:     cc.EndTime,
-			Duration:    s.calculateDuration(cc.StartTime, cc.EndTime),
-			Title:       "Childcare",
-			Description: cc.Notes,
-			Completed:   false,
+			OrganizationID: schedulerOrgID,
+			ScheduleID:     schedule.ID,
+			TaskType:       "childcare",
+			Time:           cc.StartTime,
+			EndTime:        cc.EndTime,
+			Duration:       s.calculateDuration(cc.StartTime, cc.EndTime),
+			Title:          "Childcare",
+			Description:    cc.Notes,
+			Completed:      false,
 		}
 
 		if err := s.db.Create(&task).Error; err != nil {

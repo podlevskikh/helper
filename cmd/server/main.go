@@ -267,7 +267,13 @@ func main() {
 			api.DELETE("/recurring-tasks/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.DeleteRecurringTask)
 
 			// Schedule management
-			api.POST("/regenerate-schedule", func(c *gin.Context) {
+			// Пересборка дней — только для дома, который ведёт планировщик (организация 1),
+			// и только для его данных: раньше любой вошедший стирал задачи всех домов.
+			api.POST("/regenerate-schedule", middleware.Require(middleware.CapManageSchedule), func(c *gin.Context) {
+				if middleware.MustMembership(c).OrganizationID != scheduler.OrgID {
+					c.JSON(403, gin.H{"error": "schedule regeneration is not available for this home"})
+					return
+				}
 				days := 7
 
 				// Normalize to start of day so today's schedule is always included
@@ -282,7 +288,7 @@ func main() {
 				if err := db.Exec(`DELETE FROM meal_recipes WHERE schedule_task_id IN (
 					SELECT st.id FROM schedule_tasks st
 					JOIN daily_schedules ds ON ds.id = st.schedule_id
-					WHERE ds.date >= ? AND ds.date < ? AND st.task_type != 'custom'
+					WHERE ds.organization_id = 1 AND ds.date >= ? AND ds.date < ? AND st.task_type != 'custom'
 				)`, today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to delete meal_recipes: %v", err)
 				}
@@ -291,7 +297,7 @@ func main() {
 				if err := db.Exec(`DELETE FROM task_zones WHERE schedule_task_id IN (
 					SELECT st.id FROM schedule_tasks st
 					JOIN daily_schedules ds ON ds.id = st.schedule_id
-					WHERE ds.date >= ? AND ds.date < ? AND st.task_type != 'custom'
+					WHERE ds.organization_id = 1 AND ds.date >= ? AND ds.date < ? AND st.task_type != 'custom'
 				)`, today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to delete task_zones: %v", err)
 				}
@@ -299,14 +305,14 @@ func main() {
 				// 3. Delete non-custom schedule_tasks
 				if err := db.Exec(`DELETE FROM schedule_tasks
 					WHERE task_type != 'custom'
-					AND schedule_id IN (SELECT id FROM daily_schedules WHERE date >= ? AND date < ?)`,
+					AND schedule_id IN (SELECT id FROM daily_schedules WHERE organization_id = 1 AND date >= ? AND date < ?)`,
 					today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to delete schedule tasks: %v", err)
 				}
 
 				// 4. Delete daily_schedules that have no tasks left
 				if err := db.Exec(`DELETE FROM daily_schedules
-					WHERE date >= ? AND date < ?
+					WHERE organization_id = 1 AND date >= ? AND date < ?
 					AND id NOT IN (SELECT DISTINCT schedule_id FROM schedule_tasks)`,
 					today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to delete empty daily schedules: %v", err)
@@ -314,7 +320,7 @@ func main() {
 
 				// 5. Reset generated=false on schedules that still exist (have custom tasks only)
 				if err := db.Exec(`UPDATE daily_schedules SET generated = false
-					WHERE date >= ? AND date < ?`, today, endDate).Error; err != nil {
+					WHERE organization_id = 1 AND date >= ? AND date < ?`, today, endDate).Error; err != nil {
 					log.Printf("Warning: Failed to reset generated flag: %v", err)
 				}
 
