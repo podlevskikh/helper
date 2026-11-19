@@ -115,6 +115,10 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 			"password_hash": hash, "token_version": gorm.Expr("token_version + 1")}).Error; err != nil {
 			return err
 		}
+		// Незавершённую смену почты гасим: её мог запросить тот, кто знал старый пароль.
+		if err := CancelPendingEmailChanges(tx, user.ID, now); err != nil {
+			return err
+		}
 		return tx.Model(&models.RefreshToken{}).
 			Where("user_id = ? AND revoked_at IS NULL", user.ID).
 			Update("revoked_at", now).Error

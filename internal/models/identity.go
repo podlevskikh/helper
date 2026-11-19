@@ -123,4 +123,15 @@ type EmailChange struct {
 	ConfirmedAt     *time.Time `json:"confirmed_at,omitempty"`
 	CanceledAt      *time.Time `json:"canceled_at,omitempty"`
 	CreatedAt       time.Time  `json:"created_at"`
+	// TokenVersion — версия токена пользователя на момент запроса. Подтверждение проходит, только если
+	// она не изменилась: смена/сброс пароля, «это не я», выход везде гасят незавершённую смену почты.
+	TokenVersion int `gorm:"not null;default:0" json:"-"`
+	// SendCount — сколько писем со ссылкой ушло на новый адрес (запрос + «отправить ещё раз»).
+	SendCount int `gorm:"not null;default:1" json:"-"`
+	// Откат со старого адреса после подтверждения (ссылка в письме «почта изменена», 14 дней):
+	// почта возвращается, все входы завершаются, пароль сбрасывается.
+	OldEmail        string     `json:"-"`
+	RevertTokenHash *string    `gorm:"uniqueIndex" json:"-"`
+	RevertExpiresAt *time.Time `json:"-"`
+	RevertedAt      *time.Time `json:"-"`
 }

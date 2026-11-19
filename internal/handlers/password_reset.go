@@ -105,6 +105,10 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		}
 		// остальные ссылки этого пользователя тоже гасим
 		tx.Model(&models.PasswordReset{}).Where("user_id = ? AND used_at IS NULL", reset.UserID).Update("used_at", now)
+		// и незавершённую смену почты — её мог запросить тот, кто знал старый пароль
+		if err := CancelPendingEmailChanges(tx, reset.UserID, now); err != nil {
+			return err
+		}
 		return tx.Model(&models.RefreshToken{}).Where("user_id = ? AND revoked_at IS NULL", reset.UserID).Update("revoked_at", now).Error
 	})
 	if err != nil {

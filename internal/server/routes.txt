@@ -79,6 +79,7 @@ POST /auth/email/cancel
 POST /auth/email/check
 POST /auth/email/confirm
 POST /auth/email/resend
+POST /auth/email/revert
 POST /auth/login
 POST /auth/logout
 POST /auth/password

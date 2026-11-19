@@ -44,7 +44,7 @@ var routePolicy = map[string]policy{
 	"GET /static/*filepath": pub(), "HEAD /static/*filepath": pub(), "GET /static2/*filepath": pub(), "HEAD /static2/*filepath": pub(),
 	// вошедший, без дома
 	"GET /auth/me": authOnly(), "PATCH /auth/me": authOnly(), "DELETE /auth/me": authOnly(), "POST /auth/password": authOnly(), "POST /auth/email": authOnly(), "GET /auth/email": authOnly(), "DELETE /auth/email": authOnly(),
-	"POST /auth/email/resend": authOnly(), "POST /auth/email/check": pub(), "POST /auth/email/confirm": pub(), "POST /auth/email/cancel": pub(),
+	"POST /auth/email/resend": authOnly(), "POST /auth/email/check": pub(), "POST /auth/email/confirm": pub(), "POST /auth/email/cancel": pub(), "POST /auth/email/revert": pub(),
 	"POST /me/devices": authOnly(), "DELETE /me/devices/:token": authOnly(),
 	// дом
 	"POST /orgs/:orgId/invites": org(team), "GET /orgs/:orgId/members": org(team),

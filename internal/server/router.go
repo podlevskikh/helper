@@ -117,6 +117,9 @@ func NewRouter(d Deps) *gin.Engine {
 	forgotLimit := middleware.RateLimit(middleware.RateLimitOptions{Max: 5, Per: 15 * time.Minute})
 	// Письма при смене почты (запрос и «отправить ещё раз») — отдельный счётчик.
 	emailLimit := middleware.RateLimit(middleware.RateLimitOptions{Max: 10, Per: 15 * time.Minute})
+	// Ссылки из писем (проверка, подтверждение, отмена, откат) — свой счётчик неудач: истёкшая ссылка
+	// или повторный клик не съедают попытки входа у всех за тем же адресом.
+	linkLimit := middleware.RateLimit(middleware.RateLimitOptions{Max: 20, Per: 15 * time.Minute, OnlyFailures: true})
 
 	authGroup := router.Group("/auth")
 	{
@@ -130,12 +133,13 @@ func NewRouter(d Deps) *gin.Engine {
 		authGroup.POST("/password", authMw, loginLimit, authHandler.ChangePassword)
 		// Смена почты — с подтверждением по ссылке (internal/handlers/email_change.go).
 		authGroup.GET("/email", authMw, authHandler.GetEmailChange)
-		authGroup.POST("/email", authMw, loginLimit, emailLimit, authHandler.RequestEmailChange)
+		authGroup.POST("/email", authMw, emailLimit, loginLimit, authHandler.RequestEmailChange)
 		authGroup.DELETE("/email", authMw, authHandler.CancelOwnEmailChange)
 		authGroup.POST("/email/resend", authMw, emailLimit, authHandler.ResendEmailChange)
-		authGroup.POST("/email/check", loginLimit, authHandler.CheckEmailChange)
-		authGroup.POST("/email/confirm", loginLimit, authHandler.ConfirmEmailChange)
-		authGroup.POST("/email/cancel", loginLimit, authHandler.CancelEmailChange)
+		authGroup.POST("/email/check", linkLimit, authHandler.CheckEmailChange)
+		authGroup.POST("/email/confirm", linkLimit, authHandler.ConfirmEmailChange)
+		authGroup.POST("/email/cancel", linkLimit, authHandler.CancelEmailChange)
+		authGroup.POST("/email/revert", linkLimit, authHandler.RevertEmailChange)
 		authGroup.POST("/password/forgot", forgotLimit, authHandler.ForgotPassword)
 		authGroup.POST("/password/reset", loginLimit, authHandler.ResetPassword)
 		authGroup.POST("/password/reset/check", loginLimit, authHandler.CheckResetToken)

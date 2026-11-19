@@ -225,7 +225,9 @@ func TestEmailChangeCancel(t *testing.T) {
 	e.expect("это не я", e.do(req{method: "POST", path: "/auth/email/cancel", body: map[string]string{"token": cancel}}), 200)
 	e.expect("подтвердить после отмены", e.do(req{method: "POST", path: "/auth/email/confirm", body: map[string]string{"token": confirm}}), 410)
 	e.expect("сессии завершены", e.do(req{method: "GET", path: "/auth/me", token: o.Token}), 401)
-	e.expect("вход по старой почте", e.do(req{method: "POST", path: "/auth/login", body: map[string]string{"email": o.Email, "password": o.Password}}), 200)
+	// Пароль сброшен: тот, кто его знал, войти больше не может; владелец задаёт новый через «Забыли пароль?».
+	e.expect("старый пароль после «это не я»", e.do(req{method: "POST", path: "/auth/login", body: map[string]string{"email": o.Email, "password": o.Password}}), 401)
+	setPassword(e, o.UserID, o.Password)
 
 	// Отмена из профиля.
 	w := e.do(req{method: "POST", path: "/auth/login", body: map[string]string{"email": o.Email, "password": o.Password}})
@@ -238,6 +240,97 @@ func TestEmailChangeCancel(t *testing.T) {
 		t.Errorf("после отмены всё ещё ждёт: %v", g)
 	}
 	e.expect("подтвердить отменённое", e.do(req{method: "POST", path: "/auth/email/confirm", body: map[string]string{"token": confirm2}}), 410)
+}
+
+func setPassword(e *env, userID uint, pw string) {
+	hash, err := auth.HashPassword(pw)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	e.db.Model(&models.User{}).Where("id = ?", userID).Update("password_hash", hash)
+}
+
+// AUTH-EMAIL-07: незавершённая смена почты не переживает смену и сброс пароля (иначе тот, кто знал
+// старый пароль, подтвердил бы её из своего ящика и забрал аккаунт).
+func TestEmailChangeCanceledByPasswordChange(t *testing.T) {
+	e := newEnv(t, 1000)
+	o := e.owner("emailpw")
+	e.expect("запрос", e.do(req{method: "POST", path: "/auth/email", token: o.Token,
+		body: map[string]string{"current_password": o.Password, "new_email": "atk-" + uniq() + "@test.local"}}), 202)
+	confirm, cancel := setEmailTokens(e, o.UserID)
+	newPw := "new-pass-" + uniq()
+	e.expect("смена пароля", e.do(req{method: "POST", path: "/auth/password", token: o.Token,
+		body: map[string]string{"current_password": o.Password, "new_password": newPw}}), 200)
+	e.expect("подтверждение после смены пароля", e.do(req{method: "POST", path: "/auth/email/confirm", body: map[string]string{"token": confirm}}), 410)
+	e.expect("отмена после смены пароля", e.do(req{method: "POST", path: "/auth/email/cancel", body: map[string]string{"token": cancel}}), 410)
+
+	// То же через «Забыли пароль?»: смену почты гасит и сброс.
+	w := e.do(req{method: "POST", path: "/auth/login", body: map[string]string{"email": o.Email, "password": newPw}})
+	tok, _ := e.json(w)["access"].(string)
+	e.expect("запрос 2", e.do(req{method: "POST", path: "/auth/email", token: tok,
+		body: map[string]string{"current_password": newPw, "new_email": "atk2-" + uniq() + "@test.local"}}), 202)
+	confirm2, _ := setEmailTokens(e, o.UserID)
+	raw := "reset-" + uniq()
+	e.db.Create(&models.PasswordReset{UserID: o.UserID, TokenHash: auth.HashToken(raw), ExpiresAt: time.Now().Add(time.Hour)})
+	e.expect("сброс пароля", e.do(req{method: "POST", path: "/auth/password/reset", body: map[string]string{"token": raw, "password": "reset-pass-" + uniq()}}), 200)
+	e.expect("подтверждение после сброса", e.do(req{method: "POST", path: "/auth/email/confirm", body: map[string]string{"token": confirm2}}), 410)
+}
+
+// AUTH-EMAIL-08: смену подтвердили быстрее, чем владелец увидел уведомление, — ссылка «вернуть почту»
+// из письма на старый адрес: почта возвращается, все входы завершены, пароль сброшен, ссылка одноразовая.
+func TestEmailChangeRevert(t *testing.T) {
+	e := newEnv(t, 1000)
+	o := e.owner("emailrev")
+	atk := "atk-" + uniq() + "@test.local"
+	e.expect("запрос", e.do(req{method: "POST", path: "/auth/email", token: o.Token,
+		body: map[string]string{"current_password": o.Password, "new_email": atk}}), 202)
+	confirm, _ := setEmailTokens(e, o.UserID)
+	e.expect("подтверждение", e.do(req{method: "POST", path: "/auth/email/confirm", body: map[string]string{"token": confirm}}), 200)
+	w := e.do(req{method: "POST", path: "/auth/login", body: map[string]string{"email": atk, "password": o.Password}})
+	e.expect("вход по новой почте", w, 200)
+	atkTok, _ := e.json(w)["access"].(string)
+
+	revert := "revert-" + uniq()
+	e.db.Model(&models.EmailChange{}).Where("user_id = ? AND confirmed_at IS NOT NULL", o.UserID).
+		Update("revert_token_hash", auth.HashToken(revert))
+	w = e.do(req{method: "POST", path: "/auth/email/check", body: map[string]string{"token": revert, "kind": "revert"}})
+	e.expect("проверка ссылки отката", w, 200)
+	if e.json(w)["old_email"] != o.Email {
+		t.Errorf("проверка отката: %v", e.json(w))
+	}
+	e.expect("откат", e.do(req{method: "POST", path: "/auth/email/revert", body: map[string]string{"token": revert}}), 200)
+	e.expect("повторный откат", e.do(req{method: "POST", path: "/auth/email/revert", body: map[string]string{"token": revert}}), 410)
+	e.expect("сессии захватчика", e.do(req{method: "GET", path: "/auth/me", token: atkTok}), 401)
+	e.expect("вход по почте захватчика", e.do(req{method: "POST", path: "/auth/login", body: map[string]string{"email": atk, "password": o.Password}}), 401)
+	e.expect("старый пароль сброшен", e.do(req{method: "POST", path: "/auth/login", body: map[string]string{"email": o.Email, "password": o.Password}}), 401)
+	var u models.User
+	e.db.First(&u, o.UserID)
+	if u.Email != o.Email {
+		t.Errorf("почта не вернулась: %s", u.Email)
+	}
+}
+
+// AUTH-EMAIL-09: «отправить ещё раз» — не больше 3 раз на запрос, срок ссылки не продлевается.
+func TestEmailChangeResendLimits(t *testing.T) {
+	e := newEnv(t, 1000)
+	o := e.owner("emailresend")
+	e.expect("запрос", e.do(req{method: "POST", path: "/auth/email", token: o.Token,
+		body: map[string]string{"current_password": o.Password, "new_email": "victim-" + uniq() + "@test.local"}}), 202)
+	var before models.EmailChange
+	e.db.Where("user_id = ?", o.UserID).First(&before)
+	codes := []int{}
+	for i := 0; i < 5; i++ {
+		e.db.Model(&models.EmailChange{}).Where("id = ?", before.ID).Update("sent_at", time.Now().Add(-2*time.Minute))
+		codes = append(codes, e.do(req{method: "POST", path: "/auth/email/resend", token: o.Token}).Code)
+	}
+	if fmt.Sprint(codes) != "[200 200 200 429 429]" {
+		t.Errorf("повторы: %v, ждали 3 раза 200, потом 429", codes)
+	}
+	var after models.EmailChange
+	e.db.First(&after, before.ID)
+	if !after.ExpiresAt.Equal(before.ExpiresAt) {
+		t.Errorf("срок ссылки продлён: %v → %v", before.ExpiresAt, after.ExpiresAt)
+	}
 }
 
 // AUTH-EMAIL-04: занятый адрес — ответ на запрос такой же, как на свободный (не раскрывает);

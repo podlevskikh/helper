@@ -49,10 +49,10 @@ type logoutRequest struct {
 }
 
 type membershipView struct {
-	ID             uint         `json:"id"`
-	OrganizationID uint         `json:"organization_id"`
-	OrgName        string       `json:"org_name"`
-	Role           models.Role  `json:"role"`
+	ID             uint                    `json:"id"`
+	OrganizationID uint                    `json:"organization_id"`
+	OrgName        string                  `json:"org_name"`
+	Role           models.Role             `json:"role"`
 	Status         models.MembershipStatus `json:"status"`
 }
 
@@ -233,9 +233,14 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	// Отзываем старый токен
+	// Отзываем старый токен условным UPDATE: два одновременных обновления или отзыв всех сессий
+	// (смена пароля, смена почты) в ту же секунду не дадут рабочую пару по уже отозванному токену.
 	now := time.Now()
-	h.db.Model(&rt).Update("revoked_at", &now)
+	claim := h.db.Model(&models.RefreshToken{}).Where("id = ? AND revoked_at IS NULL", rt.ID).Update("revoked_at", &now)
+	if claim.Error != nil || claim.RowsAffected != 1 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired refresh token"})
+		return
+	}
 
 	access, refresh, err := h.issueTokenPair(rt.UserID)
 	if err != nil {

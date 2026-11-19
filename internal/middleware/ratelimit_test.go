@@ -78,3 +78,26 @@ func TestRateLimitIPv6Per64(t *testing.T) {
 		t.Fatalf("разные адреса одной /64 не делят лимит: %v", codes)
 	}
 }
+
+// 429 от другого лимита — не попытка подбора: счётчик неудачных входов он не трогает.
+func TestRateLimit429NotCountedAsFailure(t *testing.T) {
+	t.Setenv("RATE_LIMIT_SCALE", "")
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	failures := RateLimit(RateLimitOptions{Max: 2, Per: time.Hour, OnlyFailures: true})
+	r.POST("/busy", failures, func(c *gin.Context) { c.Status(http.StatusTooManyRequests) })
+	r.POST("/login", failures, func(c *gin.Context) { c.Status(http.StatusUnauthorized) })
+	send := func(path string) int {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", path, nil)
+		req.RemoteAddr = "203.0.113.9:1234"
+		r.ServeHTTP(w, req)
+		return w.Code
+	}
+	for i := 0; i < 10; i++ {
+		send("/busy")
+	}
+	if c := send("/login"); c != http.StatusUnauthorized {
+		t.Fatalf("после десяти 429 вход заблокирован: %d", c)
+	}
+}

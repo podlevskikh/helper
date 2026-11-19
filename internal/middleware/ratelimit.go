@@ -28,7 +28,7 @@ type limiter struct {
 }
 
 // RateLimitOptions: Max попыток за Per с одного адреса. OnlyFailures — считать только
-// неудачные ответы (4xx), чтобы успешные входы не съедали лимит.
+// неудачные ответы (4xx, кроме 429), чтобы успешные входы не съедали лимит.
 type RateLimitOptions struct {
 	Max          int
 	Per          time.Duration
@@ -128,7 +128,8 @@ func RateLimit(opt RateLimitOptions) gin.HandlerFunc {
 
 		c.Next()
 
-		if st := c.Writer.Status(); opt.OnlyFailures && (st < 400 || st >= 500) {
+		// 429 от другого лимита — не попытка подбора; её тоже возвращаем.
+		if st := c.Writer.Status(); opt.OnlyFailures && (st < 400 || st >= 500 || st == http.StatusTooManyRequests) {
 			l.mu.Lock()
 			if l.buckets[key] == w && w.count > 0 {
 				w.count--

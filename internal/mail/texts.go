@@ -153,18 +153,20 @@ func EmailChangeRequested(to, locale, maskedNew, cancelLink string) Message {
 		HTML: layout(title, append(ps, "Not you? Cancel the change — every session will be signed out — then change your password."), "Not me — cancel", cancelLink, foot)}
 }
 
-// EmailChanged — на СТАРЫЙ адрес после подтверждения.
-func EmailChanged(to, locale, maskedNew, appURL string) Message {
+// EmailChanged — на СТАРЫЙ адрес после подтверждения; revertLink — «это не я — вернуть почту» (14 дней).
+func EmailChanged(to, locale, maskedNew, revertLink string) Message {
 	if isRu(locale) {
 		title := "Почта для входа изменена"
-		ps := []string{fmt.Sprintf("Почта для входа в ваш аккаунт Helper Day изменена на %s. На всех устройствах нужно войти заново.", maskedNew)}
-		foot := "Если это были не вы — напишите в поддержку (ссылка в приложении: «Настройки → Поддержка»)."
-		return Message{To: to, Subject: title, Text: plain(title, ps, appURL, foot), HTML: layout(title, ps, "Открыть приложение", appURL, foot)}
+		ps := []string{fmt.Sprintf("Почта для входа в ваш аккаунт Helper Day изменена на %s. На всех устройствах нужно войти заново.", maskedNew),
+			"Это не вы? Верните почту по кнопке ниже в течение 14 дней — все входы будут завершены, а новый пароль вы зададите через «Забыли пароль?»."}
+		foot := "Если это были вы — ничего делать не нужно."
+		return Message{To: to, Subject: title, Text: plain(title, ps, revertLink, foot), HTML: layout(title, ps, "Это не я — вернуть почту", revertLink, foot)}
 	}
 	title := "Your sign-in email was changed"
-	ps := []string{fmt.Sprintf("The sign-in email of your Helper Day account was changed to %s. Every device will need to sign in again.", maskedNew)}
-	foot := "If it wasn't you, contact support (in the app: Settings → Support)."
-	return Message{To: to, Subject: title, Text: plain(title, ps, appURL, foot), HTML: layout(title, ps, "Open the app", appURL, foot)}
+	ps := []string{fmt.Sprintf("The sign-in email of your Helper Day account was changed to %s. Every device will need to sign in again.", maskedNew),
+		"Not you? Use the button below within 14 days to get your email back — every session will be signed out, and you'll set a new password via “Forgot password?”."}
+	foot := "If it was you, there's nothing to do."
+	return Message{To: to, Subject: title, Text: plain(title, ps, revertLink, foot), HTML: layout(title, ps, "Not me — restore my email", revertLink, foot)}
 }
 
 // MaskEmail: nikita@example.com → n***@example.com (в письмах на другой адрес полный адрес не показываем).
