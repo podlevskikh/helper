@@ -117,6 +117,15 @@ func runDataMigrations() {
 
 	// M1: seed organisation + owner user if none exist, then backfill organization_id
 	seedOrgAndOwner()
+
+	// Владелец дома — у старых домов owner_user_id мог остаться пустым: берём его из членства owner.
+	res := DB.Exec(`UPDATE organizations o SET owner_user_id = m.user_id
+		FROM (SELECT DISTINCT ON (organization_id) organization_id, user_id FROM memberships
+		      WHERE role = 'owner' ORDER BY organization_id, id) m
+		WHERE m.organization_id = o.id AND COALESCE(o.owner_user_id, 0) = 0`)
+	if res.Error == nil && res.RowsAffected > 0 {
+		log.Printf("organizations: заполнен владелец у %d домов", res.RowsAffected)
+	}
 }
 
 // seedOrgAndOwner создаёт seed-организацию + владельца и заполняет organization_id

@@ -41,7 +41,7 @@ func (h *AuthHandler) DeleteMe(c *gin.Context) {
 // DeleteAccount удаляет пользователя и всё, что ему принадлежит. Вызывать внутри транзакции.
 func DeleteAccount(tx *gorm.DB, userID uint) error {
 	// Дома, которыми владеет пользователь, удаляются целиком — если в доме нет другого владельца.
-	// Владельца определяем по членству с ролью owner: organizations.owner_user_id при регистрации не заполняется.
+	// Владельца определяем по членству с ролью owner — так же, как права в middleware.
 	var owned []uint
 	err := tx.Model(&models.Membership{}).
 		Where("user_id = ? AND role = ?", userID, models.RoleOwner).
