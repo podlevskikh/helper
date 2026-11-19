@@ -228,7 +228,7 @@ func main() {
 			api.POST("/recipes", middleware.Require(middleware.CapManageRecipes), adminHandler.CreateRecipe)
 			api.PUT("/recipes/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.UpdateRecipe)
 			api.DELETE("/recipes/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.DeleteRecipe)
-			api.POST("/recipes/upload-image", adminHandler.UploadRecipeImage)
+			api.POST("/recipes/upload-image", middleware.Require(middleware.CapManageRecipes), adminHandler.UploadRecipeImage)
 
 			// Recipe Comments
 			api.GET("/recipes/:id/comments", adminHandler.GetRecipeComments)
@@ -238,9 +238,9 @@ func main() {
 			// Meal times
 			api.GET("/mealtimes", adminHandler.GetMealTimes)
 			api.GET("/mealtimes/:id", adminHandler.GetMealTime)
-			api.POST("/mealtimes", adminHandler.CreateMealTime)
-			api.PUT("/mealtimes/:id", adminHandler.UpdateMealTime)
-			api.DELETE("/mealtimes/:id", adminHandler.DeleteMealTime)
+			api.POST("/mealtimes", middleware.Require(middleware.CapManageSchedule), adminHandler.CreateMealTime)
+			api.PUT("/mealtimes/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.UpdateMealTime)
+			api.DELETE("/mealtimes/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.DeleteMealTime)
 
 			// Cleaning zones
 			api.GET("/zones", adminHandler.GetCleaningZones)
@@ -252,21 +252,21 @@ func main() {
 			// Childcare schedules
 			api.GET("/childcare", adminHandler.GetChildcareSchedules)
 			api.GET("/childcare/:id", adminHandler.GetChildcareSchedule)
-			api.POST("/childcare", adminHandler.CreateChildcareSchedule)
-			api.PUT("/childcare/:id", adminHandler.UpdateChildcareSchedule)
-			api.DELETE("/childcare/:id", adminHandler.DeleteChildcareSchedule)
+			api.POST("/childcare", middleware.Require(middleware.CapManageSchedule), adminHandler.CreateChildcareSchedule)
+			api.PUT("/childcare/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.UpdateChildcareSchedule)
+			api.DELETE("/childcare/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.DeleteChildcareSchedule)
 
-			// Task management
+			// Task management (менять расписание может только тот, у кого manage_schedule — не помощник)
 			api.GET("/tasks/:id", adminHandler.GetTask)
-			api.PUT("/tasks/:id", adminHandler.UpdateTask)
-			api.POST("/tasks/:id/recipes", adminHandler.AddRecipeToTask)
-			api.DELETE("/tasks/:id/recipes/:recipe_id", adminHandler.RemoveRecipeFromTask)
-			api.POST("/tasks/:id/zones", adminHandler.AddZoneToTask)
-			api.DELETE("/tasks/:id/zones/:zone_id", adminHandler.RemoveZoneFromTask)
+			api.PUT("/tasks/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.UpdateTask)
+			api.POST("/tasks/:id/recipes", middleware.Require(middleware.CapManageSchedule), adminHandler.AddRecipeToTask)
+			api.DELETE("/tasks/:id/recipes/:recipe_id", middleware.Require(middleware.CapManageSchedule), adminHandler.RemoveRecipeFromTask)
+			api.POST("/tasks/:id/zones", middleware.Require(middleware.CapManageSchedule), adminHandler.AddZoneToTask)
+			api.DELETE("/tasks/:id/zones/:zone_id", middleware.Require(middleware.CapManageSchedule), adminHandler.RemoveZoneFromTask)
 
 			// Custom one-off tasks
-			api.POST("/custom-tasks", adminHandler.CreateCustomTask)
-			api.DELETE("/custom-tasks/:id", adminHandler.DeleteCustomTask)
+			api.POST("/custom-tasks", middleware.Require(middleware.CapManageSchedule), adminHandler.CreateCustomTask)
+			api.DELETE("/custom-tasks/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.DeleteCustomTask)
 			api.GET("/recurring-tasks", adminHandler.GetRecurringTasks)
 			api.POST("/recurring-tasks", middleware.Require(middleware.CapManageSchedule), adminHandler.CreateRecurringTask)
 			api.DELETE("/recurring-tasks/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.DeleteRecurringTask)
