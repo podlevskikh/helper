@@ -111,7 +111,8 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	}
 	now := time.Now()
 	err = h.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(user).Update("password_hash", hash).Error; err != nil {
+		if err := tx.Model(user).Updates(map[string]interface{}{
+			"password_hash": hash, "token_version": gorm.Expr("token_version + 1")}).Error; err != nil {
 			return err
 		}
 		return tx.Model(&models.RefreshToken{}).

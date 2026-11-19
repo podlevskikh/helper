@@ -49,6 +49,11 @@ func (h *NotificationsHandler) RegisterDevice(c *gin.Context) {
 	var d models.PushDevice
 	if h.db.Where("token = ?", req.Token).First(&d).Error != nil {
 		d = models.PushDevice{Token: req.Token}
+	} else if d.UserID != uid && d.DisabledAt == nil && now.Sub(d.LastSeenAt) < 30*24*time.Hour {
+		// Токен уже у другого активного пользователя: перехват запрещён. На общем телефоне приложение
+		// при выходе отвязывает токен (DELETE /me/devices/:token), и тогда новый вход его заберёт.
+		c.JSON(http.StatusConflict, gin.H{"error": "device registered to another account", "code": "device_taken"})
+		return
 	}
 	d.UserID = uid
 	d.Platform = req.Platform

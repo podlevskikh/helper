@@ -65,7 +65,11 @@ type authResponse struct {
 // --- helpers ---
 
 func (h *AuthHandler) issueTokenPair(userID uint) (accessToken, rawRefresh string, err error) {
-	accessToken, err = auth.GenerateAccessToken(userID)
+	var u models.User
+	if err = h.db.Select("id", "token_version").First(&u, userID).Error; err != nil {
+		return
+	}
+	accessToken, err = auth.GenerateAccessToken(userID, u.TokenVersion)
 	if err != nil {
 		return
 	}
@@ -183,11 +187,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
 	var user models.User
-	if err := h.db.Where("email = ?", req.Email).First(&user).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
-		return
+	found := h.db.Where("email = ?", req.Email).First(&user).Error == nil
+	hash := ""
+	if found {
+		hash = user.PasswordHash
 	}
-	if err := auth.CheckPassword(req.Password, user.PasswordHash); err != nil {
+	// Одинаковое время и ответ для «нет такого email» и «неверный пароль».
+	if err := auth.CheckPasswordTimingSafe(req.Password, hash); err != nil || !found {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}

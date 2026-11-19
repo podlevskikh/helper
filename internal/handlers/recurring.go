@@ -169,6 +169,9 @@ func (h *AdminHandler) CreateRecurringTask(c *gin.Context) {
 	if priority != "" {
 		priority = normalizePriority(priority)
 	}
+	if !checkTaskRefs(c, h.db, h.orgID(c), input.TaskCategoryID, input.AssignedToUserID) {
+		return
+	}
 
 	r := models.RecurringTask{
 		OrganizationID:   h.orgID(c),

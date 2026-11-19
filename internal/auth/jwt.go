@@ -14,24 +14,34 @@ import (
 // AccessTokenClaims — payload access-токена.
 type AccessTokenClaims struct {
 	UserID uint `json:"user_id"`
+	// TokenVersion — версия пользователя: смена/сброс пароля и удаление аккаунта сразу гасят старые токены.
+	TokenVersion int `json:"tv"`
 	jwt.RegisteredClaims
 }
 
 const accessTokenDuration = 15 * time.Minute
 const refreshTokenDuration = 30 * 24 * time.Hour
 
+var processSecret = func() string {
+	b := make([]byte, 32)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}()
+
+// jwtSecret: JWT_SECRET (на проде его кладёт database.EnsureJWTSecret из базы). Если не задан —
+// случайный секрет процесса (тесты), а не известная строка из кода.
 func jwtSecret() []byte {
-	s := os.Getenv("JWT_SECRET")
-	if s == "" {
-		s = "dev-secret-change-in-production"
+	if s := os.Getenv("JWT_SECRET"); s != "" {
+		return []byte(s)
 	}
-	return []byte(s)
+	return []byte(processSecret)
 }
 
 // GenerateAccessToken выпускает JWT access-токен (HS256, ~15м).
-func GenerateAccessToken(userID uint) (string, error) {
+func GenerateAccessToken(userID uint, tokenVersion int) (string, error) {
 	claims := AccessTokenClaims{
-		UserID: userID,
+		UserID:       userID,
+		TokenVersion: tokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(accessTokenDuration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

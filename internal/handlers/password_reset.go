@@ -87,7 +87,8 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		if res.Error != nil || res.RowsAffected == 0 {
 			return gorm.ErrRecordNotFound // ссылку успели использовать параллельно
 		}
-		if err := tx.Model(&models.User{}).Where("id = ?", reset.UserID).Update("password_hash", hash).Error; err != nil {
+		if err := tx.Model(&models.User{}).Where("id = ?", reset.UserID).Updates(map[string]interface{}{
+			"password_hash": hash, "token_version": gorm.Expr("token_version + 1")}).Error; err != nil {
 			return err
 		}
 		// остальные ссылки этого пользователя тоже гасим

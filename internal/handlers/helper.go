@@ -225,9 +225,12 @@ func (h *HelperHandler) GetScheduleByDate(c *gin.Context) {
 func (h *HelperHandler) GetUpcomingSchedules(c *gin.Context) {
 	days := 7 // default 7 days
 	if daysParam := c.Query("days"); daysParam != "" {
-		if d, err := strconv.Atoi(daysParam); err == nil {
-			days = d
+		d, err := strconv.Atoi(daysParam)
+		if err != nil || d < 1 || d > 31 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "days must be 1..31"})
+			return
 		}
+		days = d
 	}
 
 	// Support custom start date

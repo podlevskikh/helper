@@ -1,12 +1,8 @@
 package handlers
 
 import (
-	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -208,57 +204,6 @@ func (h *AdminHandler) DeleteRecipe(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Recipe deleted"})
 }
 
-// UploadRecipeImage handles image file upload for recipes
-func (h *AdminHandler) UploadRecipeImage(c *gin.Context) {
-	file, err := c.FormFile("image")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No file uploaded"})
-		return
-	}
-
-	// Validate file type
-	ext := filepath.Ext(file.Filename)
-	allowedExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true}
-	if !allowedExts[ext] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file type. Allowed: jpg, jpeg, png, gif, webp"})
-		return
-	}
-
-	// Create uploads directory if it doesn't exist
-	uploadsDir := "web/static/uploads/recipes"
-	if err := os.MkdirAll(uploadsDir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
-		return
-	}
-
-	// Generate unique filename
-	filename := fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(file.Filename))
-	filePath := filepath.Join(uploadsDir, filename)
-
-	// Save file
-	src, err := file.Open()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open uploaded file"})
-		return
-	}
-	defer src.Close()
-
-	dst, err := os.Create(filePath)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
-		return
-	}
-	defer dst.Close()
-
-	if _, err := io.Copy(dst, src); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
-		return
-	}
-
-	// Return URL path
-	imageURL := fmt.Sprintf("/static/uploads/recipes/%s", filename)
-	c.JSON(http.StatusOK, gin.H{"url": imageURL})
-}
 
 // MealTime handlers
 
@@ -611,8 +556,13 @@ func (h *AdminHandler) CreateRecipeComment(c *gin.Context) {
 
 func (h *AdminHandler) DeleteRecipeComment(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.orgDB(c).Delete(&models.RecipeComment{}, id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	res := h.orgDB(c).Delete(&models.RecipeComment{}, id)
+	if res.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": res.Error.Error()})
+		return
+	}
+	if res.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted"})
@@ -644,6 +594,9 @@ func (h *AdminHandler) UpdateTask(c *gin.Context) {
 		return
 	}
 
+	if !checkTaskRefs(c, h.db, h.orgID(c), input.TaskCategoryID, input.AssignedToUserID) {
+		return
+	}
 	before := task
 	if input.Priority != nil {
 		task.Priority = *input.Priority
@@ -692,6 +645,12 @@ func (h *AdminHandler) GetTask(c *gin.Context) {
 	var task models.ScheduleTask
 
 	if err := h.orgDB(c).Preload("Recipes").Preload("Recipe").Preload("Zone").Preload("Zones").First(&task, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+	// Помощник видит только общие задачи и свои — личные задачи нанимателя или другого сотрудника скрыты.
+	if m := middleware.MustMembership(c); !middleware.Can(m, middleware.CapManageSchedule) &&
+		task.AssignedToUserID != nil && *task.AssignedToUserID != m.UserID {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
@@ -893,6 +852,9 @@ func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
 		return
 	}
 	date = time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+	if !checkTaskRefs(c, h.db, h.orgID(c), input.TaskCategoryID, input.AssignedToUserID) {
+		return
+	}
 
 	// Find or create daily_schedule for this date
 	var schedule models.DailySchedule

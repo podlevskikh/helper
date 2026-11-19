@@ -28,6 +28,9 @@ import (
 func TestDeleteMe(t *testing.T) {
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
+		if os.Getenv("REQUIRE_DB") == "1" {
+			t.Fatal("TEST_DATABASE_URL не задан, а REQUIRE_DB=1")
+		}
 		t.Skip("TEST_DATABASE_URL не задан")
 	}
 	t.Setenv("SMTP_HOST", "") // письма не отправляем
@@ -93,7 +96,7 @@ func TestDeleteMe(t *testing.T) {
 	must(t, db.Create(&list).Error)
 	must(t, db.Create(&models.ShoppingListItem{OrganizationID: orgID, Item: "Молоко", ListID: &list.ID, AddedByUserID: &helper.ID}).Error)
 
-	helperToken, _ := auth.GenerateAccessToken(helper.ID)
+	helperToken, _ := auth.GenerateAccessToken(helper.ID, 0)
 
 	t.Run("wrong password", func(t *testing.T) {
 		if w := call("DELETE", "/auth/me", helperToken, map[string]string{"password": "nope"}); w.Code != http.StatusForbidden {

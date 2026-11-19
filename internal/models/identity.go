@@ -40,6 +40,7 @@ type User struct {
 	Phone        string    `json:"phone,omitempty"` // задел под P1 (магик-ссылка/OTP)
 	AvatarURL    string    `json:"avatar_url,omitempty"`
 	Locale       string    `gorm:"default:'ru'" json:"locale"` // ru|en|el
+	TokenVersion int       `gorm:"not null;default:0" json:"-"` // +1 при смене пароля — старые access-токены недействительны
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

@@ -23,6 +23,9 @@ import (
 func TestOrgIsolation(t *testing.T) {
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
+		if os.Getenv("REQUIRE_DB") == "1" {
+			t.Fatal("TEST_DATABASE_URL не задан, а REQUIRE_DB=1")
+		}
 		t.Skip("TEST_DATABASE_URL не задан")
 	}
 	t.Setenv("SMTP_HOST", "")
