@@ -3,7 +3,9 @@ package server
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
@@ -141,5 +143,92 @@ func TestRegisterName(t *testing.T) {
 	w = e.do(req{method: "POST", path: "/auth/register", body: map[string]string{"email": "maria.k-" + uniq() + "@test.local", "password": "pass-" + uniq(), "org_name": "Дом"}})
 	if u := e.json(w)["user"].(map[string]any); fmt.Sprint(u["name"]) == "" || strings.Contains(fmt.Sprint(u["name"]), "@") {
 		t.Errorf("имя без поля: %v", u["name"])
+	}
+}
+
+// AUTH-09: смена почты — только с текущим паролем; занятая → 409; вход по новой почте, старая не работает;
+// неиспользованные ссылки сброса пароля (ушли на прежнюю почту) удаляются.
+func TestChangeEmail(t *testing.T) {
+	e := newEnv(t, 1000)
+	o := e.owner("email")
+	other := e.owner("email2")
+	e.db.Create(&models.PasswordReset{UserID: o.UserID, TokenHash: "h-" + uniq(), ExpiresAt: time.Now().Add(time.Hour)})
+
+	e.expect("неверный пароль", e.do(req{method: "POST", path: "/auth/email", token: o.Token,
+		body: map[string]string{"current_password": "nope", "new_email": "x-" + uniq() + "@test.local"}}), 403)
+	e.expect("не почта", e.do(req{method: "POST", path: "/auth/email", token: o.Token,
+		body: map[string]string{"current_password": o.Password, "new_email": "not-an-email"}}), 400)
+	e.expect("занята", e.do(req{method: "POST", path: "/auth/email", token: o.Token,
+		body: map[string]string{"current_password": o.Password, "new_email": strings.ToUpper(other.Email)}}), 409)
+	e.expect("без входа", e.do(req{method: "POST", path: "/auth/email",
+		body: map[string]string{"current_password": o.Password, "new_email": "y@test.local"}}), 401)
+
+	newEmail := "New-" + uniq() + "@Test.local"
+	w := e.do(req{method: "POST", path: "/auth/email", token: o.Token,
+		body: map[string]string{"current_password": o.Password, "new_email": " " + newEmail + " "}})
+	e.expect("смена", w, 200)
+	if got := e.json(w)["user"].(map[string]any)["email"]; got != strings.ToLower(newEmail) {
+		t.Errorf("почта в ответе: %v", got)
+	}
+	e.expect("вход по новой", e.do(req{method: "POST", path: "/auth/login",
+		body: map[string]string{"email": strings.ToLower(newEmail), "password": o.Password}}), 200)
+	e.expect("вход по старой", e.do(req{method: "POST", path: "/auth/login",
+		body: map[string]string{"email": o.Email, "password": o.Password}}), 401)
+	var resets int64
+	e.db.Model(&models.PasswordReset{}).Where("user_id = ?", o.UserID).Count(&resets)
+	if resets != 0 {
+		t.Errorf("остались ссылки сброса на старую почту: %d", resets)
+	}
+}
+
+// INV-08: одно приглашение — один человек, даже при одновременном принятии; приглашение не понижает
+// роль того, кто уже в доме (владелец, открывший ссылку «помощник», остаётся владельцем).
+func TestInviteAcceptOnceAndNoDowngrade(t *testing.T) {
+	e := newEnv(t, 1000)
+	o := e.owner("invrace")
+	w := e.do(req{method: "POST", path: fmt.Sprintf("/orgs/%d/invites", o.Org), token: o.Token, org: o.Org,
+		body: map[string]string{"role": "helper"}})
+	e.expect("приглашение без почты", w, 201)
+	token := e.json(w)["token"]
+
+	codes := make(chan int, 8)
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			r := e.do(req{method: "POST", path: fmt.Sprintf("/invites/%v/accept", token), body: map[string]string{
+				"name": "гонка", "password": "pass-" + uniq(), "email": "race-" + uniq() + "@test.local"}})
+			codes <- r.Code
+		}()
+	}
+	wg.Wait()
+	close(codes)
+	ok := 0
+	for c := range codes {
+		if c == 200 {
+			ok++
+		} else if c != 410 {
+			t.Errorf("параллельное принятие: код %d", c)
+		}
+	}
+	var members int64
+	e.db.Model(&models.Membership{}).Where("organization_id = ? AND role = 'helper'", o.Org).Count(&members)
+	if ok != 1 || members != 1 {
+		t.Fatalf("одно приглашение приняли %d раз, помощников в доме %d", ok, members)
+	}
+
+	// Владелец сам принимает приглашение «помощник» на свою почту.
+	w = e.do(req{method: "POST", path: fmt.Sprintf("/orgs/%d/invites", o.Org), token: o.Token, org: o.Org,
+		body: map[string]string{"email": o.Email, "role": "helper"}})
+	if w.Code != 201 {
+		return // приглашать уже состоящих нельзя — понижение невозможно и так
+	}
+	e.do(req{method: "POST", path: fmt.Sprintf("/invites/%v/accept", e.json(w)["token"]), body: map[string]string{
+		"name": "владелец", "password": o.Password}})
+	var m models.Membership
+	e.db.Where("user_id = ? AND organization_id = ?", o.UserID, o.Org).First(&m)
+	if m.Role != "owner" {
+		t.Errorf("приглашение понизило владельца до %q", m.Role)
 	}
 }

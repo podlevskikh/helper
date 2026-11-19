@@ -288,6 +288,18 @@ try:
     s, js, _ = call("GET", "/admin/api/mealtimes", token=tokB, org=orgB)
     check("MEAL-01 у нового дома завтрак, обед и ужин", s == 200 and len(js or []) == 3, f"({s} {js})")
 
+    section("Почта")
+    s, _, _ = call("POST", "/auth/email", {"current_password": "wrong-pass", "new_email": email("b2")}, tokB)
+    expect("AUTH-09 смена почты с неверным паролем", s, 403)
+    s, _, _ = call("POST", "/auth/email", {"current_password": PW, "new_email": email("a")}, tokB)
+    expect("AUTH-09 чужая почта занята", s, 409)
+    s, _, _ = call("POST", "/auth/email", {"current_password": PW, "new_email": email("b2")}, tokB)
+    expect("AUTH-09 смена почты", s, 200)
+    s, _, _ = call("POST", "/auth/login", {"email": email("b2"), "password": PW})
+    expect("AUTH-09 вход по новой почте", s, 200)
+    s, _, _ = call("POST", "/auth/login", {"email": email("b"), "password": PW})
+    expect("AUTH-09 старая почта не работает", s, 401)
+
     section("Пароль")
     mark = log_len()
     s, _, _ = call("POST", "/auth/password/forgot", {"email": email("a")})

@@ -72,6 +72,7 @@ POST /admin/api/regenerate-schedule
 POST /admin/api/tasks/:id/recipes
 POST /admin/api/tasks/:id/zones
 POST /admin/api/zones
+POST /auth/email
 POST /auth/login
 POST /auth/logout
 POST /auth/password
