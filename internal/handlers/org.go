@@ -24,16 +24,16 @@ func NewOrgHandler(db *gorm.DB) *OrgHandler {
 
 // MemberView — то, что отдаём наружу (без лишних полей).
 type MemberView struct {
-	ID             uint                   `json:"id"`
-	UserID         uint                   `json:"user_id"`
-	OrganizationID uint                   `json:"organization_id"`
-	Role           models.Role            `json:"role"`
+	ID             uint                    `json:"id"`
+	UserID         uint                    `json:"user_id"`
+	OrganizationID uint                    `json:"organization_id"`
+	Role           models.Role             `json:"role"`
 	Status         models.MembershipStatus `json:"status"`
-	InvitedBy      *uint                  `json:"invited_by,omitempty"`
-	Name           string                 `json:"name"`
-	Email          string                 `json:"email"`
-	AvatarURL      string                 `json:"avatar_url,omitempty"`
-	CreatedAt      string                 `json:"created_at"`
+	InvitedBy      *uint                   `json:"invited_by,omitempty"`
+	Name           string                  `json:"name"`
+	Email          string                  `json:"email"`
+	AvatarURL      string                  `json:"avatar_url,omitempty"`
+	CreatedAt      string                  `json:"created_at"`
 	// Выходные и праздники — для подписи в списке команды
 	DaysOff             []int  `json:"days_off"`
 	HolidayCountry      string `json:"holiday_country"`
@@ -80,16 +80,16 @@ func (h *OrgHandler) GetMembers(c *gin.Context) {
 	for _, mb := range memberships {
 		u := userMap[mb.UserID]
 		result = append(result, MemberView{
-			ID:             mb.ID,
-			UserID:         mb.UserID,
-			OrganizationID: mb.OrganizationID,
-			Role:           mb.Role,
-			Status:         mb.Status,
-			InvitedBy:      mb.InvitedBy,
-			Name:           u.Name,
-			Email:          u.Email,
-			AvatarURL:      u.AvatarURL,
-			CreatedAt:      mb.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			ID:                  mb.ID,
+			UserID:              mb.UserID,
+			OrganizationID:      mb.OrganizationID,
+			Role:                mb.Role,
+			Status:              mb.Status,
+			InvitedBy:           mb.InvitedBy,
+			Name:                u.Name,
+			Email:               u.Email,
+			AvatarURL:           u.AvatarURL,
+			CreatedAt:           mb.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			DaysOff:             daysOffList(mb.DaysOff),
 			HolidayCountry:      calendar.PersonFrom(mb).Country,
 			VacationDaysPerYear: mb.VacationDaysPerYear,

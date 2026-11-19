@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/clock"
+	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/notify"
 
@@ -210,7 +210,6 @@ func (h *AdminHandler) DeleteRecipe(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Recipe deleted"})
 }
 
-
 // MealTime handlers
 
 func (h *AdminHandler) GetMealTimes(c *gin.Context) {
@@ -242,12 +241,12 @@ func (h *AdminHandler) CreateMealTime(c *gin.Context) {
 	}
 	mealTime.ID = 0
 	mealTime.OrganizationID = h.orgID(c)
-	
+
 	if err := h.db.Create(&mealTime).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	if h.RefreshMeals != nil {
 		h.RefreshMeals(h.orgID(c))
 	}
@@ -491,19 +490,19 @@ func (h *AdminHandler) CreateChildcareSchedule(c *gin.Context) {
 	}
 	schedule.ID = 0
 	schedule.OrganizationID = h.orgID(c)
-	
+
 	if err := h.db.Create(&schedule).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusCreated, schedule)
 }
 
 func (h *AdminHandler) UpdateChildcareSchedule(c *gin.Context) {
 	id := c.Param("id")
 	var schedule models.ChildcareSchedule
-	
+
 	if err := h.orgDB(c).First(&schedule, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Childcare schedule not found"})
 		return
@@ -514,12 +513,12 @@ func (h *AdminHandler) UpdateChildcareSchedule(c *gin.Context) {
 		return
 	}
 	schedule.ID, schedule.OrganizationID = keepID, keepOrg
-	
+
 	if err := h.db.Save(&schedule).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, schedule)
 }
 
@@ -628,14 +627,14 @@ func (h *AdminHandler) UpdateTask(c *gin.Context) {
 	}
 
 	var input struct {
-		Time               string `json:"time"`
-		EndTime            string `json:"end_time"`
-		Title              string `json:"title"`
-		Description        string `json:"description"`
-		RecipeIDs          []uint `json:"recipe_ids"`
-		TaskCategoryID     *uint  `json:"task_category_id"`
-		AssignedToUserID   *uint  `json:"assigned_to_user_id"`
-		Priority           *string `json:"priority"`
+		Time             string  `json:"time"`
+		EndTime          string  `json:"end_time"`
+		Title            string  `json:"title"`
+		Description      string  `json:"description"`
+		RecipeIDs        []uint  `json:"recipe_ids"`
+		TaskCategoryID   *uint   `json:"task_category_id"`
+		AssignedToUserID *uint   `json:"assigned_to_user_id"`
+		Priority         *string `json:"priority"`
 		// Date — перенести разовую задачу на другой день (YYYY-MM-DD).
 		Date *string `json:"date"`
 	}
@@ -893,14 +892,14 @@ func (h *AdminHandler) RemoveZoneFromTask(c *gin.Context) {
 // Custom tasks survive schedule regeneration.
 func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
 	var input struct {
-		Date               string `json:"date"`
-		Time               string `json:"time"`
-		EndTime            string `json:"end_time"`
-		Priority           string `json:"priority"`
-		Title              string `json:"title"`
-		Description        string `json:"description"`
-		TaskCategoryID     *uint  `json:"task_category_id"`
-		AssignedToUserID   *uint  `json:"assigned_to_user_id"`
+		Date             string `json:"date"`
+		Time             string `json:"time"`
+		EndTime          string `json:"end_time"`
+		Priority         string `json:"priority"`
+		Title            string `json:"title"`
+		Description      string `json:"description"`
+		TaskCategoryID   *uint  `json:"task_category_id"`
+		AssignedToUserID *uint  `json:"assigned_to_user_id"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -929,17 +928,17 @@ func (h *AdminHandler) CreateCustomTask(c *gin.Context) {
 	}
 
 	task := models.ScheduleTask{
-		ScheduleID:         schedule.ID,
-		OrganizationID:     h.orgID(c),
-		TaskType:           "custom",
-		Time:               input.Time,
-		EndTime:            input.EndTime,
-		Priority:           input.Priority,
-		Title:              input.Title,
-		Description:        input.Description,
-		TaskCategoryID:     input.TaskCategoryID,
-		AssignedToUserID:   input.AssignedToUserID,
-		Completed:          false,
+		ScheduleID:       schedule.ID,
+		OrganizationID:   h.orgID(c),
+		TaskType:         "custom",
+		Time:             input.Time,
+		EndTime:          input.EndTime,
+		Priority:         input.Priority,
+		Title:            input.Title,
+		Description:      input.Description,
+		TaskCategoryID:   input.TaskCategoryID,
+		AssignedToUserID: input.AssignedToUserID,
+		Completed:        false,
 	}
 	if err := h.db.Create(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -975,4 +974,3 @@ func (h *AdminHandler) DeleteCustomTask(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Custom task deleted"})
 }
-

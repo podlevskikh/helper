@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"podlevskikh/awesomeProject/internal/calendar"
-	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/clock"
+	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/notify"
 
@@ -76,14 +76,14 @@ func (h *HelperHandler) mergeChildcareTasks(c *gin.Context, schedule *models.Dai
 		}
 		task := models.ScheduleTask{
 			OrganizationID: h.orgID(c),
-			ScheduleID:  schedule.ID,
-			TaskType:    "childcare",
-			Time:        cc.StartTime,
-			EndTime:     cc.EndTime,
-			Duration:    childcareDuration(cc.StartTime, cc.EndTime),
-			Title:       "Childcare",
-			Description: cc.Notes,
-			Completed:   false,
+			ScheduleID:     schedule.ID,
+			TaskType:       "childcare",
+			Time:           cc.StartTime,
+			EndTime:        cc.EndTime,
+			Duration:       childcareDuration(cc.StartTime, cc.EndTime),
+			Title:          "Childcare",
+			Description:    cc.Notes,
+			Completed:      false,
 		}
 		if err := h.db.Create(&task).Error; err == nil {
 			schedule.Tasks = append(schedule.Tasks, task)
@@ -275,7 +275,7 @@ func (h *HelperHandler) CompleteTask(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
-	
+
 	wasDone := task.Completed
 	task.Completed = true
 	now := time.Now()
@@ -287,7 +287,7 @@ func (h *HelperHandler) CompleteTask(c *gin.Context) {
 	if !wasDone {
 		notify.TaskCompleted(h.db, currentUserID(c), &task)
 	}
-	
+
 	c.JSON(http.StatusOK, task)
 }
 
@@ -300,14 +300,14 @@ func (h *HelperHandler) UncompleteTask(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
-	
+
 	task.Completed = false
 	task.CompletedAt = nil
 	if err := h.db.Save(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, task)
 }
 
@@ -333,7 +333,7 @@ func (h *HelperHandler) AddShoppingListItem(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	item.AddedBy = "helper"
 	item.OrganizationID = h.orgID(c)
 	item.ID = 0
@@ -354,7 +354,7 @@ func (h *HelperHandler) AddShoppingListItem(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusCreated, item)
 }
 
@@ -366,7 +366,7 @@ func (h *HelperHandler) MarkItemPurchased(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Item not found"})
 		return
 	}
-	
+
 	item.Purchased = true
 	now := time.Now()
 	item.PurchasedAt = &now
@@ -374,7 +374,7 @@ func (h *HelperHandler) MarkItemPurchased(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, item)
 }
 
