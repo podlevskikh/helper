@@ -17,7 +17,7 @@ func TestIDORAllRoutesWithID(t *testing.T) {
 	helperA := e.member(a, "helper", "idorA")
 	b := e.owner("idorB")
 
-	day := time.Now().UTC().Truncate(24 * time.Hour).AddDate(0, 0, 3)
+	day := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, 3)
 	recipe := models.Recipe{OrganizationID: a.Org, Name: "секретный рецепт"}
 	e.db.Create(&recipe)
 	comment := models.RecipeComment{OrganizationID: a.Org, RecipeID: recipe.ID, Comment: "коммент"}
