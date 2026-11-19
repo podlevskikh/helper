@@ -8,6 +8,7 @@ import (
 	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
+	"podlevskikh/awesomeProject/internal/notify"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -272,12 +273,16 @@ func (h *HelperHandler) CompleteTask(c *gin.Context) {
 		return
 	}
 	
+	wasDone := task.Completed
 	task.Completed = true
 	now := time.Now()
 	task.CompletedAt = &now
 	if err := h.db.Save(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if !wasDone {
+		notify.TaskCompleted(h.db, currentUserID(c), &task)
 	}
 	
 	c.JSON(http.StatusOK, task)

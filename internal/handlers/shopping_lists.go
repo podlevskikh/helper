@@ -12,6 +12,7 @@ import (
 
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
+	"podlevskikh/awesomeProject/internal/notify"
 )
 
 // ── Списки покупок (раздел «Входящие») ──────────────────────────────────────
@@ -245,7 +246,11 @@ func (h *HelperHandler) SendShoppingList(c *gin.Context) {
 	}
 	if l.Status == models.ShoppingListDraft {
 		now := time.Now()
-		h.db.Model(l).Updates(map[string]any{"status": models.ShoppingListOpen, "sent_at": now})
+		res := h.db.Model(&models.ShoppingList{}).Where("id = ? AND status = ?", l.ID, models.ShoppingListDraft).
+			Updates(map[string]any{"status": models.ShoppingListOpen, "sent_at": now})
+		if res.Error == nil && res.RowsAffected > 0 {
+			notify.ListSent(h.db, currentUserID(c), l)
+		}
 	}
 	h.writeList(c, http.StatusOK, l.ID)
 }
@@ -288,6 +293,10 @@ func (h *HelperHandler) AddShoppingListEntry(c *gin.Context) {
 	if err := h.db.Create(item).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	// Помощник дописал в уже отправленный список — нанимателю (копится 5 минут).
+	if l.Status == models.ShoppingListOpen && isHelperRole(c) {
+		notify.ListItemAdded(h.db, currentUserID(c), l, item.Item)
 	}
 	c.JSON(http.StatusCreated, item)
 }
@@ -436,9 +445,15 @@ func (h *HelperHandler) CloseShoppingList(c *gin.Context) {
 		return
 	}
 	resp := gin.H{"closed_id": l.ID}
+	var nextID *uint
 	if next != nil {
 		resp["next_id"] = next.ID
+		nextID = &next.ID
 	}
+	var total, bought int64
+	h.db.Model(&models.ShoppingListItem{}).Where("list_id = ?", l.ID).Count(&total)
+	h.db.Model(&models.ShoppingListItem{}).Where("list_id = ? AND purchased = ?", l.ID, true).Count(&bought)
+	notify.ListClosed(h.db, uid, l, int(bought), int(total), nextID)
 	c.JSON(http.StatusOK, resp)
 }
 

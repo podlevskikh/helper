@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/middleware"
@@ -242,7 +243,11 @@ func (h *OrgHandler) GetOrgSettings(c *gin.Context) {
 	if limit <= 0 {
 		limit = 3
 	}
-	c.JSON(http.StatusOK, gin.H{"name": org.Name, "high_priority_limit": limit})
+	tz := org.Timezone
+	if tz == "" {
+		tz = "Europe/Nicosia"
+	}
+	c.JSON(http.StatusOK, gin.H{"name": org.Name, "high_priority_limit": limit, "timezone": tz})
 }
 
 // UpdateOrgSettings — изменить настройки организации.
@@ -250,7 +255,8 @@ func (h *OrgHandler) GetOrgSettings(c *gin.Context) {
 func (h *OrgHandler) UpdateOrgSettings(c *gin.Context) {
 	m := middleware.MustMembership(c)
 	var input struct {
-		HighPriorityLimit *int `json:"high_priority_limit"`
+		HighPriorityLimit *int    `json:"high_priority_limit"`
+		Timezone          *string `json:"timezone"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -263,6 +269,13 @@ func (h *OrgHandler) UpdateOrgSettings(c *gin.Context) {
 			return
 		}
 		h.db.Model(&models.Organization{}).Where("id = ?", m.OrganizationID).Update("high_priority_limit", l)
+	}
+	if input.Timezone != nil {
+		if _, err := time.LoadLocation(*input.Timezone); err != nil || *input.Timezone == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "unknown timezone"})
+			return
+		}
+		h.db.Model(&models.Organization{}).Where("id = ?", m.OrganizationID).Update("timezone", *input.Timezone)
 	}
 	h.GetOrgSettings(c)
 }
