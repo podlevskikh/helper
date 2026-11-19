@@ -1,0 +1,46 @@
+# После пуша в main Railway выкатывает новую версию (~1,5 минуты).
+# Ждём, пока /version отдаст этот коммит, и прогоняем публичный смоук прода (без входа, без паролей).
+# Провал → issue с меткой prod-smoke.
+name: post-deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: post-deploy
+  cancel-in-progress: true
+env:
+  PROD_URL: https://helper-production-12b0.up.railway.app
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Смоук прода (ждёт коммит в /version)
+        id: smoke
+        run: python3 scripts/smoke.py "$PROD_URL" --expect-sha "$GITHUB_SHA" --quiet | tee smoke.txt
+      - name: Issue при провале
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create prod-smoke --color B60205 --description "Смоук прода упал" 2>/dev/null || true
+          {
+            echo "Смоук прода после выкатки \`${GITHUB_SHA::7}\` упал."
+            echo
+            echo "Прогон: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+            echo '```'
+            tail -40 smoke.txt 2>/dev/null || echo "(нет вывода)"
+            echo '```'
+            echo
+            echo "Что делать: docs/qa/release.md фронта, раздел «Если на проде что-то сломалось»."
+          } > body.md
+          gh issue create --title "Прод: смоук после выкатки ${GITHUB_SHA::7} упал" --label prod-smoke --body-file body.md

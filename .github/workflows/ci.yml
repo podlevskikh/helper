@@ -1,0 +1,57 @@
+# Проверка каждого пуша и PR: то же, что scripts/release-check.sh локально.
+# Сборка как в Dockerfile, vet, все тесты на временной базе — в двух часовых поясах
+# (UTC, как на проде, и UTC+14, где «сегодня» по UTC ещё «вчера»), затем сервер на чистой базе и полный смоук.
+# Прод-подобной копии (helper_prodsim_base) в CI нет — в публичный репозиторий данные не кладём;
+# миграции на «старых» данных проверяет release-check.sh локально.
+name: ci
+# Запускается на пуш в любую ветку: при защите main (docs/ops/github-setup.md) коммит сначала пушится
+# в ветку, проходит CI, и только потом тот же коммит идёт в main.
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        tz: [UTC, Pacific/Kiritimati]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: helper
+          POSTGRES_PASSWORD: helper_password
+          POSTGRES_DB: helper_db
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U helper" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PG_ADMIN_URL: postgres://helper:helper_password@localhost:5432/helper_db?sslmode=disable
+      PGPASSWORD: helper_password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Пустая база-шаблон вместо копии прода
+        run: psql -q "$PG_ADMIN_URL" -c "CREATE DATABASE helper_ci_base"
+      - name: check.sh (TZ=${{ matrix.tz }})
+        if: matrix.tz != 'UTC'
+        env:
+          CHECK_TZ: ${{ matrix.tz }}
+        run: ./scripts/check.sh
+      - name: release-check.sh (check + сервер + смоук)
+        if: matrix.tz == 'UTC'
+        env:
+          PRODSIM_TEMPLATE: helper_ci_base
+        run: ./scripts/release-check.sh

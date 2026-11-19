@@ -1,0 +1,47 @@
+# Ночной бэкап базы прода: pg_dump под пользователем только для чтения → шифрование age → артефакт на 30 дней.
+# Репозиторий публичный: файл зашифрован публичным ключом, расшифровать его можно только закрытым ключом,
+# который хранится у владелицы (не в GitHub). Как настроить и как восстановить — docs/ops/backup.md.
+# Без секретов PROD_DATABASE_URL_READONLY и BACKUP_AGE_RECIPIENT шаг пропускается с предупреждением.
+name: backup
+on:
+  schedule:
+    - cron: "30 1 * * *"   # 01:30 UTC = 03:30/04:30 по Никосии
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DB_URL: ${{ secrets.PROD_DATABASE_URL_READONLY }}
+      AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+    steps:
+      - name: Секреты заданы?
+        id: cfg
+        run: |
+          if [ -z "$DB_URL" ] || [ -z "$AGE_RECIPIENT" ]; then
+            echo "::warning::Бэкап не настроен: нужны секреты PROD_DATABASE_URL_READONLY и BACKUP_AGE_RECIPIENT (docs/ops/backup.md)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: pg_dump → age
+        if: steps.cfg.outputs.ready == 'true'
+        run: |
+          sudo apt-get install -y -qq age >/dev/null
+          name="helper-$(date -u +%Y-%m-%d).dump.age"
+          # pg_dump 17 читает и более старые серверы Postgres.
+          docker run --rm -e DB_URL postgres:17 sh -c 'pg_dump --format=custom --no-owner --no-privileges "$DB_URL"' \
+            | age -r "$AGE_RECIPIENT" > "$name"
+          size="$(stat -c %s "$name")"
+          [ "$size" -gt 1000 ] || { echo "::error::Бэкап подозрительно мал: $size байт"; exit 1; }
+          echo "NAME=$name" >> "$GITHUB_ENV"
+          echo "Бэкап $name: $size байт"
+      - uses: actions/upload-artifact@v4
+        if: steps.cfg.outputs.ready == 'true'
+        with:
+          name: ${{ env.NAME }}
+          path: ${{ env.NAME }}
+          retention-days: 30
+          if-no-files-found: error

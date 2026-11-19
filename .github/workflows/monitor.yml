@@ -1,0 +1,46 @@
+# Раз в 15 минут: /healthz прода (сервер жив и база отвечает). Три попытки с паузой.
+# Падение → issue с меткой prod-down (одна открытая на раз); восстановление → комментарий и закрытие.
+# Это страховка; основной монитор с уведомлением на телефон — UptimeRobot (docs/ops/monitoring.md).
+name: monitor
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+env:
+  PROD_URL: https://helper-production-12b0.up.railway.app
+jobs:
+  healthz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Проверка /healthz
+        id: probe
+        run: |
+          for i in 1 2 3; do
+            code="$(curl -s -o body.txt -w '%{http_code}' --max-time 20 "$PROD_URL/healthz" || echo 000)"
+            [ "$code" = "200" ] && { echo "ok=true" >> "$GITHUB_OUTPUT"; exit 0; }
+            sleep 20
+          done
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+      - name: Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OK: ${{ steps.probe.outputs.ok }}
+          CODE: ${{ steps.probe.outputs.code }}
+        run: |
+          open="$(gh issue list -R "$GITHUB_REPOSITORY" --label prod-down --state open --json number -q '.[0].number')"
+          if [ "$OK" = "true" ]; then
+            [ -n "$open" ] && gh issue close "$open" -R "$GITHUB_REPOSITORY" -c "Прод снова отвечает ($(date -u +%H:%MZ))."
+            exit 0
+          fi
+          if [ -z "$open" ]; then
+            gh label create prod-down -R "$GITHUB_REPOSITORY" --color B60205 --description "Прод не отвечает" 2>/dev/null || true
+            gh issue create -R "$GITHUB_REPOSITORY" --label prod-down \
+              --title "Прод не отвечает: /healthz → $CODE" \
+              --body "$(date -u +%Y-%m-%dT%H:%MZ): $PROD_URL/healthz ответил $CODE три раза подряд. Ответ: $(head -c 300 body.txt 2>/dev/null)"
+          fi
+          exit 1
