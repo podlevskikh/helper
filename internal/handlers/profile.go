@@ -12,6 +12,7 @@ import (
 
 	"podlevskikh/awesomeProject/internal/auth"
 	"podlevskikh/awesomeProject/internal/middleware"
+	"podlevskikh/awesomeProject/internal/mail"
 	"podlevskikh/awesomeProject/internal/models"
 )
 
@@ -126,5 +127,6 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "token error"})
 		return
 	}
+	mail.SendAsync(mail.PasswordChanged(user.Email, user.Locale, webOrigin(c)))
 	c.JSON(http.StatusOK, gin.H{"access": access, "refresh": refresh})
 }

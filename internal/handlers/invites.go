@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"podlevskikh/awesomeProject/internal/auth"
+	"podlevskikh/awesomeProject/internal/mail"
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/notify"
@@ -146,6 +148,8 @@ type acceptInviteRequest struct {
 	Locale   string `json:"locale"`
 }
 
+var errAccountExists = errors.New("account exists")
+
 func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 	token := c.Param("token")
 
@@ -191,11 +195,12 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 				return txErr
 			}
 		} else {
-			// Пользователь уже существует — просто обновляем имя и пароль
-			tx.Model(&user).Updates(map[string]interface{}{
-				"name":          strings.TrimSpace(req.Name),
-				"password_hash": hash,
-			})
+			// Аккаунт с этим адресом уже есть (например, работает в другом доме).
+			// Пароль не перезаписываем — иначе ссылка-приглашение позволяла бы угнать чужой аккаунт:
+			// нужно ввести пароль от этого аккаунта.
+			if auth.CheckPassword(req.Password, user.PasswordHash) != nil {
+				return errAccountExists
+			}
 		}
 
 		// Проверяем, нет ли уже членства в этой орге
@@ -222,11 +227,18 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 		// Помечаем инвайт как принятый
 		return tx.Model(&invite).Update("status", models.InviteAccepted).Error
 	})
+	if errors.Is(err, errAccountExists) {
+		c.JSON(http.StatusConflict, gin.H{"error": "account exists", "code": "account_exists"})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to accept invite"})
 		return
 	}
 	notify.MemberJoined(h.db, invite.OrganizationID, user.ID)
+	var org models.Organization
+	h.db.First(&org, invite.OrganizationID)
+	mail.SendAsync(mail.Welcome(user.Email, user.Locale, user.Name, org.Name, webOrigin(c), true))
 
 	// Используем authHandler helper через прямой вызов
 	ah := &AuthHandler{db: h.db}

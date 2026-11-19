@@ -37,7 +37,7 @@ type User struct {
 	Email        string    `gorm:"uniqueIndex;not null" json:"email"`
 	PasswordHash string    `gorm:"not null" json:"-"` // bcrypt; никогда не отдаём наружу
 	Name         string    `json:"name"`
-	Phone        string    `json:"phone,omitempty"`      // задел под P1 (магик-ссылка/OTP)
+	Phone        string    `json:"phone,omitempty"` // задел под P1 (магик-ссылка/OTP)
 	AvatarURL    string    `json:"avatar_url,omitempty"`
 	Locale       string    `gorm:"default:'ru'" json:"locale"` // ru|en|el
 	CreatedAt    time.Time `json:"created_at"`
@@ -46,15 +46,15 @@ type User struct {
 
 // Organization — арендатор. Корень изоляции данных (organization_id во всех доменных моделях).
 type Organization struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	Name        string    `gorm:"not null" json:"name"`
-	OwnerUserID uint      `gorm:"index" json:"owner_user_id"`
+	ID          uint   `gorm:"primaryKey" json:"id"`
+	Name        string `gorm:"not null" json:"name"`
+	OwnerUserID uint   `gorm:"index" json:"owner_user_id"`
 	// Сколько задач высокой важности можно поставить на один день
 	HighPriorityLimit int `gorm:"default:3" json:"high_priority_limit"`
 	// Часовой пояс дома (IANA): по нему считаются «сегодня», план дня, напоминания и тихие часы
-	Timezone    string    `gorm:"default:'Europe/Nicosia'" json:"timezone"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Timezone  string    `gorm:"default:'Europe/Nicosia'" json:"timezone"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Membership — связь User ↔ Organization с ролью. Через неё скоупятся все данные и проверяются права.
@@ -67,11 +67,11 @@ type Membership struct {
 	Status         MembershipStatus `gorm:"default:'active'" json:"status"`
 	InvitedBy      *uint            `json:"invited_by,omitempty"`
 	// Выходные и праздники (настраивает наниматель в карточке сотрудника)
-	DaysOff             string `gorm:"default:'7'" json:"days_off"`                  // ISO-дни недели через запятую: 1 = Пн … 7 = Вс
-	HolidayCountry      string `gorm:"size:4;default:'CY'" json:"holiday_country"` // ISO-код страны праздников; "-" — без праздников
-	VacationDaysPerYear int    `gorm:"default:24" json:"vacation_days_per_year"`    // рабочих дней отпуска в году
-	CreatedAt      time.Time        `json:"created_at"`
-	UpdatedAt      time.Time        `json:"updated_at"`
+	DaysOff             string    `gorm:"default:'7'" json:"days_off"`                // ISO-дни недели через запятую: 1 = Пн … 7 = Вс
+	HolidayCountry      string    `gorm:"size:4;default:'CY'" json:"holiday_country"` // ISO-код страны праздников; "-" — без праздников
+	VacationDaysPerYear int       `gorm:"default:24" json:"vacation_days_per_year"`   // рабочих дней отпуска в году
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // Invite — приглашение в организацию (копируемая ссылка с токеном).
@@ -95,5 +95,15 @@ type RefreshToken struct {
 	TokenHash string     `gorm:"uniqueIndex;not null" json:"-"`
 	ExpiresAt time.Time  `json:"expires_at"`
 	RevokedAt *time.Time `json:"revoked_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+// PasswordReset — одноразовая ссылка «задать новый пароль» (хранится хэш, живёт 1 час).
+type PasswordReset struct {
+	ID        uint       `gorm:"primaryKey" json:"id"`
+	UserID    uint       `gorm:"index;not null" json:"user_id"`
+	TokenHash string     `gorm:"uniqueIndex;not null" json:"-"`
+	ExpiresAt time.Time  `json:"expires_at"`
+	UsedAt    *time.Time `json:"used_at,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`
 }

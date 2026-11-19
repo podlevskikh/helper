@@ -59,6 +59,7 @@ func Initialize(databaseURL string) error {
 		&models.Membership{},
 		&models.Invite{},
 		&models.RefreshToken{},
+		&models.PasswordReset{},
 		// Домен
 		&models.Recipe{},
 		&models.MealTime{},

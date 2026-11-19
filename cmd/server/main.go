@@ -41,6 +41,8 @@ func main() {
 
 	db := database.GetDB()
 	database.EnsureJWTSecret(db)
+	database.EnsureSealingKeys(db)
+	database.LoadSealedSecrets(database.SealedFile) // пароль почты и т.п. — см. scripts/seal-mail.sh
 
 	// Initialize scheduler
 	sched := scheduler.NewScheduler(db)
@@ -131,6 +133,8 @@ func main() {
 		authGroup.GET("/me", authMw, authHandler.Me)
 		authGroup.PATCH("/me", authMw, authHandler.UpdateMe)
 		authGroup.POST("/password", authMw, authHandler.ChangePassword)
+		authGroup.POST("/password/forgot", authHandler.ForgotPassword)
+		authGroup.POST("/password/reset", authHandler.ResetPassword)
 	}
 
 	// Устройства для пушей (без контекста дома: токен — на пользователя)
@@ -139,6 +143,11 @@ func main() {
 		meGroup.POST("/devices", notificationsHandler.RegisterDevice)
 		meGroup.DELETE("/devices/:token", notificationsHandler.UnregisterDevice)
 	}
+
+	// Открытый ключ для запечатанных секретов (scripts/seal-mail.sh)
+	router.GET("/system/sealing-key", func(c *gin.Context) {
+		c.JSON(200, gin.H{"public_key": database.SealingPublicKey()})
+	})
 
 	// Invite routes
 	router.GET("/invites/:token", inviteHandler.GetInvite)

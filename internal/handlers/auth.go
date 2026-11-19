@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"podlevskikh/awesomeProject/internal/auth"
+	"podlevskikh/awesomeProject/internal/mail"
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
 
@@ -160,6 +161,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 	memberships, _ := h.loadMemberships(user.ID)
+	mail.SendAsync(mail.Welcome(user.Email, user.Locale, user.Name, org.Name, webOrigin(c), false))
 	c.JSON(http.StatusCreated, authResponse{Access: access, Refresh: refresh, User: &user, Memberships: memberships})
 }
 
