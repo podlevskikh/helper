@@ -149,6 +149,17 @@ for path, icon in [("/app/", "favicon.ico?v="), ("/app/privacy", "site-icon.png?
     except Exception as e:
         html = str(e)
     check(f"PUB-07 версия иконки {icon.split('?')[0]} в {path}", icon in html)
+# PUB-08: заголовок вкладки приложения; документы — бренд, английская секция с lang="en",
+# mailto без точки в конце, ссылки на главную и на соседние документы с языком.
+s, html, _ = page("/app/")
+check("PUB-08 /app/ — заголовок вкладки Helper's Day", s == 200
+      and re.search(r"<title[^>]*>Helper(?:'|&#x27;|&#39;|&apos;)s Day</title>", html) is not None, f"({s})")
+for path in ["/app/privacy", "/app/terms", "/app/support"]:
+    s, html, _ = page(path)
+    check(f"PUB-08 документ {path}", s == 200 and "Helper's Day" in html and "Helper Day" not in html
+          and '<section id="en" lang="en">' in html and 'href="mailto:support@helperday.app"' in html
+          and not re.search(r'mailto:[^"]*\.(?=")', html) and 'href="/"' in html
+          and 'href="terms"' in html and 'Privacy</a>' in html, f"({s})")
 s, js, _ = call("GET", "/healthz")
 check("PUB-05 /healthz", s == 200 and (js or {}).get("status") == "ok", f"({s} {js})")
 s, _, _ = call("DELETE", "/auth/me")

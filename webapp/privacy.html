@@ -14,7 +14,9 @@
   header { background: var(--cherry); color: var(--cream); padding: 28px 16px 24px; }
   header .wrap, main { max-width: 760px; margin: 0 auto; }
   header h1 { margin: 0 0 8px; font-size: 26px; line-height: 1.25; }
-  header nav a { color: var(--cream); margin-right: 16px; font-weight: 600; }
+  header .home { display: inline-block; color: var(--cream); opacity: .85; font-weight: 700; text-decoration: none; margin-bottom: 10px; }
+  header nav { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+  header nav a { color: var(--cream); font-weight: 600; }
   main { padding: 8px 16px 48px; }
   h2 { color: var(--cherry); margin-top: 32px; }
   h3 { margin-top: 24px; font-size: 18px; }
@@ -24,14 +26,15 @@
 </style>
 </head>
 <body>
-<header><div class="wrap"><h1>Политика конфиденциальности / Privacy Policy</h1>
-<nav><a href="#ru">Русский</a><a href="#en">English</a><a href="privacy">Privacy</a><a href="terms">Terms</a><a href="support">Support</a></nav></div></header>
+<header><div class="wrap"><a class="home" href="/">Helper&#39;s Day</a><h1>Политика конфиденциальности / Privacy Policy</h1>
+<nav><a href="#ru">Русский</a><a href="#en">English</a><a class="doc" href="privacy">Конфиденциальность · Privacy</a><a class="doc" href="terms">Условия · Terms</a><a class="doc" href="support">Поддержка · Support</a></nav></div></header>
 <main>
 <p>Действует с 19 ноября 2026 г. · Effective November 19, 2026</p>
 <hr>
-<h2 id="ru">Русский</h2>
-<p>Приложение Helper Day помогает тому, кто ведёт дом, и его помощникам вести расписание дел по дому: задачи, готовку по рецептам, уборку по зонам, уход за ребёнком и списки покупок. Эта политика объясняет, какие данные мы получаем, зачем и как вы можете ими управлять.</p>
-<p><strong>Кто отвечает за данные.</strong> Helper Day — разработчик и продавец приложения в App Store. Связь: <a href="mailto:support@helperday.app.">support@helperday.app.</a></p>
+<section id="ru" lang="ru">
+<h2>Русский</h2>
+<p>Приложение Helper's Day помогает тому, кто ведёт дом, и его помощникам вести расписание дел по дому: задачи, готовку по рецептам, уборку по зонам, уход за ребёнком и списки покупок. Эта политика объясняет, какие данные мы получаем, зачем и как вы можете ими управлять.</p>
+<p><strong>Кто отвечает за данные.</strong> Helper's Day — разработчик и продавец приложения в App Store. Связь: <a href="mailto:support@helperday.app">support@helperday.app</a>.</p>
 <h3>Какие данные мы получаем</h3>
 <ol>
 <li><strong>Аккаунт:</strong> email, имя, пароль (храним только в виде хеша bcrypt, сам пароль не видим), язык интерфейса.</li>
@@ -62,9 +65,11 @@
 <h3>Изменения</h3>
 <p>О существенных изменениях политики сообщим в приложении или на этой странице, дата вверху обновится.</p>
 <hr>
-<h2 id="en">English</h2>
-<p>Helper Day helps whoever runs the home and their helpers keep the home schedule: tasks, cooking from recipes, cleaning by zones, childcare and shopping lists. This policy explains what data we receive, why, and how you control it.</p>
-<p><strong>Who is responsible.</strong> Helper Day, the developer and App Store seller of the app. Contact: <a href="mailto:support@helperday.app.">support@helperday.app.</a></p>
+</section>
+<section id="en" lang="en">
+<h2>English</h2>
+<p>Helper's Day helps whoever runs the home and their helpers keep the home schedule: tasks, cooking from recipes, cleaning by zones, childcare and shopping lists. This policy explains what data we receive, why, and how you control it.</p>
+<p><strong>Who is responsible.</strong> Helper's Day, the developer and App Store seller of the app. Contact: <a href="mailto:support@helperday.app">support@helperday.app</a>.</p>
 <h3>Data we receive</h3>
 <ol>
 <li><strong>Account:</strong> email, name, password (stored only as a bcrypt hash), interface language.</li>
@@ -94,6 +99,17 @@
 <p>Traffic to the server uses HTTPS, passwords are hashed, and sign-in keys on the device are kept in secure storage.</p>
 <h3>Changes</h3>
 <p>We will announce material changes in the app or on this page and update the date at the top.</p>
+</section>
 </main>
+<script>
+// Переход между документами сохраняет язык: #en/#ru из адреса, иначе — секция, до которой дочитали.
+document.querySelectorAll("a.doc").forEach(function (a) {
+  a.addEventListener("click", function () {
+    var h = location.hash, en = document.getElementById("en");
+    var lang = h === "#en" || h === "#ru" ? h : en && en.getBoundingClientRect().top < innerHeight / 2 ? "#en" : "#ru";
+    a.setAttribute("href", a.getAttribute("href").split("#")[0] + lang);
+  });
+});
+</script>
 </body>
 </html>
