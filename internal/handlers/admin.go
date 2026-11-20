@@ -122,20 +122,32 @@ func (h *AdminHandler) UpdateRecipe(c *gin.Context) {
 		return
 	}
 
-	// Update recipe fields
+	// Текст рецепта правит любой участник (CapEditRecipes): кто готовит, тот и уточняет состав и способ.
 	recipe.Name = input.Name
 	recipe.Description = input.Description
 	recipe.Ingredients = input.Ingredients
 	recipe.Instructions = input.Instructions
-	recipe.FamilyMember = input.FamilyMember
 	recipe.Tags = input.Tags
-	recipe.ImageURL = input.ImageURL
 	recipe.VideoURL = input.VideoURL
 	recipe.Rating = input.Rating
 	recipe.PrepTime = input.PrepTime
 	recipe.CookTime = input.CookTime
 	recipe.Servings = input.Servings
-	recipe.IsActive = input.IsActive
+
+	// Для кого блюдо, фото, «готовим сейчас» и приёмы пищи влияют на меню — только с CapManageRecipes.
+	m := middleware.MustMembership(c)
+	canManage := middleware.Can(m, middleware.CapManageRecipes)
+	if canManage {
+		recipe.FamilyMember = input.FamilyMember
+		recipe.ImageURL = input.ImageURL
+		recipe.IsActive = input.IsActive
+	}
+
+	var editor models.User
+	if err := h.db.Select("id", "name").First(&editor, m.UserID).Error; err == nil {
+		recipe.UpdatedByID = &editor.ID
+		recipe.UpdatedByName = editor.Name
+	}
 
 	if err := h.db.Save(&recipe).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -143,7 +155,7 @@ func (h *AdminHandler) UpdateRecipe(c *gin.Context) {
 	}
 
 	// Update meal time associations
-	if input.MealTimeIDs != nil {
+	if canManage && input.MealTimeIDs != nil {
 		var mealTimes []models.MealTime
 		if len(input.MealTimeIDs) > 0 {
 			if err := h.orgDB(c).Find(&mealTimes, input.MealTimeIDs).Error; err != nil {

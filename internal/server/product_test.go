@@ -415,3 +415,39 @@ func TestInviteAcceptOnceAndNoDowngrade(t *testing.T) {
 		t.Errorf("приглашение понизило владельца до %q", m.Role)
 	}
 }
+
+// REC-03: помощник правит текст рецепта (состав, как готовить); для кого блюдо, «готовим сейчас» и приёмы пищи
+// остаются как были; в рецепте видно, кто правил последним. Создать и удалить рецепт помощник не может.
+func TestHelperEditsRecipeText(t *testing.T) {
+	e := newEnv(t, 1000)
+	o := e.owner("recedit")
+	h := e.member(o, "helper", "recedit")
+	meals := e.jsonList(e.do(req{method: "GET", path: "/admin/api/mealtimes", token: o.Token, org: o.Org}))
+	w := e.do(req{method: "POST", path: "/admin/api/recipes", token: o.Token, org: o.Org, body: map[string]any{
+		"name": "Сырники", "ingredients": "Творог — 150 г", "instructions": "Смешать", "family_member": "adult",
+		"is_active": true, "servings": 1, "tags": "завтрак", "meal_time_ids": []any{meals[0]["id"]}}})
+	e.expect("создание", w, 201)
+	path := fmt.Sprintf("/admin/api/recipes/%.0f", e.json(w)["id"])
+
+	w = e.do(req{method: "PUT", path: path, token: h.Token, org: h.Org, body: map[string]any{
+		"name": "Сырники", "ingredients": "Творог — 150 г\nМука — 1 ст. л.", "instructions": "Смешать, жарить 3 мин с каждой стороны",
+		"family_member": "baby", "is_active": false, "servings": 1, "tags": "завтрак", "meal_time_ids": []any{}}})
+	e.expect("правка помощником", w, 200)
+	r := e.json(w)
+	if r["ingredients"] != "Творог — 150 г\nМука — 1 ст. л." || r["instructions"] != "Смешать, жарить 3 мин с каждой стороны" {
+		t.Errorf("текст не сохранился: %v", r)
+	}
+	if r["family_member"] != "adult" || r["is_active"] != true {
+		t.Errorf("помощник поменял, для кого блюдо или «готовим сейчас»: %v %v", r["family_member"], r["is_active"])
+	}
+	if mt, _ := r["meal_times"].([]any); len(mt) != 1 {
+		t.Errorf("помощник поменял приёмы пищи: %v", r["meal_times"])
+	}
+	if r["updated_by_name"] != "helper recedit" {
+		t.Errorf("кто правил: %v", r["updated_by_name"])
+	}
+
+	e.expect("создание помощником", e.do(req{method: "POST", path: "/admin/api/recipes", token: h.Token, org: h.Org,
+		body: map[string]any{"name": "x"}}), 403)
+	e.expect("удаление помощником", e.do(req{method: "DELETE", path: path, token: h.Token, org: h.Org}), 403)
+}

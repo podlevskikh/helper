@@ -8,24 +8,27 @@ import (
 
 // Recipe represents a meal recipe
 type Recipe struct {
-	ID             uint      `gorm:"primaryKey" json:"id"`
-	OrganizationID uint      `gorm:"index;not null;default:1" json:"organization_id"`
-	Name           string    `gorm:"not null" json:"name"`
-	Description    string    `json:"description"`
-	Ingredients    string    `gorm:"type:text" json:"ingredients"` // JSON or text list
-	Instructions   string    `gorm:"type:text" json:"instructions"`
-	PrepTime       int       `json:"prep_time"` // in minutes
-	CookTime       int       `json:"cook_time"` // in minutes
-	Servings       int       `json:"servings"`
-	Category       string    `json:"category,omitempty"`            // DEPRECATED: use MealTimes relation instead
-	FamilyMember   string    `json:"family_member"`                 // all, adult, baby, specific person
-	Tags           string    `json:"tags"`                          // comma-separated tags
-	ImageURL       string    `json:"image_url"`                     // URL to recipe image
-	VideoURL       string    `json:"video_url"`                     // URL to recipe video
-	Rating         float64   `gorm:"default:0" json:"rating"`       // 0-5 stars
-	IsActive       bool      `gorm:"default:true" json:"is_active"` // whether recipe is active and can be scheduled
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             uint    `gorm:"primaryKey" json:"id"`
+	OrganizationID uint    `gorm:"index;not null;default:1" json:"organization_id"`
+	Name           string  `gorm:"not null" json:"name"`
+	Description    string  `json:"description"`
+	Ingredients    string  `gorm:"type:text" json:"ingredients"` // JSON or text list
+	Instructions   string  `gorm:"type:text" json:"instructions"`
+	PrepTime       int     `json:"prep_time"` // in minutes
+	CookTime       int     `json:"cook_time"` // in minutes
+	Servings       int     `json:"servings"`
+	Category       string  `json:"category,omitempty"`            // DEPRECATED: use MealTimes relation instead
+	FamilyMember   string  `json:"family_member"`                 // all, adult, baby, specific person
+	Tags           string  `json:"tags"`                          // comma-separated tags
+	ImageURL       string  `json:"image_url"`                     // URL to recipe image
+	VideoURL       string  `json:"video_url"`                     // URL to recipe video
+	Rating         float64 `gorm:"default:0" json:"rating"`       // 0-5 stars
+	IsActive       bool    `gorm:"default:true" json:"is_active"` // whether recipe is active and can be scheduled
+	// Кто последним правил рецепт (имя на момент правки) — видно в карточке: «Изменила Мария, 20 нояб.».
+	UpdatedByID   *uint     `json:"updated_by_id,omitempty"`
+	UpdatedByName string    `json:"updated_by_name,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 
 	// Relations
 	MealTimes []MealTime `gorm:"many2many:recipe_meal_times;" json:"meal_times,omitempty"` // multiple meal types for this recipe

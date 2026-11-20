@@ -16,6 +16,9 @@ const (
 	CapManageSchedule Capability = "manage_schedule"
 	CapViewRecipes    Capability = "view_recipes"
 	CapManageRecipes  Capability = "manage_recipes"
+	// CapEditRecipes — править текст рецепта (состав, как готовить, время). Есть у всех: кто готовит,
+	// тот и уточняет рецепт. Создать, удалить и поменять, в какие приёмы пищи он идёт, — CapManageRecipes.
+	CapEditRecipes    Capability = "edit_recipes"
 	CapViewShopping   Capability = "view_shopping"
 	CapManageShopping Capability = "manage_shopping"
 	CapManageTeam     Capability = "manage_team"
@@ -27,24 +30,24 @@ const (
 var roleCapabilities = map[models.Role][]Capability{
 	models.RoleOwner: {
 		CapViewSchedule, CapManageSchedule,
-		CapViewRecipes, CapManageRecipes,
+		CapViewRecipes, CapEditRecipes, CapManageRecipes,
 		CapViewShopping, CapManageShopping,
 		CapManageTeam, CapManageSettings, CapManageBilling,
 	},
 	models.RoleAdmin: {
 		CapViewSchedule, CapManageSchedule,
-		CapViewRecipes, CapManageRecipes,
+		CapViewRecipes, CapEditRecipes, CapManageRecipes,
 		CapViewShopping, CapManageShopping,
 		CapManageTeam,
 	},
 	models.RoleManager: {
 		CapViewSchedule, CapManageSchedule,
-		CapViewRecipes,
+		CapViewRecipes, CapEditRecipes,
 		CapViewShopping, CapManageShopping,
 	},
 	models.RoleHelper: {
 		CapViewSchedule,
-		CapViewRecipes,
+		CapViewRecipes, CapEditRecipes,
 		CapViewShopping, CapManageShopping,
 	},
 }

@@ -225,7 +225,7 @@ func NewRouter(d Deps) *gin.Engine {
 			api.GET("/recipes", adminHandler.GetRecipes)
 			api.GET("/recipes/:id", adminHandler.GetRecipe)
 			api.POST("/recipes", middleware.Require(middleware.CapManageRecipes), adminHandler.CreateRecipe)
-			api.PUT("/recipes/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.UpdateRecipe)
+			api.PUT("/recipes/:id", middleware.Require(middleware.CapEditRecipes), adminHandler.UpdateRecipe)
 			api.DELETE("/recipes/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.DeleteRecipe)
 			// Загрузка фото рецептов убрана: рецепты без фото (решение владелицы), а старый обработчик не проверял размер и содержимое.
 
