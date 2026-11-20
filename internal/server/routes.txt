@@ -34,6 +34,8 @@ GET /app
 GET /app/*path
 GET /auth/email
 GET /auth/me
+GET /en
+GET /en/
 GET /healthz
 GET /helper/
 GET /helper/api/childcare/today
@@ -54,10 +56,12 @@ GET /orgs/:orgId/members/:userId/schedule-settings
 GET /orgs/:orgId/notification-prefs
 GET /orgs/:orgId/settings
 GET /orgs/:orgId/task-categories
+GET /site/*path
 GET /static/*filepath
 GET /static2/*filepath
 GET /system/sealing-key
 GET /version
+HEAD /
 HEAD /app/*path
 HEAD /static/*filepath
 HEAD /static2/*filepath

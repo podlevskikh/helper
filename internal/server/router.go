@@ -384,14 +384,16 @@ func NewRouter(d Deps) *gin.Engine {
 		}
 	}
 
-	// Root redirect
-	router.GET("/", func(c *gin.Context) {
-		if hasWebApp {
-			c.Redirect(302, handlers.WebAppPrefix+"/")
-			return
-		}
-		c.Redirect(302, "/helper")
-	})
+	// Главная: лендинг (landing/), без него — редирект в приложение
+	if !handlers.RegisterLanding(router, "./landing") {
+		router.GET("/", func(c *gin.Context) {
+			if hasWebApp {
+				c.Redirect(302, handlers.WebAppPrefix+"/")
+				return
+			}
+			c.Redirect(302, "/helper")
+		})
+	}
 
 	return router
 }

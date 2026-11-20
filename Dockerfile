@@ -33,6 +33,8 @@ COPY web ./web
 COPY web2 ./web2
 # Веб-версия приложения (Expo), раздаётся по /app — собирается во фронте scripts/build-for-backend.sh
 COPY webapp ./webapp
+# Главная страница сайта (лендинг): / и /en/, картинки на /site/
+COPY landing ./landing
 # Запечатанные секреты (пароль почты) — расшифровывает только сам сервер, см. scripts/seal-mail.sh
 COPY secrets.sealed.json ./
 
