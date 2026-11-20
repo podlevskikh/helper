@@ -411,6 +411,16 @@ try:
     expect("ROLE-11 роль вернули", s, 200)
     s, _, _ = call("PATCH", f"/orgs/{orgA}/members/{helperId}", {"role": "owner"}, tokAdm, orgA)
     expect("ROLE-11 роль owner не выдаётся", s, 400)
+    # LANG-03: сервер принимает все языки приложения и отвергает незнакомые
+    for code in ("es", "fil", "id", "el", "uk", "ne", "si"):
+        s, js, _ = call("PATCH", "/auth/me", {"locale": code}, tokA)
+        check(f"LANG-03 язык {code} сохраняется", s == 200, f"({s} {js})")
+    s, js, _ = call("GET", "/auth/me", token=tokA)
+    check("LANG-03 /auth/me отдаёт выбранный язык", ((js or {}).get("user") or {}).get("locale") == "si", f"({js})")
+    s, _, _ = call("PATCH", "/auth/me", {"locale": "de"}, tokA)
+    expect("LANG-03 незнакомый язык", s, 400)
+    s, _, _ = call("PATCH", "/auth/me", {"locale": "ru"}, tokA)
+    expect("LANG-03 язык вернули", s, 200)
     s, js, _ = call("GET", "/auth/me", token=tokA)
     ownerId = ((js or {}).get("user") or {}).get("id")
     s, _, _ = call("PATCH", f"/orgs/{orgA}/members/{ownerId}", {"role": "helper"}, tokAdm, orgA)

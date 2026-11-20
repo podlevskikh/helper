@@ -1,0 +1,6 @@
+package notify
+
+// Тексты пушей: язык «ne». Ключи и параметры — как в catalogEn (i18n.go); формы по числу — через «|».
+func init() {
+	catalogs["ne"] = map[string]string{}
+}

@@ -72,10 +72,68 @@ func TestQuietSummary(t *testing.T) {
 	}
 }
 
-func TestPluralRu(t *testing.T) {
-	for n, want := range map[int]string{1: "задача", 2: "задачи", 5: "задач", 11: "задач", 21: "задача", 22: "задачи", 14: "задач"} {
-		if got := pluralRu(n, "задача", "задачи", "задач"); got != want {
-			t.Errorf("%d: got %s want %s", n, got, want)
+func TestPluralIndex(t *testing.T) {
+	for n, want := range map[int]int{1: 0, 2: 1, 5: 2, 11: 2, 21: 0, 22: 1, 14: 2} {
+		if got := pluralIndex("ru", n); got != want {
+			t.Errorf("ru %d: got %d want %d", n, got, want)
+		}
+	}
+	if pluralIndex("id", 5) != 0 || pluralIndex("si", 0) != 0 || pluralIndex("es", 0) != 1 || pluralIndex("en", 1) != 0 {
+		t.Error("правила числа для id/si/es/en")
+	}
+}
+
+// LANG-04: у каждого языка пушей — все ключи английского, параметры только из английской строки,
+// у форм по числу — столько форм, сколько у языка (ru, uk — 3; id — 1; остальные — 2).
+func TestCatalogsComplete(t *testing.T) {
+	params := func(s string) map[string]bool {
+		m := map[string]bool{}
+		for _, p := range strings.Split(s, "{")[1:] {
+			if i := strings.Index(p, "}"); i > 0 {
+				m[p[:i]] = true
+			}
+		}
+		return m
+	}
+	forms := map[string]int{"ru": 3, "uk": 3, "id": 1}
+	for lang, cat := range catalogs {
+		if lang == "en" {
+			continue
+		}
+		for key, en := range catalogEn {
+			v, ok := cat[key]
+			if !ok {
+				t.Errorf("%s: нет ключа %q", lang, key)
+				continue
+			}
+			want := params(en)
+			for p := range params(v) {
+				if !want[p] {
+					t.Errorf("%s %q: параметр {%s} не из английской строки", lang, key, p)
+				}
+			}
+			if strings.Contains(en, "|") {
+				n := forms[lang]
+				if n == 0 {
+					n = 2
+				}
+				if got := len(strings.Split(v, "|")); got != n {
+					t.Errorf("%s %q: %d форм вместо %d", lang, key, got, n)
+				}
+			}
+		}
+		for key := range cat {
+			if _, ok := catalogEn[key]; !ok {
+				t.Errorf("%s: лишний ключ %q", lang, key)
+			}
+		}
+	}
+}
+
+func TestLang(t *testing.T) {
+	for in, want := range map[string]string{"ru": "ru", "uk-UA": "uk", "tl": "fil", "in_ID": "id", "fil": "fil", "de": "en", "": "en", "be": "ru"} {
+		if got := Lang(in); got != want {
+			t.Errorf("Lang(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

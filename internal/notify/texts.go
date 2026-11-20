@@ -31,29 +31,6 @@ type Params struct {
 	Reason    string   `json:"reason,omitempty"` // почему помощник отдыхает: weekly | holiday | vacation | day_off
 }
 
-func dayOffReason(reason string, ru bool) string {
-	if ru {
-		switch reason {
-		case "holiday":
-			return "праздник"
-		case "vacation":
-			return "отпуск"
-		case "day_off":
-			return "отгул"
-		}
-		return "выходной"
-	}
-	switch reason {
-	case "holiday":
-		return "a holiday"
-	case "vacation":
-		return "on vacation"
-	case "day_off":
-		return "a day off"
-	}
-	return "a day off"
-}
-
 const maxTitle = 60
 
 func clip(s string, n int) string {
@@ -65,31 +42,9 @@ func clip(s string, n int) string {
 	return strings.TrimSpace(string(r[:n-1])) + "…"
 }
 
-// pluralRu: 1 задача, 2 задачи, 5 задач.
-func pluralRu(n int, one, few, many string) string {
-	n10, n100 := n%10, n%100
-	switch {
-	case n10 == 1 && n100 != 11:
-		return one
-	case n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14):
-		return few
-	default:
-		return many
-	}
-}
-
-func pluralEn(n int, one, many string) string {
-	if n == 1 {
-		return one
-	}
-	return many
-}
-
-func isRu(locale string) bool { return strings.HasPrefix(strings.ToLower(locale), "ru") }
-
 // quoteList — «А», «Б» и ещё N. Одинаковые названия показываем один раз,
 // «ещё N» считает все оставшиеся задачи.
-func quoteList(items []string, max int, ru bool) string {
+func quoteList(items []string, max int, lang string) string {
 	var parts []string
 	shown := map[string]bool{}
 	covered := 0
@@ -103,19 +58,11 @@ func quoteList(items []string, max int, ru bool) string {
 		}
 		shown[it] = true
 		covered++
-		if ru {
-			parts = append(parts, "«"+clip(it, 30)+"»")
-		} else {
-			parts = append(parts, "“"+clip(it, 30)+"”")
-		}
+		parts = append(parts, quote(lang, clip(it, 30)))
 	}
 	s := strings.Join(parts, ", ")
 	if rest := len(items) - covered; rest > 0 {
-		if ru {
-			s += fmt.Sprintf(" и ещё %d", rest)
-		} else {
-			s += fmt.Sprintf(" and %d more", rest)
-		}
+		s += tr(lang, "and_more", "n", rest)
 	}
 	return s
 }
@@ -135,79 +82,53 @@ func plainList(items []string, max int) string {
 	return s
 }
 
-// Render собирает заголовок и текст пуша на языке получателя (ru, иначе английский).
+func upperFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	r := []rune(s)
+	return strings.ToUpper(string(r[:1])) + string(r[1:])
+}
+
+// Render собирает заголовок и текст пуша на языке получателя (см. Lang; незнакомый язык — английский).
 func Render(kind Kind, locale string, p Params) (title, body string) {
-	ru := isRu(locale)
+	l := Lang(locale)
 	task := clip(TaskTitle(p.TaskType, p.Title, locale), maxTitle)
 	tomorrow := p.Day == "tomorrow"
 	switch kind {
 	case KindMorning:
-		if ru {
-			title = "Доброе утро, " + p.Name
-			body = fmt.Sprintf("Сегодня %d %s", p.Count, pluralRu(p.Count, "задача", "задачи", "задач"))
-			if p.HighCount > 0 {
-				body += fmt.Sprintf(", %d %s", p.HighCount, pluralRu(p.HighCount, "важная", "важные", "важных"))
-			}
-			if task != "" {
-				body += ". Первая — «" + task + "»"
-				if p.FirstTime != "" {
-					body += " в " + p.FirstTime
-				}
-			}
-		} else {
-			title = "Good morning, " + p.Name
-			body = fmt.Sprintf("%d %s today", p.Count, pluralEn(p.Count, "task", "tasks"))
-			if p.HighCount > 0 {
-				body += fmt.Sprintf(", %d important", p.HighCount)
-			}
-			if task != "" {
-				body += ". First: “" + task + "”"
-				if p.FirstTime != "" {
-					body += " at " + p.FirstTime
-				}
+		title = tr(l, "morning.title", "name", p.Name)
+		body = trN(l, "morning.count", p.Count)
+		if p.HighCount > 0 {
+			body += trN(l, "morning.high", p.HighCount)
+		}
+		if task != "" {
+			body += tr(l, "morning.first", "task", quote(l, task))
+			if p.FirstTime != "" {
+				body += tr(l, "morning.first_at", "time", p.FirstTime)
 			}
 		}
 	case KindReminder:
 		if p.StartAt != "" {
-			if ru {
-				title = task + ": начать готовить в " + p.StartAt
-				body = "Подать к " + p.Time
-			} else {
-				title = task + ": start cooking at " + p.StartAt
-				body = "Serve at " + p.Time
-			}
+			title = tr(l, "reminder.cook_title", "task", task, "time", p.StartAt)
+			body = tr(l, "reminder.cook_body", "time", p.Time)
 		} else {
-			if ru {
-				title = fmt.Sprintf("Через %d мин · %s", p.Lead, task)
-				body = p.Time
-			} else {
-				title = fmt.Sprintf("In %d min · %s", p.Lead, task)
-				body = p.Time
-			}
+			title = tr(l, "reminder.title", "n", p.Lead, "task", task)
+			body = p.Time
 		}
 		if p.Important {
-			if ru {
-				body += " · важная задача"
-			} else {
-				body += " · important task"
-			}
+			body += tr(l, "reminder.important")
 		}
 	case KindTaskNew:
 		// Имя не склоняем («от Анны» не собрать из любого имени) — «Анна: новая задача».
-		switch {
-		case ru && tomorrow:
-			title = "новая задача на завтра"
-		case ru:
-			title = "новая задача на сегодня"
-		case tomorrow:
-			title = "new task for tomorrow"
-		default:
-			title = "new task for today"
+		key := "task_new.today"
+		if tomorrow {
+			key = "task_new.tomorrow"
 		}
 		if p.Actor != "" {
-			title = p.Actor + ": " + title
+			title = tr(l, key+"_by", "actor", p.Actor)
 		} else {
-			title = strings.ToUpper(title[:1]) + title[1:]
+			title = tr(l, key)
 		}
 		body = task
 		if p.Time != "" {
@@ -215,79 +136,40 @@ func Render(kind Kind, locale string, p Params) (title, body string) {
 		}
 	case KindTaskMoved:
 		switch {
-		case ru && p.Time == "":
-			title = task + " — когда удобно"
-		case ru && tomorrow:
-			title = task + " — завтра в " + p.Time
-		case ru:
-			title = task + " — теперь в " + p.Time
 		case p.Time == "":
-			title = task + " — any time"
+			title = tr(l, "task_moved.any", "task", task)
 		case tomorrow:
-			title = task + " — tomorrow at " + p.Time
+			title = tr(l, "task_moved.tomorrow", "task", task, "time", p.Time)
 		default:
-			title = task + " — now at " + p.Time
+			title = tr(l, "task_moved.now", "task", task, "time", p.Time)
 		}
-		if ru {
-			body = "Новое время · " + p.Actor
-		} else {
-			body = "New time · " + p.Actor
-		}
+		body = tr(l, "task_moved.body", "actor", p.Actor)
 	case KindTaskCancelled:
-		if ru {
-			title = "Задача отменена"
-			body = task + " — сегодня не нужно"
-			if tomorrow {
-				body = task + " — завтра не нужно"
-			}
+		title = tr(l, "task_cancelled.title")
+		if tomorrow {
+			body = tr(l, "task_cancelled.tomorrow", "task", task)
 		} else {
-			title = "Task cancelled"
-			body = task + " — not needed today"
-			if tomorrow {
-				body = task + " — not needed tomorrow"
-			}
+			body = tr(l, "task_cancelled.today", "task", task)
 		}
 	case KindListClosed:
-		if ru {
-			title = "Покупки привезли"
-			body = fmt.Sprintf("Куплено %d из %d", p.Done, p.Total)
-			if p.Left > 0 {
-				body += fmt.Sprintf(". Ещё %d — в новом списке", p.Left)
-			}
-		} else {
-			title = "Groceries are in"
-			body = fmt.Sprintf("%d of %d bought", p.Done, p.Total)
-			if p.Left > 0 {
-				body += fmt.Sprintf(". %d moved to a new list", p.Left)
-			}
+		title = tr(l, "list_closed.title")
+		body = tr(l, "list_closed.body", "done", p.Done, "total", p.Total)
+		if p.Left > 0 {
+			body += tr(l, "list_closed.left", "n", p.Left)
 		}
 	case KindListSent:
-		if ru {
-			title = p.Actor + ": список покупок"
-			body = fmt.Sprintf("%d %s", p.Count, pluralRu(p.Count, "пункт", "пункта", "пунктов"))
-		} else {
-			title = p.Actor + ": shopping list"
-			body = fmt.Sprintf("%d %s", p.Count, pluralEn(p.Count, "item", "items"))
-		}
+		title = tr(l, "list_sent.title", "actor", p.Actor)
+		body = trN(l, "list_sent.count", p.Count)
 		if len(p.Items) > 0 {
 			body += ": " + plainList(p.Items, 4)
 		}
 	case KindListAdded:
-		if ru {
-			title = p.Actor + ": дописано в список"
-		} else {
-			title = p.Actor + ": added to the list"
-		}
+		title = tr(l, "list_added.title", "actor", p.Actor)
 		body = fmt.Sprintf("+%d: %s", len(p.Items), plainList(p.Items, 5))
 	case KindDigest:
 		if p.Done >= p.Total {
-			if ru {
-				title = p.Name + ": всё сделано"
-				body = fmt.Sprintf("%d из %d", p.Done, p.Total)
-			} else {
-				title = p.Name + ": all done"
-				body = fmt.Sprintf("%d of %d", p.Done, p.Total)
-			}
+			title = tr(l, "digest.all_title", "name", p.Name)
+			body = tr(l, "digest.all_body", "done", p.Done, "total", p.Total)
 		} else {
 			items := make([]string, len(p.Items))
 			for i, it := range p.Items {
@@ -297,91 +179,48 @@ func Render(kind Kind, locale string, p Params) (title, body string) {
 				}
 				items[i] = TaskTitle(tt, it, locale)
 			}
-			if ru {
-				title = fmt.Sprintf("%s: сделано %d из %d", p.Name, p.Done, p.Total)
-				body = "Не сделано: " + quoteList(items, 2, true)
-			} else {
-				title = fmt.Sprintf("%s: %d of %d done", p.Name, p.Done, p.Total)
-				body = "Not done: " + quoteList(items, 2, false)
-			}
+			title = tr(l, "digest.title", "name", p.Name, "done", p.Done, "total", p.Total)
+			body = tr(l, "digest.not_done", "list", quoteList(items, 2, l))
 		}
 	case KindImportantDone:
-		if ru {
-			title = "Готово · " + task
-			body = p.Actor + " · отмечено в " + p.At
-		} else {
-			title = "Done · " + task
-			body = p.Actor + " · checked at " + p.At
-		}
+		title = tr(l, "important_done.title", "task", task)
+		body = tr(l, "important_done.body", "actor", p.Actor, "time", p.At)
 	case KindDayOff:
-		if ru {
-			title = "Завтра у " + p.Name + ": " + dayOffReason(p.Reason, true)
-			body = fmt.Sprintf("%d %s перейдут к вам: %s", p.Count, pluralRu(p.Count, "регулярная задача", "регулярные задачи", "регулярных задач"),
-				plainList(p.Items, 3))
-		} else {
-			title = "Tomorrow " + p.Name + " is " + dayOffReason(p.Reason, false)
-			body = fmt.Sprintf("%d recurring %s will be yours: %s", p.Count, pluralEn(p.Count, "task", "tasks"), plainList(p.Items, 3))
+		reason := "weekly"
+		switch p.Reason {
+		case "holiday", "vacation", "day_off":
+			reason = p.Reason
 		}
+		title = tr(l, "day_off.title", "name", p.Name, "reason", tr(l, "reason."+reason))
+		body = trN(l, "day_off.body", p.Count, "list", plainList(p.Items, 3))
 	case KindMemberJoined:
-		if ru {
-			title = p.Name + " теперь в доме"
-			body = "Можно ставить задачи"
-		} else {
-			title = p.Name + " joined your home"
-			body = "You can now assign tasks"
-		}
+		title = tr(l, "member_joined.title", "name", p.Name)
+		body = tr(l, "member_joined.body")
 	case KindQuietSummary:
-		if ru {
-			title = "Пока вы отдыхали"
-		} else {
-			title = "While you were resting"
-		}
-		body = strings.Join(p.Titles, "; ")
-		if body != "" {
-			body = strings.ToUpper(string([]rune(body)[:1])) + string([]rune(body)[1:])
-		}
+		title = tr(l, "quiet.title")
+		body = upperFirst(strings.Join(p.Titles, "; "))
 	case KindTest:
-		if ru {
-			title = "Проверка уведомлений"
-			body = "Если вы это видите — всё работает"
-		} else {
-			title = "Test notification"
-			body = "If you can see this, it works"
-		}
+		title = tr(l, "test.title")
+		body = tr(l, "test.body")
 	}
 	return clip(title, 90), clip(body, 180)
 }
 
 // SummaryLine — строка для сводки «Пока вы отдыхали»: коротко и с названием задачи.
 func SummaryLine(kind Kind, locale string, p Params) string {
-	ru := isRu(locale)
-	task := clip(TaskTitle(p.TaskType, p.Title, locale), 40)
+	l := Lang(locale)
+	task := quote(l, clip(TaskTitle(p.TaskType, p.Title, locale), 40))
 	switch kind {
 	case KindTaskNew:
-		if ru {
-			return "новая задача «" + task + "»"
-		}
-		return "new task “" + task + "”"
+		return tr(l, "summary.task_new", "task", task)
 	case KindTaskCancelled:
-		if ru {
-			return "отменена «" + task + "»"
-		}
-		return "cancelled “" + task + "”"
+		return tr(l, "summary.cancelled", "task", task)
 	case KindTaskMoved:
-		if ru {
-			return "«" + task + "» в " + p.Time
-		}
-		return "“" + task + "” at " + p.Time
+		return tr(l, "summary.moved", "task", task, "time", p.Time)
 	case KindListClosed:
-		if ru {
-			return "покупки привезли"
-		}
-		return "groceries are in"
+		return tr(l, "summary.list_closed")
 	case KindListSent:
-		if ru {
-			return "список покупок (" + p.Actor + ")"
-		}
-		return "shopping list from " + p.Actor
+		return tr(l, "summary.list_sent", "actor", p.Actor)
 	}
 	t, _ := Render(kind, locale, p)
 	return t
@@ -390,7 +229,7 @@ func SummaryLine(kind Kind, locale string, p Params) string {
 // TaskTitle — название задачи для пуша: у системных задач (еда, уборка, ребёнок)
 // заголовок в базе служебный, его переводим.
 func TaskTitle(taskType, title, locale string) string {
-	ru := isRu(locale)
+	l := Lang(locale)
 	switch taskType {
 	case "meal":
 		if i := strings.Index(title, " - "); i > 0 {
@@ -398,15 +237,9 @@ func TaskTitle(taskType, title, locale string) string {
 		}
 	case "cleaning":
 		zone := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(title, "Уборка"), ":"))
-		if ru {
-			return "Уборка: " + zone
-		}
-		return "Cleaning: " + zone
+		return tr(l, "task_title.cleaning", "zone", zone)
 	case "childcare":
-		if ru {
-			return "Уход за ребёнком"
-		}
-		return "Childcare"
+		return tr(l, "task_title.childcare")
 	}
 	return title
 }
