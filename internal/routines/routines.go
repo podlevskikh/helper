@@ -189,6 +189,10 @@ func HasAny(db *gorm.DB, orgID uint) bool {
 func LockDay(tx *gorm.DB, orgID uint, date time.Time) error {
 	date = day(date)
 	key := date.Year()*10000 + int(date.Month())*100 + date.Day()
+	// Дольше 10 с не ждём: зависшая сборка дня не держит запросы бесконечно.
+	if err := tx.Exec("SET LOCAL lock_timeout = '10s'").Error; err != nil {
+		return err
+	}
 	return tx.Exec("SELECT pg_advisory_xact_lock(?::int, ?::int)", int32(orgID), key).Error
 }
 

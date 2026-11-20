@@ -23,12 +23,13 @@ type clientErrorRequest struct {
 	AppVersion string `json:"app_version"`
 }
 
+// cut — не больше n символов (по буквам, не по байтам).
 func cut(s string, n int) string {
-	s = strings.TrimSpace(s)
-	if len(s) > n {
-		return s[:n]
+	r := []rune(strings.TrimSpace(s))
+	if len(r) > n {
+		return string(r[:n])
 	}
-	return s
+	return string(r)
 }
 
 // ReportClientError — POST /me/client-errors. 204; 400 — нет текста ошибки или тело больше 16 КБ.
@@ -46,13 +47,13 @@ func ReportClientError(c *gin.Context) {
 		platform = "other"
 	}
 	e := observability.ClientError{
-		Message:    cut(req.Message, 500),
-		Stack:      cut(req.Stack, 4000),
-		Route:      observability.RedactPath(cut(req.Route, 200)),
+		Message:    observability.OneLine(observability.ScrubText(cut(req.Message, 500))),
+		Stack:      observability.ScrubText(cut(req.Stack, 4000)),
+		Route:      observability.OneLine(observability.RouteTemplate(cut(req.Route, 200))),
 		Platform:   platform,
-		AppVersion: cut(req.AppVersion, 32),
+		AppVersion: observability.OneLine(cut(req.AppVersion, 32)),
 	}
-	log.Printf("client error [%s %s] %s: %s", e.Platform, e.AppVersion, e.Route, e.Message)
+	log.Printf("client error [%s %s] %q: %q", e.Platform, e.AppVersion, e.Route, e.Message)
 	observability.CaptureClientError(e)
 	c.Status(http.StatusNoContent)
 }

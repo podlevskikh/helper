@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -69,8 +70,28 @@ func Scrub(ev *sentry.Event, _ *sentry.EventHint) *sentry.Event {
 		}
 	}
 	ev.User = sentry.User{}
+	// Текст сообщений и исключений — без адресов почты (ответы SMTP, тексты ошибок приложения).
+	ev.Message = ScrubText(ev.Message)
+	for i := range ev.Exception {
+		ev.Exception[i].Value = ScrubText(ev.Exception[i].Value)
+	}
 	return ev
 }
+
+var (
+	emailLike = regexp.MustCompile(`[^\s<>"'@:]+@[^\s<>"'@]+\.[^\s<>"'@]+`)
+	control   = regexp.MustCompile(`[\x00-\x1f\x7f]+`)
+	digits    = regexp.MustCompile(`/\d+`)
+)
+
+// ScrubText убирает из текста адреса почты.
+func ScrubText(s string) string { return emailLike.ReplaceAllString(s, "<email>") }
+
+// OneLine — текст в одну строку без управляющих символов (журнал нельзя подделать переводом строки).
+func OneLine(s string) string { return control.ReplaceAllString(s, " ") }
+
+// RouteTemplate — адрес экрана без чисел: /task/123 → /task/:id.
+func RouteTemplate(s string) string { return digits.ReplaceAllString(RedactPath(s), "/:id") }
 
 // Middleware — паники (сообщаются и пробрасываются дальше в gin.Recovery) и ответы 5xx.
 // Пусто, если Sentry не включён.

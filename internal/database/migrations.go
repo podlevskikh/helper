@@ -204,35 +204,54 @@ func mergeDuplicateDay(tx *gorm.DB, keep, drop uint) error {
 		drop, keep)
 }
 
-// dedupeRoutineTasks убирает копии задачи регулярной задачи в одном дне (тот же день, задача и время).
-// Остаётся «самая живая» копия: выполненная → с заменой блюда → изменённая вручную → самая ранняя.
+// dedupeRoutineTasks — шаг миграции: копии по всей базе.
 func dedupeRoutineTasks(tx *gorm.DB) error {
+	_, err := DedupeRoutineTasks(tx, time.Time{})
+	return err
+}
+
+// DedupeRoutineTasks убирает копии задачи регулярной задачи в одном дне (тот же день, задача и время),
+// поставленные гонкой сборки дня: созданные в пределах 5 минут от оставляемой. Задача, перенесённая
+// вручную в день, где эта регулярная задача уже стоит, создана раньше — её не трогаем.
+// Остаётся «самая живая» копия: выполненная → с заменой блюда → изменённая вручную → самая ранняя.
+// since — только дни с этой даты (нулевое время — все дни). Возвращает, сколько задач убрано.
+func DedupeRoutineTasks(db *gorm.DB, since time.Time) (int, error) {
 	var ids []uint
-	if err := tx.Raw(`SELECT id FROM (
-		SELECT st.id, row_number() OVER (
+	if err := db.Raw(`SELECT id FROM (
+		SELECT st.id, st.created_at,
+			row_number() OVER w AS rn,
+			first_value(st.created_at) OVER w AS keep_created
+		FROM schedule_tasks st JOIN daily_schedules ds ON ds.id = st.schedule_id
+		WHERE st.routine_id IS NOT NULL AND ds.date >= ?
+		WINDOW w AS (
 			PARTITION BY st.schedule_id, st.routine_id, COALESCE(st.time, '')
-			ORDER BY st.completed DESC,
+			ORDER BY COALESCE(st.completed, false) DESC,
 				EXISTS (SELECT 1 FROM meal_swaps ms WHERE ms.task_id = st.id) DESC,
-				(st.updated_at > st.created_at + interval '2 seconds') DESC,
-				st.id ASC) AS rn
-		FROM schedule_tasks st WHERE st.routine_id IS NOT NULL) r
-		WHERE rn > 1`).Scan(&ids).Error; err != nil {
-		return err
+				COALESCE(st.updated_at > st.created_at + interval '2 seconds', false) DESC,
+				st.id ASC)) r
+		WHERE rn > 1 AND abs(extract(epoch FROM (created_at - keep_created))) < 300`, since).Scan(&ids).Error; err != nil {
+		return 0, err
 	}
 	if len(ids) == 0 {
-		return nil
+		return 0, nil
 	}
-	for _, q := range []string{
-		"DELETE FROM meal_recipes WHERE schedule_task_id IN ?",
-		"DELETE FROM task_zones WHERE schedule_task_id IN ?",
-		"DELETE FROM task_dishes WHERE task_id IN ?",
-		"DELETE FROM meal_swaps WHERE task_id IN ?",
-		"DELETE FROM schedule_tasks WHERE id IN ?",
-	} {
-		if err := tx.Exec(q, ids).Error; err != nil {
-			return fmt.Errorf("%s: %w", q, err)
+	err := db.Transaction(func(tx *gorm.DB) error {
+		for _, q := range []string{
+			"DELETE FROM meal_recipes WHERE schedule_task_id IN ?",
+			"DELETE FROM task_zones WHERE schedule_task_id IN ?",
+			"DELETE FROM task_dishes WHERE task_id IN ?",
+			"DELETE FROM meal_swaps WHERE task_id IN ?",
+			"DELETE FROM schedule_tasks WHERE id IN ?",
+		} {
+			if err := tx.Exec(q, ids).Error; err != nil {
+				return fmt.Errorf("%s: %w", q, err)
+			}
 		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
 	}
 	log.Printf("schedule_tasks: убрано копий задач регулярных задач: %d", len(ids))
-	return nil
+	return len(ids), nil
 }

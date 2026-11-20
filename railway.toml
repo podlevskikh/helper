@@ -9,5 +9,6 @@ healthcheckPath = "/healthz"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
-# Между SIGTERM и SIGKILL при выкатке: сервер дожидается начатых запросов (до 15 с) и писем (cmd/server/main.go).
-drainingSeconds = 25
+# Между SIGTERM и SIGKILL при выкатке: сервер дожидается начатых запросов (до 15 с), фоновых задач (до 5 с)
+# и писем (до 10 с) — cmd/server/main.go. С запасом.
+drainingSeconds = 40

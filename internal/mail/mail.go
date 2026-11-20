@@ -19,6 +19,7 @@ import (
 	"net/smtp"
 	"net/textproto"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -77,6 +78,9 @@ var (
 	// OnFailure — письмо не ушло после всех попыток (main отправляет в Sentry; без адреса получателя).
 	OnFailure = func(subject string, err error) {}
 	inflight  sync.WaitGroup
+	// stopping закрывается в Wait: сервер останавливается — паузы между попытками не ждём.
+	stopping     = make(chan struct{})
+	stoppingOnce sync.Once
 )
 
 // SendAsync отправляет письмо в фоне: ответ API не ждёт почтовый сервер. До 3 попыток;
@@ -96,7 +100,7 @@ func SendAsync(m Message) {
 			}
 			return
 		}
-		log.Printf("mail: не удалось отправить «%s» для %s: %v", m.Subject, MaskEmail(m.To), err)
+		log.Printf("mail: не удалось отправить «%s» для %s: %s", m.Subject, MaskEmail(m.To), SafeError(err))
 		OnFailure(m.Subject, err)
 	}()
 }
@@ -107,9 +111,31 @@ func sendWithRetry(m Message) error {
 		if err = sendFunc(m); err == nil || errors.Is(err, ErrNotConfigured) || permanent(err) || attempt >= len(retryDelays) {
 			return err
 		}
-		log.Printf("mail: «%s» — попытка %d не удалась (%v), повтор через %s", m.Subject, attempt+1, err, retryDelays[attempt])
-		time.Sleep(retryDelays[attempt])
+		log.Printf("mail: «%s» — попытка %d не удалась (%s), повтор через %s", m.Subject, attempt+1, SafeError(err), retryDelays[attempt])
+		select {
+		case <-time.After(retryDelays[attempt]):
+		case <-stopping:
+		}
 	}
+}
+
+var emailLike = regexp.MustCompile(`[^\s<>"'@]+@[^\s<>"'@]+`)
+
+// SafeError — текст ошибки без адресов почты (ответы SMTP вида «550 <x@y>: rejected» их содержат).
+func SafeError(err error) string {
+	if err == nil {
+		return ""
+	}
+	return emailLike.ReplaceAllString(err.Error(), "<email>")
+}
+
+// SMTPCode — код ответа SMTP (550, 421…) или 0, если ошибка не от сервера (сеть, TLS).
+func SMTPCode(err error) int {
+	var te *textproto.Error
+	if errors.As(err, &te) {
+		return te.Code
+	}
+	return 0
 }
 
 // permanent — ответ SMTP 5xx (адрес не существует, письмо отклонено): повтор не поможет.
@@ -120,6 +146,7 @@ func permanent(err error) bool {
 
 // Wait ждёт письма, которые ещё отправляются (перед остановкой сервера), но не дольше timeout.
 func Wait(timeout time.Duration) bool {
+	stoppingOnce.Do(func() { close(stopping) })
 	done := make(chan struct{})
 	go func() { inflight.Wait(); close(done) }()
 	select {
@@ -158,16 +185,20 @@ func Send(m Message) error {
 	}
 	defer cl.Close()
 	if c.port != "465" {
-		if ok, _ := cl.Extension("STARTTLS"); ok {
-			if err := cl.StartTLS(&tls.Config{ServerName: c.host}); err != nil {
-				return err
-			}
+		// Без шифрования письмо (ссылка сброса пароля) не отправляем: подменённый ответ сервера
+		// без STARTTLS — ошибка, а не тихая отправка открытым текстом.
+		if ok, _ := cl.Extension("STARTTLS"); !ok {
+			return errors.New("mail: сервер не предлагает STARTTLS")
 		}
-	}
-	if ok, _ := cl.Extension("AUTH"); ok {
-		if err := cl.Auth(smtp.PlainAuth("", c.user, c.pass, c.host)); err != nil {
+		if err := cl.StartTLS(&tls.Config{ServerName: c.host}); err != nil {
 			return err
 		}
+	}
+	if ok, _ := cl.Extension("AUTH"); !ok {
+		return errors.New("mail: сервер не предлагает AUTH")
+	}
+	if err := cl.Auth(smtp.PlainAuth("", c.user, c.pass, c.host)); err != nil {
+		return err
 	}
 	if err := cl.Mail(c.from); err != nil {
 		return err

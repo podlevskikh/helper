@@ -39,16 +39,19 @@ func TestDedupeRoutineTasks(t *testing.T) {
 	mk("09:00", false)
 	done := mk("09:00", true)
 	mk("09:00", false)
-	other := mk("18:00", false)                                         // другое время — не копия
+	other := mk("18:00", false) // другое время — не копия
+	moved := mk("12:00", false) // перенесли вручную в день, где задача уже стоит: создана давно — не копия
+	DB.Exec("UPDATE schedule_tasks SET created_at = now() - interval '2 days' WHERE id = ?", moved.ID)
+	mk("12:00", false)
 	DB.Create(&models.TaskDish{TaskID: done.ID + 1000000, Position: 1}) // чужая строка не мешает
 
 	if err := DB.Transaction(dedupeRoutineTasks); err != nil {
 		t.Fatal(err)
 	}
 	var left []models.ScheduleTask
-	DB.Where("schedule_id = ?", s.ID).Order("time").Find(&left)
-	if len(left) != 2 || left[0].ID != done.ID || left[1].ID != other.ID {
-		t.Fatalf("осталось %d задач (%v), ждали выполненную %d и %d", len(left), left, done.ID, other.ID)
+	DB.Where("schedule_id = ?", s.ID).Order("time, id").Find(&left)
+	if len(left) != 4 || left[0].ID != done.ID || left[1].ID != moved.ID || left[3].ID != other.ID {
+		t.Fatalf("осталось %d задач (%v), ждали выполненную %d, перенесённую %d, её соседку и %d", len(left), left, done.ID, moved.ID, other.ID)
 	}
 	if err := DB.Transaction(dedupeRoutineTasks); err != nil { // повторный запуск ничего не ломает
 		t.Fatal(err)

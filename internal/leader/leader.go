@@ -8,6 +8,7 @@ package leader
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"log"
 	"time"
 )
@@ -59,8 +60,8 @@ watch:
 		case <-done:
 			break watch
 		case <-t.C:
-			if err := conn.PingContext(ctx); err != nil {
-				log.Printf("фоновые задачи: соединение с базой потеряно (%v) — перестаю быть ведущим", err)
+			if !stillHeld(ctx, conn, key) {
+				log.Println("фоновые задачи: блокировка ведущего потеряна (соединение с базой) — перестаю быть ведущим")
 				break watch
 			}
 		}
@@ -70,4 +71,17 @@ watch:
 	unlockCtx, stop := context.WithTimeout(context.Background(), 2*time.Second)
 	defer stop()
 	_, _ = conn.ExecContext(unlockCtx, "SELECT pg_advisory_unlock($1)", key)
+	// Соединение не возвращаем в пул: если снять блокировку не вышло, она уйдёт вместе с ним.
+	_ = conn.Raw(func(any) error { return driver.ErrBadConn })
+}
+
+// stillHeld — блокировка ещё у этого соединения (проверка с таймаутом: зависшая сеть не держит вечно).
+func stillHeld(ctx context.Context, conn *sql.Conn, key int64) bool {
+	c, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	var held bool
+	err := conn.QueryRowContext(c, `SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory'
+		AND pid = pg_backend_pid() AND granted AND objsubid = 1
+		AND ((classid::bigint << 32) | objid::bigint) = $1)`, key).Scan(&held)
+	return err == nil && held
 }

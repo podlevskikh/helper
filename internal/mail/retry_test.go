@@ -3,6 +3,7 @@ package mail
 import (
 	"errors"
 	"net/textproto"
+	"strings"
 	"testing"
 	"time"
 )
@@ -46,5 +47,13 @@ func TestSendRetries(t *testing.T) {
 	Wait(time.Second)
 	if calls != 3 || failed != 2 {
 		t.Fatalf("сервис лежит: попыток %d (ждали 3), провалов %d (ждали 2)", calls, failed)
+	}
+}
+
+// MAIL-01: в журнал и Sentry не попадают адреса из ответов SMTP.
+func TestSafeError(t *testing.T) {
+	err := &textproto.Error{Code: 550, Msg: "<anna.k@example.com>: Recipient address rejected"}
+	if got := SafeError(err); strings.Contains(got, "@") || !strings.Contains(got, "Recipient address rejected") || SMTPCode(err) != 550 {
+		t.Fatalf("SafeError = %q, code %d", got, SMTPCode(err))
 	}
 }

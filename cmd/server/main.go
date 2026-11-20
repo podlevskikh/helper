@@ -57,7 +57,7 @@ func main() {
 
 	// Письмо не ушло после всех попыток — в Sentry (без адреса получателя).
 	mail.OnFailure = func(subject string, err error) {
-		observability.CaptureMessage(fmt.Sprintf("mail: письмо «%s» не отправлено: %v", subject, err))
+		observability.CaptureMessage(fmt.Sprintf("mail: письмо «%s» не отправлено (SMTP %d): %s", subject, mail.SMTPCode(err), mail.SafeError(err)))
 	}
 
 	// Пуш-уведомления: очередь → Expo (PUSH_DRY_RUN=1 — только в лог)
@@ -96,7 +96,9 @@ func main() {
 	go func() {
 		defer close(jobsDone)
 		leader.Run(ctx, sqlDB, leader.Key, func(jobCtx context.Context) {
-			go pushWorker.Run(jobCtx)
+			pushDone := make(chan struct{})
+			go func() { defer close(pushDone); pushWorker.Run(jobCtx) }()
+			defer func() { <-pushDone }() // ведущим перестаём, только когда очередь пушей остановилась
 			log.Println("Generating initial schedules...")
 			if err := sched.GenerateScheduleForNextDays(7); err != nil {
 				log.Printf("Warning: Failed to generate initial schedules: %v", err)
@@ -109,6 +111,10 @@ func main() {
 				case <-jobCtx.Done():
 					return
 				case <-ticker.C:
+					// Копии задач, которые могла поставить версия без блокировки дня (во время выкатки).
+					if _, err := database.DedupeRoutineTasks(db, time.Now().AddDate(0, 0, -2)); err != nil {
+						log.Printf("dedupe routine tasks: %v", err)
+					}
 					log.Println("Running daily schedule generation...")
 					if err := sched.GenerateScheduleForNextDays(7); err != nil {
 						log.Printf("Error in daily schedule generation: %v", err)
