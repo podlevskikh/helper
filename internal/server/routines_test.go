@@ -311,3 +311,42 @@ func TestRoutineTaskRemovedForDay(t *testing.T) {
 		t.Errorf("в среду задачи нет")
 	}
 }
+
+// RT-16: день собирают одновременно (два устройства, планировщик, второй сервер при выкатке) —
+// задача регулярной задачи всё равно одна.
+func TestRoutineConcurrentDayBuild(t *testing.T) {
+	e := newEnv(t, 1000)
+	hm := rtSetup(e, "rtconc")
+	withNow(t, "2026-11-16T06:00:00Z") // понедельник
+	e.routine(hm.o, map[string]any{"kind": "other", "title": "Проветрить", "repeat_kind": "weekdays",
+		"weekdays": []int{1, 2, 3, 4, 5, 6}, "time_mode": "exact", "times": []string{"09:00", "18:00"},
+		"assigned_to_user_id": hm.h.UserID})
+	const date = "2026-12-02" // вне 7 дней — день ещё не собран
+	const n = 20
+	// Прогрев пула: у всех запросов уже есть соединение, и они правда идут одновременно.
+	warm := make(chan struct{})
+	for i := 0; i < 10; i++ {
+		go func() { e.db.Exec("SELECT pg_sleep(0.05)"); warm <- struct{}{} }()
+	}
+	for i := 0; i < 10; i++ {
+		<-warm
+	}
+	start, done := make(chan struct{}), make(chan struct{})
+	for i := 0; i < n; i++ {
+		go func() {
+			defer func() { done <- struct{}{} }()
+			<-start // все запросы стартуют разом
+			e.do(req{method: "GET", path: "/helper/api/schedule/date/" + date, token: hm.o.Token, org: hm.o.Org})
+		}()
+	}
+	close(start)
+	for i := 0; i < n; i++ {
+		<-done
+	}
+	var got int64 // считаем в базе: ответ API мог бы скрыть копии
+	e.db.Raw(`SELECT count(*) FROM schedule_tasks st JOIN daily_schedules ds ON ds.id = st.schedule_id
+		WHERE ds.organization_id = ? AND (ds.date AT TIME ZONE 'UTC')::date = ?::date AND st.title = ?`, hm.o.Org, date, "Проветрить").Scan(&got)
+	if got != 2 {
+		t.Fatalf("задач «Проветрить» в дне: %d, ждали 2 (09:00 и 18:00)", got)
+	}
+}

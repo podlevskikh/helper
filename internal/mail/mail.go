@@ -17,8 +17,10 @@ import (
 	"mime"
 	"net"
 	"net/smtp"
+	"net/textproto"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -68,22 +70,68 @@ func Configured() bool {
 	return ok
 }
 
-// SendAsync отправляет письмо в фоне: ответ API не ждёт почтовый сервер.
+// Повторы отправки: сбой почтового сервиса на минуту не теряет письмо (сброс пароля, подтверждение почты).
+var (
+	retryDelays = []time.Duration{5 * time.Second, 30 * time.Second} // паузы перед 2-й и 3-й попыткой
+	sendFunc    = Send                                               // подменяется в тестах
+	// OnFailure — письмо не ушло после всех попыток (main отправляет в Sentry; без адреса получателя).
+	OnFailure = func(subject string, err error) {}
+	inflight  sync.WaitGroup
+)
+
+// SendAsync отправляет письмо в фоне: ответ API не ждёт почтовый сервер. До 3 попыток;
+// постоянная ошибка (адрес отклонён, 5xx) — без повторов.
 func SendAsync(m Message) {
+	inflight.Add(1)
 	go func() {
-		if err := Send(m); err != nil {
-			if errors.Is(err, ErrNotConfigured) {
-				log.Printf("mail: почта не настроена — письмо «%s» для %s не отправлено", m.Subject, m.To)
-				if os.Getenv("MAIL_DEV_LOG") == "1" { // только для локальной разработки: ссылки из писем в лог
-					log.Printf("mail (dev):\n%s", m.Text)
-				}
-				return
-			}
-			log.Printf("mail: не удалось отправить «%s» для %s: %v", m.Subject, m.To, err)
+		defer inflight.Done()
+		err := sendWithRetry(m)
+		if err == nil {
+			return
 		}
+		if errors.Is(err, ErrNotConfigured) {
+			log.Printf("mail: почта не настроена — письмо «%s» для %s не отправлено", m.Subject, MaskEmail(m.To))
+			if os.Getenv("MAIL_DEV_LOG") == "1" { // только для локальной разработки: ссылки из писем в лог
+				log.Printf("mail (dev):\n%s", m.Text)
+			}
+			return
+		}
+		log.Printf("mail: не удалось отправить «%s» для %s: %v", m.Subject, MaskEmail(m.To), err)
+		OnFailure(m.Subject, err)
 	}()
 }
 
+func sendWithRetry(m Message) error {
+	var err error
+	for attempt := 0; ; attempt++ {
+		if err = sendFunc(m); err == nil || errors.Is(err, ErrNotConfigured) || permanent(err) || attempt >= len(retryDelays) {
+			return err
+		}
+		log.Printf("mail: «%s» — попытка %d не удалась (%v), повтор через %s", m.Subject, attempt+1, err, retryDelays[attempt])
+		time.Sleep(retryDelays[attempt])
+	}
+}
+
+// permanent — ответ SMTP 5xx (адрес не существует, письмо отклонено): повтор не поможет.
+func permanent(err error) bool {
+	var te *textproto.Error
+	return errors.As(err, &te) && te.Code >= 500
+}
+
+// Wait ждёт письма, которые ещё отправляются (перед остановкой сервера), но не дольше timeout.
+func Wait(timeout time.Duration) bool {
+	done := make(chan struct{})
+	go func() { inflight.Wait(); close(done) }()
+	select {
+	case <-done:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
+// Send отправляет письмо. Весь разговор с SMTP-сервером ограничен по времени: зависшее соединение
+// не держит горутину вечно.
 func Send(m Message) error {
 	c, ok := loadConfig()
 	if !ok {
@@ -91,39 +139,53 @@ func Send(m Message) error {
 	}
 	msg := build(c, m)
 	addr := net.JoinHostPort(c.host, c.port)
-	auth := smtp.PlainAuth("", c.user, c.pass, c.host)
+	dialer := &net.Dialer{Timeout: 15 * time.Second}
+	var conn net.Conn
+	var err error
 	if c.port == "465" { // TLS сразу
-		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 15 * time.Second}, "tcp", addr, &tls.Config{ServerName: c.host})
-		if err != nil {
-			return err
-		}
-		cl, err := smtp.NewClient(conn, c.host)
-		if err != nil {
-			return err
-		}
-		defer cl.Close()
-		if err := cl.Auth(auth); err != nil {
-			return err
-		}
-		if err := cl.Mail(c.from); err != nil {
-			return err
-		}
-		if err := cl.Rcpt(m.To); err != nil {
-			return err
-		}
-		w, err := cl.Data()
-		if err != nil {
-			return err
-		}
-		if _, err := w.Write(msg); err != nil {
-			return err
-		}
-		if err := w.Close(); err != nil {
-			return err
-		}
-		return cl.Quit()
+		conn, err = tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{ServerName: c.host})
+	} else { // 587: STARTTLS
+		conn, err = dialer.Dial("tcp", addr)
 	}
-	return smtp.SendMail(addr, auth, c.from, []string{m.To}, msg) // 587: STARTTLS
+	if err != nil {
+		return err
+	}
+	_ = conn.SetDeadline(time.Now().Add(45 * time.Second))
+	cl, err := smtp.NewClient(conn, c.host)
+	if err != nil {
+		conn.Close()
+		return err
+	}
+	defer cl.Close()
+	if c.port != "465" {
+		if ok, _ := cl.Extension("STARTTLS"); ok {
+			if err := cl.StartTLS(&tls.Config{ServerName: c.host}); err != nil {
+				return err
+			}
+		}
+	}
+	if ok, _ := cl.Extension("AUTH"); ok {
+		if err := cl.Auth(smtp.PlainAuth("", c.user, c.pass, c.host)); err != nil {
+			return err
+		}
+	}
+	if err := cl.Mail(c.from); err != nil {
+		return err
+	}
+	if err := cl.Rcpt(m.To); err != nil {
+		return err
+	}
+	w, err := cl.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(msg); err != nil {
+		return err
+	}
+	if err := w.Close(); err != nil {
+		return err
+	}
+	return cl.Quit()
 }
 
 func build(c config, m Message) []byte {

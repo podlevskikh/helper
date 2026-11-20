@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"podlevskikh/awesomeProject/internal/models"
@@ -48,6 +49,7 @@ func Initialize(databaseURL string) error {
 	}
 
 	log.Println("✅ Database connection established successfully")
+	configurePool(DB)
 
 	// Редизайн v2: колонка важности категорий появляется впервые — после миграции
 	// системной «Уход за ребёнком» ставим высокую важность (один раз, выбор владельца не трогаем).
@@ -118,6 +120,24 @@ func Initialize(databaseURL string) error {
 	seedDefaultCategories()
 
 	return nil
+}
+
+// configurePool: по умолчанию database/sql держит только 2 свободных соединения — при всплеске
+// запросов каждый открывает новое соединение к базе, а число открытых ничем не ограничено
+// (у Postgres на Railway лимит около 100). DB_MAX_CONNS — потолок открытых соединений.
+func configurePool(db *gorm.DB) {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return
+	}
+	maxOpen := 25
+	if v, err := strconv.Atoi(os.Getenv("DB_MAX_CONNS")); err == nil && v > 0 {
+		maxOpen = v
+	}
+	sqlDB.SetMaxOpenConns(maxOpen)
+	sqlDB.SetMaxIdleConns(min(10, maxOpen))
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
 }
 
 // runDataMigrations runs data migrations after schema migrations

@@ -13,6 +13,7 @@ import (
 	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
+	"podlevskikh/awesomeProject/internal/routines"
 )
 
 // ── Повторяющиеся задачи нанимателя ─────────────────────────────────────────
@@ -61,6 +62,19 @@ func recurringFor(db *gorm.DB, orgID uint, date time.Time) []models.RecurringTas
 // materializeRecurring создаёт в расписании дня задачи из повторяющихся,
 // которых там ещё нет (и которые не удалили вручную). Возвращает true, если что-то создано.
 func materializeRecurring(db *gorm.DB, orgID uint, schedule *models.DailySchedule, date time.Time) bool {
+	created := false
+	// Под блокировкой дня (как «Ритм дома»): два одновременных запроса не поставят задачу дважды.
+	_ = db.Transaction(func(tx *gorm.DB) error {
+		if err := routines.LockDay(tx, orgID, date); err != nil {
+			return err
+		}
+		created = materializeRecurringLocked(tx, orgID, schedule, date)
+		return nil
+	})
+	return created
+}
+
+func materializeRecurringLocked(db *gorm.DB, orgID uint, schedule *models.DailySchedule, date time.Time) bool {
 	day := utcDay(date)
 	templates := recurringFor(db, orgID, day)
 	if len(templates) == 0 {

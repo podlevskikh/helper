@@ -58,6 +58,8 @@ func dataMigrations(st migrationsState) []dataMigration {
 		}},
 		// «Ритм дома»: приёмы пищи, зоны, повторяющиеся задачи и распорядок ребёнка → регулярные задачи.
 		{id: "2026-11-routines-from-legacy", run: migrateRoutinesFromLegacy},
+		// Гонка сборки дня (до блокировки LockDay) ставила задачу регулярной задачи несколько раз.
+		{id: "2026-11-dedupe-routine-tasks", run: dedupeRoutineTasks},
 	}
 }
 
@@ -200,4 +202,37 @@ func mergeDuplicateDay(tx *gorm.DB, keep, drop uint) error {
 	return exec(`DELETE FROM schedule_tasks t WHERE t.schedule_id = ? AND t.recurring_task_id IS NOT NULL
 		AND EXISTS (SELECT 1 FROM schedule_tasks k WHERE k.schedule_id = ? AND k.recurring_task_id = t.recurring_task_id)`,
 		drop, keep)
+}
+
+// dedupeRoutineTasks убирает копии задачи регулярной задачи в одном дне (тот же день, задача и время).
+// Остаётся «самая живая» копия: выполненная → с заменой блюда → изменённая вручную → самая ранняя.
+func dedupeRoutineTasks(tx *gorm.DB) error {
+	var ids []uint
+	if err := tx.Raw(`SELECT id FROM (
+		SELECT st.id, row_number() OVER (
+			PARTITION BY st.schedule_id, st.routine_id, COALESCE(st.time, '')
+			ORDER BY st.completed DESC,
+				EXISTS (SELECT 1 FROM meal_swaps ms WHERE ms.task_id = st.id) DESC,
+				(st.updated_at > st.created_at + interval '2 seconds') DESC,
+				st.id ASC) AS rn
+		FROM schedule_tasks st WHERE st.routine_id IS NOT NULL) r
+		WHERE rn > 1`).Scan(&ids).Error; err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	for _, q := range []string{
+		"DELETE FROM meal_recipes WHERE schedule_task_id IN ?",
+		"DELETE FROM task_zones WHERE schedule_task_id IN ?",
+		"DELETE FROM task_dishes WHERE task_id IN ?",
+		"DELETE FROM meal_swaps WHERE task_id IN ?",
+		"DELETE FROM schedule_tasks WHERE id IN ?",
+	} {
+		if err := tx.Exec(q, ids).Error; err != nil {
+			return fmt.Errorf("%s: %w", q, err)
+		}
+	}
+	log.Printf("schedule_tasks: убрано копий задач регулярных задач: %d", len(ids))
+	return nil
 }

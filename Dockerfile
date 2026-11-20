@@ -25,6 +25,9 @@ RUN apk add --no-cache ca-certificates
 
 WORKDIR /app
 
+# Gin без отладочного режима (меньше лишнего в логах и на каждом запросе)
+ENV GIN_MODE=release
+
 # Copy binary from builder
 COPY --from=builder /app/server .
 

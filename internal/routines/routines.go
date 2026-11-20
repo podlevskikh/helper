@@ -121,11 +121,19 @@ func slots(r models.Routine) []slot {
 // Исполнитель отдыхает → тому, кто поставил (или по решению на день: другому, перенести, не делать).
 func assignee(db *gorm.DB, r models.Routine, date time.Time) (uint, bool) {
 	var dec models.RoutineDayDecision
-	hasDec := db.Where("routine_id = ? AND date = ?", r.ID, date).First(&dec).Error == nil
-	if calendar.IsWorking(db, r.OrganizationID, r.AssignedToUserID, date) && !hasDec {
+	var p *models.RoutineDayDecision
+	if db.Where("routine_id = ? AND date = ?", r.ID, date).First(&dec).Error == nil {
+		p = &dec
+	}
+	return assigneeBy(db, r, p, calendar.IsWorking(db, r.OrganizationID, r.AssignedToUserID, date))
+}
+
+// assigneeBy — то же по уже загруженному решению на день и признаку «исполнитель работает».
+func assigneeBy(db *gorm.DB, r models.Routine, dec *models.RoutineDayDecision, working bool) (uint, bool) {
+	if working && dec == nil {
 		return r.AssignedToUserID, true
 	}
-	if hasDec {
+	if dec != nil {
 		switch dec.Action {
 		case models.DecisionSkip, models.DecisionMove:
 			return 0, false
@@ -175,9 +183,34 @@ func HasAny(db *gorm.DB, orgID uint) bool {
 	return n > 0
 }
 
+// LockDay — блокировка «дом + дата» до конца транзакции. Сборку дня ведут запрос клиента,
+// часовой планировщик, очередь пушей и правка регулярной задачи — иногда одновременно (и на двух
+// серверах во время выкатки). Без блокировки каждый видит «задачи ещё нет» и ставит свою копию.
+func LockDay(tx *gorm.DB, orgID uint, date time.Time) error {
+	date = day(date)
+	key := date.Year()*10000 + int(date.Month())*100 + date.Day()
+	return tx.Exec("SELECT pg_advisory_xact_lock(?::int, ?::int)", int32(orgID), key).Error
+}
+
 // MaterializeDay ставит в день дома задачи из регулярных. Возвращает true, если что-то создано.
+// Идёт под LockDay; всё нужное для дня читается пачкой (несколько запросов на день, а не на задачу).
 func MaterializeDay(db *gorm.DB, orgID uint, schedule *models.DailySchedule, date time.Time) bool {
 	date = day(date)
+	created := false
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := LockDay(tx, orgID, date); err != nil {
+			return err
+		}
+		created = materializeLocked(tx, orgID, schedule, date)
+		return nil
+	})
+	if err != nil {
+		log.Printf("routines: day %s for org %d: %v", date.Format("2006-01-02"), orgID, err)
+	}
+	return created
+}
+
+func materializeLocked(db *gorm.DB, orgID uint, schedule *models.DailySchedule, date time.Time) bool {
 	var list []models.Routine
 	if err := db.Preload("Dishes", func(q *gorm.DB) *gorm.DB { return q.Order("position") }).
 		Preload("Checklist", func(q *gorm.DB) *gorm.DB { return q.Order("position") }).
@@ -186,33 +219,84 @@ func MaterializeDay(db *gorm.DB, orgID uint, schedule *models.DailySchedule, dat
 		return false
 	}
 	moved := movedHere(db, orgID, date)
-	created := false
+	var due []models.Routine
+	var ids []uint
 	for _, r := range list {
-		if !DueByRule(r, date) && !moved[r.ID] {
-			continue
+		if DueByRule(r, date) || moved[r.ID] {
+			due = append(due, r)
+			ids = append(ids, r.ID)
 		}
-		var n int64
-		db.Model(&models.RoutineSkip{}).Where("routine_id = ? AND date = ?", r.ID, date).Count(&n)
-		if n > 0 {
+	}
+	if len(due) == 0 {
+		return false
+	}
+
+	// Пропуски, решения на день и уже стоящие задачи — по одному запросу на всё.
+	var skipIDs []uint
+	db.Model(&models.RoutineSkip{}).Where("routine_id IN ? AND date = ?", ids, date).Pluck("routine_id", &skipIDs)
+	skipped := map[uint]bool{}
+	for _, id := range skipIDs {
+		skipped[id] = true
+	}
+	var decs []models.RoutineDayDecision
+	db.Where("routine_id IN ? AND date = ?", ids, date).Find(&decs)
+	decision := map[uint]*models.RoutineDayDecision{}
+	for i := range decs {
+		decision[decs[i].RoutineID] = &decs[i]
+	}
+	type placed struct {
+		RoutineID uint
+		Time      *string
+	}
+	var rows []placed
+	db.Model(&models.ScheduleTask{}).Select("routine_id, time").
+		Where("schedule_id = ? AND routine_id IN ?", schedule.ID, ids).Scan(&rows)
+	have := map[string]bool{}
+	slotKey := func(id uint, t string) string { return strconv.FormatUint(uint64(id), 10) + "|" + t }
+	for _, p := range rows {
+		t := ""
+		if p.Time != nil {
+			t = *p.Time
+		}
+		have[slotKey(p.RoutineID, t)] = true
+	}
+	// Работает ли исполнитель — один раз на человека.
+	working := map[uint]bool{}
+	isWorking := func(uid uint) bool {
+		w, ok := working[uid]
+		if !ok {
+			w = calendar.IsWorking(db, orgID, uid, date)
+			working[uid] = w
+		}
+		return w
+	}
+
+	created := false
+	for _, r := range due {
+		if skipped[r.ID] {
 			continue
 		}
 		who, ok := r.AssignedToUserID, true
 		if !moved[r.ID] || DueByRule(r, date) {
-			who, ok = assignee(db, r, date)
+			dec := decision[r.ID]
+			w := false
+			if dec == nil {
+				w = isWorking(r.AssignedToUserID)
+			}
+			who, ok = assigneeBy(db, r, dec, w)
 		}
 		if !ok {
 			continue
 		}
 		for _, s := range slots(r) {
-			db.Model(&models.ScheduleTask{}).
-				Where("schedule_id = ? AND routine_id = ? AND time = ?", schedule.ID, r.ID, s.from).Count(&n)
-			if n > 0 {
+			if have[slotKey(r.ID, s.from)] {
 				continue
 			}
 			if err := createTask(db, r, schedule, date, s, who); err != nil {
 				log.Printf("routines: routine %d, %s: %v", r.ID, date.Format("2006-01-02"), err)
 				continue
 			}
+			have[slotKey(r.ID, s.from)] = true
 			created = true
 		}
 	}

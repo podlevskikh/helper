@@ -1,7 +1,8 @@
 # Ночной бэкап базы прода: pg_dump под пользователем только для чтения → шифрование age → артефакт на 30 дней.
 # Репозиторий публичный: файл зашифрован публичным ключом, расшифровать его можно только закрытым ключом,
 # который хранится у владелицы (не в GitHub). Как настроить и как восстановить — docs/ops/backup.md.
-# Без секретов PROD_DATABASE_URL_READONLY и BACKUP_AGE_RECIPIENT шаг пропускается с предупреждением.
+# Без секретов PROD_DATABASE_URL_READONLY и BACKUP_AGE_RECIPIENT запуск падает (красный): «зелёный» без бэкапа
+# выглядел как бэкап, а его не было.
 name: backup
 on:
   schedule:
@@ -21,8 +22,9 @@ jobs:
         id: cfg
         run: |
           if [ -z "$DB_URL" ] || [ -z "$AGE_RECIPIENT" ]; then
-            echo "::warning::Бэкап не настроен: нужны секреты PROD_DATABASE_URL_READONLY и BACKUP_AGE_RECIPIENT (docs/ops/backup.md)"
+            echo "::error::Бэкап НЕ сделан: нужны секреты PROD_DATABASE_URL_READONLY и BACKUP_AGE_RECIPIENT (docs/ops/backup.md)"
             echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 1
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi

@@ -48,6 +48,20 @@ func resolveWebAppFile(root, urlPath string) string {
 	return ""
 }
 
+// Картинки и шрифты сборки: имя с хешем содержимого (mascot-house.f72a3ca2….png) — новый файл = новое имя.
+var hashedAsset = regexp.MustCompile(`\.[0-9a-f]{20,}\.[A-Za-z0-9]+$`)
+
+// webAppCacheControl: файлы с хешем (_expo/static и assets/*.<хеш>.<ext>) — надолго, остальное
+// (HTML, иконки без хеша) — всегда перепроверять.
+func webAppCacheControl(root, target string) string {
+	sep := string(filepath.Separator)
+	if strings.HasPrefix(target, filepath.Join(root, "_expo")+sep) ||
+		(strings.HasPrefix(target, filepath.Join(root, "assets")+sep) && hashedAsset.MatchString(filepath.Base(target))) {
+		return "public, max-age=31536000, immutable"
+	}
+	return "no-cache"
+}
+
 // RegisterWebApp подключает раздачу веб-версии из dir по адресу /app. Если сборки нет — ничего не делает.
 func RegisterWebApp(router *gin.Engine, dir string) bool {
 	root, err := filepath.Abs(dir)
@@ -66,12 +80,7 @@ func RegisterWebApp(router *gin.Engine, dir string) bool {
 			c.Data(http.StatusNotFound, "text/html; charset=utf-8", page)
 			return
 		}
-		// Файлы с хешем в имени (_expo/static) — надолго, HTML — всегда свежий.
-		if strings.HasPrefix(target, filepath.Join(root, "_expo")+string(filepath.Separator)) {
-			c.Header("Cache-Control", "public, max-age=31536000, immutable")
-		} else {
-			c.Header("Cache-Control", "no-cache")
-		}
+		c.Header("Cache-Control", webAppCacheControl(root, target))
 		c.File(target)
 	}
 	router.GET(WebAppPrefix, func(c *gin.Context) { c.Redirect(http.StatusFound, WebAppPrefix+"/") })

@@ -104,3 +104,11 @@ func Middleware() []gin.HandlerFunc {
 		},
 	}
 }
+
+// CaptureMessage — сообщение в Sentry (если включён). Текст не должен содержать личных данных.
+func CaptureMessage(msg string) {
+	if !enabled {
+		return
+	}
+	sentry.CaptureMessage(msg)
+}
