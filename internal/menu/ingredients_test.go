@@ -112,3 +112,38 @@ func TestMainIngredient(t *testing.T) {
 		t.Error("без главного продукта")
 	}
 }
+
+// Рецепты на проде — на английском, количество впереди; диапазоны и «~».
+func TestParseLeadingQuantity(t *testing.T) {
+	cases := []struct {
+		line, name string
+		amt        float64
+		unit       string
+	}{
+		{"1/4 cup buckwheat groats", "buckwheat groats", 0.25, "стакан"},
+		{"100 g cottage cheese", "cottage cheese", 100, "г"},
+		{"1 ripe banana", "ripe banana", 1, ""},
+		{"- 180 g red lentils, rinsed", "red lentils, rinsed", 180, "г"},
+		{"1 1/2 cups whole milk", "whole milk", 1.5, "стакан"},
+		{"2 tbsp olive oil", "olive oil", 2, "ст. л."},
+		{"- Beef broth — ~3 liters", "Beef broth", 3000, "мл"},
+		{"- Cooked beef — 300–400 g", "Cooked beef", 400, "г"},
+		{"Fruit purée", "Fruit purée", 0, ""},
+		{"Творог — 200 г", "Творог", 200, "г"},
+	}
+	for _, c := range cases {
+		got := Parse(c.line + "\nСоль") // на проде — по продукту на строку
+		if len(got) != 2 || got[0].Name != c.name || got[0].Amount != c.amt || got[0].Unit != c.unit {
+			t.Errorf("%q → %+v, ждали %s %v %s", c.line, got, c.name, c.amt, c.unit)
+		}
+	}
+}
+
+// Рецепт на 2 порции, готовим 3 → продукты × 1,5.
+func TestNeedsDividesByRecipeServings(t *testing.T) {
+	r := models.Recipe{ID: 1, Name: "Old", Servings: 2, Ingredients: "Рис — 200 г"}
+	needs, _ := Needs([]Day{{Date: "2026-11-21", Meals: []DayMeal{{TaskID: 1, Servings: 3, recipes: []models.Recipe{r}}}}})
+	if len(needs) != 1 || needs[0].Amount != 300 {
+		t.Fatalf("рис на 3 порции из рецепта на 2: %+v", needs)
+	}
+}

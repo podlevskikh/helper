@@ -75,6 +75,14 @@ func TaskRecipes(t models.ScheduleTask) []models.Recipe {
 	return nil
 }
 
+// recipeBase — на сколько порций записан рецепт (0 — на 1).
+func recipeBase(r models.Recipe) int {
+	if r.Servings > 0 {
+		return r.Servings
+	}
+	return 1
+}
+
 // Servings — сколько порций готовить в задаче.
 func Servings(t models.ScheduleTask) int {
 	if t.Servings > 0 {
@@ -169,7 +177,8 @@ func Needs(days []Day) ([]Need, []string) {
 						acc[key] = n
 						order = append(order, key)
 					}
-					raw[key] += ing.Amount * float64(m.Servings)
+					// Рецепт записан на r.Servings порций (наши — на 1, старые — на 2–4): на порцию — делим.
+					raw[key] += ing.Amount * float64(m.Servings) / float64(recipeBase(r))
 					n.Sources = append(n.Sources, Source{TaskID: m.TaskID, RecipeID: r.ID, Recipe: r.Name, Date: d.Date,
 						Meal: m.Meal, Servings: m.Servings, PerPortion: ing.Raw})
 				}

@@ -201,6 +201,12 @@ func (h *AdminHandler) DeleteRecipe(c *gin.Context) {
 		return
 	}
 
+	// Замены блюд на день, где участвовал рецепт («Вернуть» к удалённому рецепту невозможно).
+	if err := h.db.Exec("DELETE FROM meal_swaps WHERE original_recipe_id = ? OR current_recipe_id = ?", id, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear meal swaps"})
+		return
+	}
+
 	// 3. Clear deprecated RecipeID foreign key in schedule_tasks
 	// Set RecipeID to NULL for any tasks that reference this recipe
 	if err := h.db.Exec("UPDATE schedule_tasks SET recipe_id = NULL WHERE recipe_id = ?", id).Error; err != nil {

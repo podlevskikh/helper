@@ -41,6 +41,9 @@ func Parse(text string) []Ingredient {
 		name, qty := line, ""
 		if loc := sepRe.FindStringIndex(line); loc != nil {
 			name, qty = strings.TrimSpace(line[:loc[0]]), strings.TrimSpace(line[loc[1]:])
+		} else if m := leadQtyRe.FindStringSubmatch(line); m != nil && strings.TrimSpace(m[2]) != "" {
+			// Количество впереди, как в рецептах на английском: «1/4 cup buckwheat groats», «100 g cottage cheese».
+			qty, name = strings.TrimSpace(m[1]), strings.TrimSpace(strings.TrimLeft(m[2], ", "))
 		}
 		amt, unit := parseQty(qty)
 		out = append(out, Ingredient{Name: name, Amount: amt, Unit: unit, Raw: qty})
@@ -50,13 +53,36 @@ func Parse(text string) []Ingredient {
 
 var fracs = map[string]float64{"½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1.0 / 3, "⅔": 2.0 / 3}
 
+// leadQtyRe — количество в начале строки: число (дробь, «1 1/2», диапазон «2–3», «~»), затем необязательная
+// единица и продукт.
+var leadQtyRe = regexp.MustCompile(`(?i)^([~≈]?\s*(?:\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?(?:\s*[–-]\s*\d+(?:[.,]\d+)?)?|[½¼¾⅓⅔])` +
+	`(?:\s*(?:kg|g|grams?|ml|l|liters?|litres?|cups?|tsp|teaspoons?|tbsp|tablespoons?|cloves?|pcs|pieces?|г|кг|мл|л|шт|ст\.\s?л\.|ч\.\s?л\.)\b\.?)?)\s+(.+)$`)
+
+// rangeRe — «300–400 г», «2-3 шт»: для покупки берём верхнюю границу.
+var rangeRe = regexp.MustCompile(`^(\d+(?:[.,]\d+)?)\s*[–-]\s*(\d+(?:[.,]\d+)?)`)
+
+// mixedRe — «1 1/2 cup».
+var mixedRe = regexp.MustCompile(`^(\d+)\s+(\d+)/(\d+)`)
+
 var numRe = regexp.MustCompile(`^(\d+(?:[.,]\d+)?)?\s*([½¼¾⅓⅔])?(?:\s*/\s*(\d+))?`)
 
 // parseQty: «100 г» → 100, г; «1,5 кг» → 1500, г; «½ шт» → 0.5, шт; «1 шт (небольшой)» → 1, шт.
 func parseQty(q string) (float64, string) {
-	q = strings.TrimSpace(q)
+	q = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(q), "~≈"))
 	if q == "" {
 		return 0, ""
+	}
+	if r := rangeRe.FindStringSubmatch(q); r != nil {
+		q = r[2] + q[len(r[0]):]
+	}
+	if r := mixedRe.FindStringSubmatch(q); r != nil {
+		w, _ := strconv.ParseFloat(r[1], 64)
+		a, _ := strconv.ParseFloat(r[2], 64)
+		b, _ := strconv.ParseFloat(r[3], 64)
+		if b > 0 {
+			unit, mul := normUnit(cutParen(strings.TrimSpace(q[len(r[0]):])))
+			return (w + a/b) * mul, unit
+		}
 	}
 	m := numRe.FindStringSubmatch(q)
 	if m == nil || (m[1] == "" && m[2] == "") {
@@ -74,12 +100,15 @@ func parseQty(q string) (float64, string) {
 			amt /= d
 		}
 	}
-	rest := strings.TrimSpace(q[len(m[0]):])
-	if i := strings.Index(rest, "("); i >= 0 {
-		rest = strings.TrimSpace(rest[:i])
-	}
-	unit, mul := normUnit(rest)
+	unit, mul := normUnit(cutParen(strings.TrimSpace(q[len(m[0]):])))
 	return amt * mul, unit
+}
+
+func cutParen(s string) string {
+	if i := strings.Index(s, "("); i >= 0 {
+		return strings.TrimSpace(s[:i])
+	}
+	return s
 }
 
 // normUnit приводит единицу к короткой форме; килограммы и литры — к граммам и миллилитрам.
@@ -115,6 +144,25 @@ func normUnit(u string) (string, float64) {
 		return "щепотка", 1
 	case strings.HasPrefix(l, "гол"):
 		return "гол.", 1
+	// Рецепты на английском.
+	case l == "g" || strings.HasPrefix(l, "gram"):
+		return "г", 1
+	case l == "kg" || strings.HasPrefix(l, "kilogram"):
+		return "г", 1000
+	case l == "ml" || strings.HasPrefix(l, "millilit"):
+		return "мл", 1
+	case l == "l" || strings.HasPrefix(l, "liter") || strings.HasPrefix(l, "litre"):
+		return "мл", 1000
+	case l == "tsp" || strings.HasPrefix(l, "teaspoon"):
+		return "ч. л.", 1
+	case l == "tbsp" || strings.HasPrefix(l, "tablespoon"):
+		return "ст. л.", 1
+	case strings.HasPrefix(l, "cup"):
+		return "стакан", 1
+	case strings.HasPrefix(l, "clove"):
+		return "зубч.", 1
+	case l == "pcs" || strings.HasPrefix(l, "piece"):
+		return "шт", 1
 	}
 	return strings.TrimSpace(u), 1
 }
