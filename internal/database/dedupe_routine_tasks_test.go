@@ -8,7 +8,7 @@ import (
 	"podlevskikh/awesomeProject/internal/models"
 )
 
-// MIG-05: копии задачи регулярной задачи в одном дне сводятся к одной — остаётся выполненная.
+// MIG-06: копии задачи регулярной задачи в одном дне сводятся к одной — остаётся выполненная.
 func TestDedupeRoutineTasks(t *testing.T) {
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {

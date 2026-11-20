@@ -121,6 +121,7 @@ POST /helper/api/tasks/:id/checklist/:index
 POST /helper/api/tasks/:id/complete
 POST /helper/api/tasks/:id/uncomplete
 POST /invites/:token/accept
+POST /me/client-errors
 POST /me/devices
 POST /orgs/:orgId/invites
 POST /orgs/:orgId/leave

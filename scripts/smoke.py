@@ -160,6 +160,15 @@ for path in ["/app/privacy", "/app/terms", "/app/support"]:
           and '<section id="en" lang="en">' in html and 'href="mailto:support@helperday.app"' in html
           and not re.search(r'mailto:[^"]*\.(?=")', html) and 'href="/"' in html
           and 'href="terms"' in html and 'Privacy</a>' in html, f"({s})")
+# PUB-09: шрифты веба загружаются заранее (preload в /app/) и кешируются навсегда, как и JS со CSS.
+s, html, _ = page("/app/")
+fonts = sorted(set(re.findall(r'<link rel="preload" href="(/app/fonts/[^"]+\.woff2)"', html)))
+check("PUB-09 /app/ — шрифты WOFF2 заранее", s == 200 and len(fonts) == 4, f"({s}, {len(fonts)})")
+if fonts:
+    s, _, h = call("GET", fonts[0])
+    check("PUB-09 шрифт кешируется навсегда", s == 200 and "immutable" in (h.get("Cache-Control") or ""), f"({s} {h.get('Cache-Control')})")
+s, _, _ = call("POST", "/me/client-errors", {"message": "smoke"})
+expect("OBS-04 отчёт об ошибке без входа", s, 401)
 s, js, _ = call("GET", "/healthz")
 check("PUB-05 /healthz", s == 200 and (js or {}).get("status") == "ok", f"({s} {js})")
 s, _, _ = call("DELETE", "/auth/me")

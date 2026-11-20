@@ -151,6 +151,8 @@ func NewRouter(d Deps) *gin.Engine {
 	{
 		meGroup.POST("/devices", notificationsHandler.RegisterDevice)
 		meGroup.DELETE("/devices/:token", notificationsHandler.UnregisterDevice)
+		// Экран приложения упал — коротко что случилось (лог и Sentry сервера).
+		meGroup.POST("/client-errors", middleware.RateLimit(middleware.RateLimitOptions{Max: 30, Per: 15 * time.Minute}), handlers.ReportClientError)
 	}
 
 	// Открытый ключ для запечатанных секретов (scripts/seal-mail.sh)

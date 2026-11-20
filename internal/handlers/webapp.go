@@ -51,12 +51,13 @@ func resolveWebAppFile(root, urlPath string) string {
 // Картинки и шрифты сборки: имя с хешем содержимого (mascot-house.f72a3ca2….png) — новый файл = новое имя.
 var hashedAsset = regexp.MustCompile(`\.[0-9a-f]{20,}\.[A-Za-z0-9]+$`)
 
-// webAppCacheControl: файлы с хешем (_expo/static и assets/*.<хеш>.<ext>) — надолго, остальное
+// webAppCacheControl: файлы с хешем (_expo/static, assets/ и fonts/ с хешем в имени) — надолго, остальное
 // (HTML, иконки без хеша) — всегда перепроверять.
 func webAppCacheControl(root, target string) string {
 	sep := string(filepath.Separator)
 	if strings.HasPrefix(target, filepath.Join(root, "_expo")+sep) ||
-		(strings.HasPrefix(target, filepath.Join(root, "assets")+sep) && hashedAsset.MatchString(filepath.Base(target))) {
+		((strings.HasPrefix(target, filepath.Join(root, "assets")+sep) || strings.HasPrefix(target, filepath.Join(root, "fonts")+sep)) &&
+			hashedAsset.MatchString(filepath.Base(target))) {
 		return "public, max-age=31536000, immutable"
 	}
 	return "no-cache"

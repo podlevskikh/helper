@@ -112,3 +112,24 @@ func CaptureMessage(msg string) {
 	}
 	sentry.CaptureMessage(msg)
 }
+
+// ClientError — ошибка приложения (экран упал), уже обрезанная и без личных данных.
+type ClientError struct {
+	Message, Stack, Route, Platform, AppVersion string
+}
+
+// CaptureClientError — ошибка приложения в Sentry с тегами платформы, версии и экрана.
+func CaptureClientError(e ClientError) {
+	if !enabled {
+		return
+	}
+	sentry.WithScope(func(s *sentry.Scope) {
+		s.SetTag("source", "client")
+		s.SetTag("platform", e.Platform)
+		s.SetTag("app_version", e.AppVersion)
+		s.SetTag("route", e.Route)
+		s.SetContext("client", map[string]any{"stack": e.Stack})
+		s.SetLevel(sentry.LevelError)
+		sentry.CaptureMessage("client: " + e.Message)
+	})
+}

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// MAIL-02: временный сбой почты — письмо уходит со следующей попытки; адрес отклонён (5xx) — без повторов;
+// MAIL-01: временный сбой почты — письмо уходит со следующей попытки; адрес отклонён (5xx) — без повторов;
 // итоговый сбой сообщается (OnFailure), а остановка сервера дожидается отправки (Wait).
 func TestSendRetries(t *testing.T) {
 	oldDelays, oldSend, oldFail := retryDelays, sendFunc, OnFailure
