@@ -238,3 +238,48 @@ func PieceGrams(name string) float64 {
 	}
 	return 0
 }
+
+// Main — главный продукт рецепта: без него блюдо не приготовить, остальное можно заменить или пропустить.
+// По порядку: мясо или рыба (если их несколько — самое тяжёлое по весу); продукт из названия блюда
+// («Блинчики с творогом» → творог); первый продукт списка. Вода и «обычно есть дома» (мука, соль, масло…)
+// главными не бывают. -1 — главного нет.
+func Main(recipe string, ings []Ingredient) int {
+	best, bestG := -1, -1.0
+	for i, in := range ings {
+		if Category(in.Name) != CatMeat {
+			continue
+		}
+		g := in.Amount
+		if in.Unit == "шт" {
+			g = in.Amount * PieceGrams(in.Name)
+		} else if in.Unit != "г" {
+			g = 0
+		}
+		if g > bestG {
+			best, bestG = i, g
+		}
+	}
+	if best >= 0 {
+		return best
+	}
+	title := Key(recipe)
+	for i, in := range ings {
+		if Skip(in.Name) || Pantry(in.Name) {
+			continue
+		}
+		if stem := []rune(strings.Fields(Key(in.Name) + " ")[0]); len(stem) >= 4 {
+			if len(stem) > 5 {
+				stem = stem[:5]
+			}
+			if strings.Contains(title, string(stem)) {
+				return i
+			}
+		}
+	}
+	for i, in := range ings {
+		if !Skip(in.Name) && !Pantry(in.Name) {
+			return i
+		}
+	}
+	return -1
+}
