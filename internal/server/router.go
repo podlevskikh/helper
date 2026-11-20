@@ -365,6 +365,8 @@ func NewRouter(d Deps) *gin.Engine {
 			api.GET("/shopping-lists", viewShop, helperHandler.GetShoppingLists)
 			api.POST("/shopping-lists", manageShop, helperHandler.CreateShoppingList)
 			api.GET("/shopping-lists/suggestions", viewShop, helperHandler.GetShoppingSuggestions)
+			api.GET("/shopping-lists/menu", viewShop, helperHandler.GetShoppingMenu)
+			api.POST("/shopping-lists/from-menu", manageShop, helperHandler.CreateShoppingListFromMenu)
 			api.GET("/shopping-lists/:id", viewShop, helperHandler.GetShoppingListByID)
 			api.DELETE("/shopping-lists/:id", manageShop, helperHandler.DeleteShoppingList)
 			api.POST("/shopping-lists/:id/send", manageShop, helperHandler.SendShoppingList)

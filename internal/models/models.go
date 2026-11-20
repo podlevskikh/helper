@@ -128,9 +128,11 @@ type ScheduleTask struct {
 	// Важность задачи: high | mid | normal; пусто — берётся из категории
 	Priority string `json:"priority,omitempty"`
 	// Задача создана из повторяющейся (RecurringTask) — nil для разовых
-	RecurringTaskID *uint     `gorm:"index" json:"recurring_task_id,omitempty"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	RecurringTaskID *uint `gorm:"index" json:"recurring_task_id,omitempty"`
+	// Сколько порций готовить в этот приём пищи; 0 — по умолчанию (DefaultMealServings).
+	Servings  int       `gorm:"default:0" json:"servings"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	// Relations
 	Recipe       *Recipe        `gorm:"foreignKey:RecipeID" json:"recipe,omitempty"` // deprecated, use Recipes
@@ -154,9 +156,19 @@ type ShoppingListItem struct {
 	AddedBy        string     `json:"added_by"` // admin or helper
 	AddedByUserID  *uint      `json:"added_by_user_id,omitempty"`
 	Position       int        `gorm:"default:0" json:"position"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	// Пункт собран из меню: сколько нужно по рецептам, сколько берём (помощник может уменьшить
+	// или взять с запасом), единица («г», «мл», «шт»…) и для каких блюд — JSON []menu.Source.
+	FromMenu   bool      `gorm:"default:false" json:"from_menu"`
+	NeedAmount float64   `gorm:"default:0" json:"need_amount"`
+	BuyAmount  float64   `gorm:"default:0" json:"buy_amount"`
+	Unit       string    `gorm:"type:varchar(16)" json:"unit,omitempty"`
+	Sources    string    `gorm:"type:text" json:"sources,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
+
+// DefaultMealServings — порций в приёме пищи, пока у задачи не задано своё число.
+const DefaultMealServings = 2
 
 // Статусы списка покупок.
 const (
@@ -177,8 +189,13 @@ type ShoppingList struct {
 	ClosedAt        *time.Time `json:"closed_at,omitempty"`
 	ClosedByUserID  *uint      `json:"closed_by_user_id,omitempty"`
 	ParentListID    *uint      `gorm:"index" json:"parent_list_id,omitempty"` // список, из которого перенесены пункты
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	// Список «под меню»: какие дни покрывает (YYYY-MM-DD, включительно) и что из рецептов
+	// обычно есть дома (соль, мука…) — показываем «проверьте», а не пунктами.
+	MenuFrom   string    `gorm:"type:varchar(10)" json:"menu_from,omitempty"`
+	MenuTo     string    `gorm:"type:varchar(10)" json:"menu_to,omitempty"`
+	MenuPantry string    `gorm:"type:text" json:"menu_pantry,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 
 	Items []ShoppingListItem `gorm:"foreignKey:ListID" json:"items,omitempty"`
 }

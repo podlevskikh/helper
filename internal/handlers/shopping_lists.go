@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"podlevskikh/awesomeProject/internal/clock"
+	"podlevskikh/awesomeProject/internal/menu"
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/notify"
@@ -322,9 +323,10 @@ func (h *HelperHandler) UpdateShoppingListEntry(c *gin.Context) {
 		return
 	}
 	var body struct {
-		Item      *string `json:"item"`
-		Quantity  *string `json:"quantity"`
-		Purchased *bool   `json:"purchased"`
+		Item      *string  `json:"item"`
+		Quantity  *string  `json:"quantity"`
+		Purchased *bool    `json:"purchased"`
+		BuyAmount *float64 `json:"buy_amount"` // пункт из меню: сколько берём (в единицах пункта)
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -340,6 +342,14 @@ func (h *HelperHandler) UpdateShoppingListEntry(c *gin.Context) {
 	}
 	if body.Quantity != nil {
 		item.Quantity = strings.TrimSpace(*body.Quantity)
+	}
+	if body.BuyAmount != nil {
+		if *body.BuyAmount < 0 || *body.BuyAmount > 1e6 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "buy_amount out of range"})
+			return
+		}
+		item.BuyAmount = *body.BuyAmount
+		item.Quantity = menu.Format(item.BuyAmount, item.Unit)
 	}
 	if body.Purchased != nil && *body.Purchased != item.Purchased {
 		item.Purchased = *body.Purchased
@@ -415,6 +425,8 @@ func (h *HelperHandler) CloseShoppingList(c *gin.Context) {
 			SentAt:          &now,
 			ViewedAt:        &now,
 			ParentListID:    &parent,
+			MenuFrom:        l.MenuFrom,
+			MenuTo:          l.MenuTo,
 		}
 		if err := tx.Create(&n).Error; err != nil {
 			return err
@@ -429,6 +441,11 @@ func (h *HelperHandler) CloseShoppingList(c *gin.Context) {
 				AddedBy:        it.AddedBy,
 				AddedByUserID:  it.AddedByUserID,
 				Position:       i + 1,
+				FromMenu:       it.FromMenu,
+				NeedAmount:     it.NeedAmount,
+				BuyAmount:      it.BuyAmount,
+				Unit:           it.Unit,
+				Sources:        it.Sources,
 			}
 			if err := tx.Create(&copyItem).Error; err != nil {
 				return err

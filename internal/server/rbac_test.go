@@ -82,6 +82,7 @@ var routePolicy = map[string]policy{
 	"POST /helper/api/tasks/:id/complete": org(all), "POST /helper/api/tasks/:id/uncomplete": org(all),
 	"GET /helper/api/shopping-lists": org(all), "POST /helper/api/shopping-lists": org(all),
 	"GET /helper/api/shopping-lists/suggestions": org(all), "GET /helper/api/shopping-lists/:id": org(all),
+	"GET /helper/api/shopping-lists/menu": org(all), "POST /helper/api/shopping-lists/from-menu": org(all),
 	"DELETE /helper/api/shopping-lists/:id": org(all), "POST /helper/api/shopping-lists/:id/send": org(all),
 	"POST /helper/api/shopping-lists/:id/viewed": org(all), "POST /helper/api/shopping-lists/:id/close": org(all),
 	"POST /helper/api/shopping-lists/:id/items": org(all), "PATCH /helper/api/shopping-lists/:id/items/:itemId": org(all),

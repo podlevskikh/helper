@@ -43,6 +43,7 @@ GET /helper/api/schedule/today
 GET /helper/api/schedule/upcoming
 GET /helper/api/shopping-lists
 GET /helper/api/shopping-lists/:id
+GET /helper/api/shopping-lists/menu
 GET /helper/api/shopping-lists/suggestions
 GET /helper2/
 GET /invites/:token
@@ -94,6 +95,7 @@ POST /helper/api/shopping-lists/:id/close
 POST /helper/api/shopping-lists/:id/items
 POST /helper/api/shopping-lists/:id/send
 POST /helper/api/shopping-lists/:id/viewed
+POST /helper/api/shopping-lists/from-menu
 POST /helper/api/tasks/:id/complete
 POST /helper/api/tasks/:id/uncomplete
 POST /invites/:token/accept
