@@ -23,19 +23,19 @@ import (
 type Kind string
 
 const (
-	KindMorning       Kind = "morning_plan"   // П1 помощнику: план на день
-	KindReminder      Kind = "task_reminder"  // П2 помощнику: напоминание о задаче со временем
-	KindTaskNew       Kind = "task_new"       // П3 помощнику: новая задача на сегодня/завтра
-	KindTaskMoved     Kind = "task_moved"     // П4 помощнику: задачу перенесли
-	KindTaskCancelled Kind = "task_cancelled" // П5 помощнику: задачу убрали
-	KindListClosed    Kind = "list_closed"    // П6 помощнику: покупки привезли
-	KindListSent      Kind = "list_sent"      // Н1 нанимателю: прислан список покупок
-	KindListAdded     Kind = "list_added"     // Н2 нанимателю: дописано в список
-	KindDigest        Kind = "day_digest"     // Н3 нанимателю: итог дня
+	KindMorning       Kind = "morning_plan"     // П1 помощнику: план на день
+	KindReminder      Kind = "task_reminder"    // П2 помощнику: напоминание о задаче со временем
+	KindTaskNew       Kind = "task_new"         // П3 помощнику: новая задача на сегодня/завтра
+	KindTaskMoved     Kind = "task_moved"       // П4 помощнику: задачу перенесли
+	KindTaskCancelled Kind = "task_cancelled"   // П5 помощнику: задачу убрали
+	KindListClosed    Kind = "list_closed"      // П6 помощнику: покупки привезли
+	KindListSent      Kind = "list_sent"        // Н1 нанимателю: прислан список покупок
+	KindListAdded     Kind = "list_added"       // Н2 нанимателю: дописано в список
+	KindDigest        Kind = "day_digest"       // Н3 нанимателю: итог дня
 	KindDayOff        Kind = "day_off_tomorrow" // вместе с итогом дня: завтра помощник отдыхает — его регулярные задачи на вас
-	KindImportantDone Kind = "important_done" // Н4 нанимателю: важная задача выполнена
-	KindMemberJoined  Kind = "member_joined"  // Н5 нанимателю: новый человек в доме
-	KindQuietSummary  Kind = "quiet_summary"  // склейка накопленного за тихие часы
+	KindImportantDone Kind = "important_done"   // Н4 нанимателю: важная задача выполнена
+	KindMemberJoined  Kind = "member_joined"    // Н5 нанимателю: новый человек в доме
+	KindQuietSummary  Kind = "quiet_summary"    // склейка накопленного за тихие часы
 	KindTest          Kind = "test"
 )
 

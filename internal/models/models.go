@@ -25,12 +25,12 @@ type Recipe struct {
 	Rating         float64 `gorm:"default:0" json:"rating"`       // 0-5 stars
 	IsActive       bool    `gorm:"default:true" json:"is_active"` // whether recipe is active and can be scheduled
 	// Кто последним правил рецепт (имя на момент правки) — видно в карточке: «Изменила Мария, 20 нояб.».
-	UpdatedByID   *uint     `json:"updated_by_id,omitempty"`
-	UpdatedByName string    `json:"updated_by_name,omitempty"`
+	UpdatedByID   *uint  `json:"updated_by_id,omitempty"`
+	UpdatedByName string `json:"updated_by_name,omitempty"`
 	// Тип блюда (свой у каждого дома: «Обед», «Суп»…) — по нему регулярная задача подбирает блюдо. Один тип у рецепта.
-	DishTypeID *uint `gorm:"index" json:"dish_type_id,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	DishTypeID *uint     `gorm:"index" json:"dish_type_id,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 
 	// Relations
 	MealTimes []MealTime `gorm:"many2many:recipe_meal_times;" json:"meal_times,omitempty"` // multiple meal types for this recipe
@@ -38,17 +38,17 @@ type Recipe struct {
 
 // MealTime represents configured meal times
 type MealTime struct {
-	ID             uint      `gorm:"primaryKey" json:"id"`
-	OrganizationID uint      `gorm:"index;not null;default:1" json:"organization_id"`
-	Name           string    `gorm:"not null" json:"name"`           // breakfast, lunch, dinner, snack1, babyfood, etc
-	DefaultTime    string    `gorm:"not null" json:"default_time"`   // HH:MM format (primary time, kept for backward compatibility)
-	DefaultTimes   string    `gorm:"type:text" json:"default_times"` // JSON array of times ["09:00", "12:00", "15:00"]
-	FamilyMember   string    `json:"family_member"`                  // who this meal is for
-	Active         bool      `gorm:"default:true" json:"active"`
+	ID             uint   `gorm:"primaryKey" json:"id"`
+	OrganizationID uint   `gorm:"index;not null;default:1" json:"organization_id"`
+	Name           string `gorm:"not null" json:"name"`           // breakfast, lunch, dinner, snack1, babyfood, etc
+	DefaultTime    string `gorm:"not null" json:"default_time"`   // HH:MM format (primary time, kept for backward compatibility)
+	DefaultTimes   string `gorm:"type:text" json:"default_times"` // JSON array of times ["09:00", "12:00", "15:00"]
+	FamilyMember   string `json:"family_member"`                  // who this meal is for
+	Active         bool   `gorm:"default:true" json:"active"`
 	// Перенесено в регулярную задачу «Ритма дома»: старый генератор такую запись больше не ставит в день.
-	MigratedRoutineID *uint `gorm:"index" json:"migrated_routine_id,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	MigratedRoutineID *uint     `gorm:"index" json:"migrated_routine_id,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 
 	// Relations
 	Recipes []Recipe `gorm:"many2many:recipe_meal_times;" json:"recipes,omitempty"` // recipes for this meal type
@@ -56,16 +56,16 @@ type MealTime struct {
 
 // CleaningZone represents a zone in the house that needs cleaning
 type CleaningZone struct {
-	ID               uint      `gorm:"primaryKey" json:"id"`
-	OrganizationID   uint      `gorm:"index;not null;default:1" json:"organization_id"`
-	Name             string    `gorm:"not null" json:"name"` // bedroom, kitchen, bathroom, etc
-	Description      string    `json:"description"`
-	FrequencyPerWeek int       `gorm:"not null" json:"frequency_per_week"` // how many times per week
-	Priority         string    `gorm:"default:'medium'" json:"priority"`   // high, medium, low
+	ID               uint   `gorm:"primaryKey" json:"id"`
+	OrganizationID   uint   `gorm:"index;not null;default:1" json:"organization_id"`
+	Name             string `gorm:"not null" json:"name"` // bedroom, kitchen, bathroom, etc
+	Description      string `json:"description"`
+	FrequencyPerWeek int    `gorm:"not null" json:"frequency_per_week"` // how many times per week
+	Priority         string `gorm:"default:'medium'" json:"priority"`   // high, medium, low
 	// Перенесено в регулярную задачу «Ритма дома»: старый генератор такую запись больше не ставит в день.
-	MigratedRoutineID *uint `gorm:"index" json:"migrated_routine_id,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	MigratedRoutineID *uint     `gorm:"index" json:"migrated_routine_id,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 // ChildcareSchedule represents daily childcare times (manually added each day)
@@ -77,9 +77,9 @@ type ChildcareSchedule struct {
 	EndTime        string    `gorm:"not null" json:"end_time"`   // HH:MM format
 	Notes          string    `json:"notes"`
 	// Перенесено в регулярную задачу «Ритма дома»: старый генератор такую запись больше не ставит в день.
-	MigratedRoutineID *uint `gorm:"index" json:"migrated_routine_id,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	MigratedRoutineID *uint     `gorm:"index" json:"migrated_routine_id,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 // DailySchedule represents the generated daily schedule for the helper
@@ -389,9 +389,9 @@ type RecurringTask struct {
 	StartDate time.Time `gorm:"not null" json:"start_date"`
 	Active    bool      `gorm:"default:true" json:"active"`
 	// Перенесено в регулярную задачу «Ритма дома»: старый генератор такую запись больше не ставит в день.
-	MigratedRoutineID *uint `gorm:"index" json:"migrated_routine_id,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	MigratedRoutineID *uint     `gorm:"index" json:"migrated_routine_id,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 
 	TaskCategory *TaskCategory `gorm:"foreignKey:TaskCategoryID" json:"task_category,omitempty"`
 }

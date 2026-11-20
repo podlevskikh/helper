@@ -713,4 +713,3 @@ func (h *HelperHandler) SetChecklistItem(c *gin.Context) {
 	task.Checklist = string(raw)
 	c.JSON(http.StatusOK, task)
 }
-
