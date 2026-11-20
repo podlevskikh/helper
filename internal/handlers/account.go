@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -10,18 +11,25 @@ import (
 	"podlevskikh/awesomeProject/internal/models"
 )
 
-// DeleteMe — DELETE /auth/me {password}: удалить свой аккаунт навсегда (App Store, Guideline 5.1.1(v)).
+// DeleteMe — DELETE /auth/me {password, successor_id?, delete_home?}: удалить свой аккаунт навсегда
+// (App Store, Guideline 5.1.1(v)). Пароль спрашиваем ещё раз, чтобы удаление не случилось по ошибке.
 //
-// Наниматель удаляется вместе со своими домами и всеми их данными; сотрудники этих домов
-// остаются, но теряют членство. Сотрудник удаляется сам: его задачи у нанимателя остаются
-// без исполнителя. Пароль спрашиваем ещё раз, чтобы удаление не случилось по ошибке.
+// Основной админ решает, что будет с домом, где есть кто-то ещё:
+//   - successor_id — передать роль этому админу, дом остаётся;
+//   - delete_home  — удалить дом целиком (у остальных пропадает доступ, аккаунты остаются);
+//   - ни того ни другого — 409 home_decision_required со списком админов, кому можно передать.
+//
+// Дом, где больше никого нет, удаляется вместе с аккаунтом. Остальные просто уходят из команды:
+// их задачи остаются без исполнителя.
 func (h *AuthHandler) DeleteMe(c *gin.Context) {
 	user, ok := h.currentUser(c)
 	if !ok {
 		return
 	}
 	var body struct {
-		Password string `json:"password" binding:"required"`
+		Password    string `json:"password" binding:"required"`
+		SuccessorID uint   `json:"successor_id"`
+		DeleteHome  bool   `json:"delete_home"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "password is required"})
@@ -31,11 +39,98 @@ func (h *AuthHandler) DeleteMe(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "wrong password"})
 		return
 	}
-	if err := h.db.Transaction(func(tx *gorm.DB) error { return DeleteAccount(tx, user.ID) }); err != nil {
+	var pending []gin.H
+	err := h.db.Transaction(func(tx *gorm.DB) error {
+		homes, err := homesNeedingDecision(tx, user.ID)
+		if err != nil {
+			return err
+		}
+		for _, home := range homes {
+			switch {
+			case body.DeleteHome:
+				// дом удалит DeleteAccount: пользователь в нём всё ещё основной админ
+			case body.SuccessorID != 0 && home.hasAdmin(body.SuccessorID):
+				if err := transferOwnership(tx, home.OrgID, user.ID, body.SuccessorID); err != nil {
+					return err
+				}
+			default:
+				pending = append(pending, home.view())
+			}
+		}
+		if len(pending) > 0 {
+			return errDecisionRequired
+		}
+		return DeleteAccount(tx, user.ID)
+	})
+	if errors.Is(err, errDecisionRequired) {
+		c.JSON(http.StatusConflict, gin.H{"error": "decide what happens to the home", "code": "home_decision_required", "homes": pending})
+		return
+	}
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+var errDecisionRequired = errors.New("home decision required")
+
+type homeDecision struct {
+	OrgID   uint
+	OrgName string
+	Admins  []models.Membership
+	Others  int64 // сколько ещё людей в команде
+	names   map[uint]string
+}
+
+func (d homeDecision) hasAdmin(userID uint) bool {
+	for _, a := range d.Admins {
+		if a.UserID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+func (d homeDecision) view() gin.H {
+	admins := make([]gin.H, 0, len(d.Admins))
+	for _, a := range d.Admins {
+		admins = append(admins, gin.H{"user_id": a.UserID, "name": d.names[a.UserID]})
+	}
+	return gin.H{"org_id": d.OrgID, "org_name": d.OrgName, "admins": admins, "members": d.Others}
+}
+
+// homesNeedingDecision — дома, где userID основной админ и в команде есть кто-то ещё.
+func homesNeedingDecision(tx *gorm.DB, userID uint) ([]homeDecision, error) {
+	var owned []models.Membership
+	if err := tx.Where("user_id = ? AND role = ? AND status = ?", userID, models.RoleOwner, models.MembershipActive).Find(&owned).Error; err != nil {
+		return nil, err
+	}
+	var out []homeDecision
+	for _, o := range owned {
+		d := homeDecision{OrgID: o.OrganizationID, names: map[uint]string{}}
+		active := tx.Model(&models.Membership{}).Where("organization_id = ? AND status = ? AND user_id <> ?", o.OrganizationID, models.MembershipActive, userID)
+		if err := active.Count(&d.Others).Error; err != nil {
+			return nil, err
+		}
+		if d.Others == 0 {
+			continue
+		}
+		if err := tx.Where("organization_id = ? AND status = ? AND role = ? AND user_id <> ?", o.OrganizationID, models.MembershipActive, models.RoleAdmin, userID).
+			Order("created_at ASC").Find(&d.Admins).Error; err != nil {
+			return nil, err
+		}
+		for _, a := range d.Admins {
+			var u models.User
+			tx.First(&u, a.UserID)
+			d.names[a.UserID] = memberView(a, u).Name
+		}
+		var org models.Organization
+		tx.First(&org, o.OrganizationID)
+		d.OrgName = org.Name
+		out = append(out, d)
+	}
+	return out, nil
 }
 
 // DeleteAccount удаляет пользователя и всё, что ему принадлежит. Вызывать внутри транзакции.

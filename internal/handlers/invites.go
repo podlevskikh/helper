@@ -77,6 +77,7 @@ func isLocalHost(hostport string) bool {
 type createInviteRequest struct {
 	Email string      `json:"email"` // опционально
 	Role  models.Role `json:"role" binding:"required"`
+	Name  string      `json:"name"` // как человека зовут в команде; опционально
 }
 
 func (h *InviteHandler) CreateInvite(c *gin.Context) {
@@ -92,9 +93,14 @@ func (h *InviteHandler) CreateInvite(c *gin.Context) {
 		return
 	}
 
-	// owner нельзя приглашать через инвайт
-	if req.Role == models.RoleOwner {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot invite with owner role"})
+	// Основного админа приглашением не назначить — только передать роль (transfer-ownership).
+	if !models.IsInvitableRole(req.Role) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "role must be admin, manager or helper"})
+		return
+	}
+	name, ok := cleanTeamName(req.Name)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name is too long"})
 		return
 	}
 
@@ -109,6 +115,7 @@ func (h *InviteHandler) CreateInvite(c *gin.Context) {
 		OrganizationID: m.OrganizationID,
 		Email:          email,
 		Role:           req.Role,
+		Name:           name,
 		Token:          token,
 		Status:         models.InvitePending,
 		ExpiresAt:      time.Now().Add(7 * 24 * time.Hour),
@@ -126,6 +133,7 @@ func (h *InviteHandler) CreateInvite(c *gin.Context) {
 		"expires_at": invite.ExpiresAt,
 		"role":       invite.Role,
 		"email":      invite.Email,
+		"name":       invite.Name,
 	})
 }
 
@@ -151,6 +159,7 @@ func (h *InviteHandler) GetInvite(c *gin.Context) {
 		"org_name":   org.Name,
 		"role":       invite.Role,
 		"email":      invite.Email,
+		"name":       invite.Name,
 		"expires_at": invite.ExpiresAt,
 	})
 }
@@ -257,8 +266,9 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 			// роль меняют в «Команде»). Ушедшего раньше — возвращаем с ролью из приглашения.
 			if existing.Status != models.MembershipActive {
 				if txErr := tx.Model(&existing).Updates(map[string]interface{}{
-					"role":   invite.Role,
-					"status": models.MembershipActive,
+					"role":         invite.Role,
+					"status":       models.MembershipActive,
+					"display_name": invite.Name,
 				}).Error; txErr != nil {
 					return txErr
 				}
@@ -270,6 +280,7 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 				Role:           invite.Role,
 				Status:         models.MembershipActive,
 				InvitedBy:      &invite.InvitedBy,
+				DisplayName:    invite.Name,
 			}
 			if txErr := tx.Create(&membership).Error; txErr != nil {
 				return txErr
@@ -317,7 +328,7 @@ func (h *InviteHandler) ListInvites(c *gin.Context) {
 	out := make([]gin.H, 0, len(invites))
 	for _, inv := range invites {
 		out = append(out, gin.H{
-			"id": inv.ID, "email": inv.Email, "role": inv.Role, "expires_at": inv.ExpiresAt, "created_at": inv.CreatedAt,
+			"id": inv.ID, "email": inv.Email, "name": inv.Name, "role": inv.Role, "expires_at": inv.ExpiresAt, "created_at": inv.CreatedAt,
 			"invite_url": fmt.Sprintf("%s/invite?token=%s", webOrigin(c), inv.Token),
 		})
 	}

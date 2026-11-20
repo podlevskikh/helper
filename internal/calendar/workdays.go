@@ -236,12 +236,14 @@ func CountVacationDays(db *gorm.DB, p *Person, start, end time.Time) int {
 	return n
 }
 
-// OrgWorkdays — дни недели (ISO 1..7), в которые работает хотя бы один сотрудник дома (не владелец).
+// OrgWorkdays — дни недели (ISO 1..7), в которые работает хотя бы один помощник или модератор.
+// Админы ведут дом и в расчёт не входят.
 // По ним раскладывается уборка: зона не должна попадать на общий выходной.
 // Если сотрудников нет — Пн–Сб.
 func OrgWorkdays(db *gorm.DB, orgID uint) []int {
 	var ms []models.Membership
-	db.Where("organization_id = ? AND status = ? AND role <> ?", orgID, models.MembershipActive, models.RoleOwner).Find(&ms)
+	db.Where("organization_id = ? AND status = ? AND role IN ?", orgID, models.MembershipActive,
+		[]models.Role{models.RoleHelper, models.RoleManager}).Find(&ms)
 	if len(ms) == 0 {
 		return []int{1, 2, 3, 4, 5, 6}
 	}

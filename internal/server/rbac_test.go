@@ -17,11 +17,12 @@ import (
 // Чужой дом (X-Org-Id дома, где человек не участник) = ровно 403.
 
 var (
-	all      = []string{"owner", "admin", "manager", "helper"}
-	schedule = []string{"owner", "admin", "manager"}
-	team     = []string{"owner", "admin"}
-	recipes  = []string{"owner", "admin"}
-	settings = []string{"owner"}
+	all       = []string{"owner", "admin", "manager", "helper"}
+	schedule  = []string{"owner", "admin", "manager"}
+	team      = []string{"owner", "admin"}
+	recipes   = []string{"owner", "admin"}
+	settings  = []string{"owner", "admin"}
+	ownerOnly = []string{"owner"}
 )
 
 type policy struct {
@@ -49,6 +50,8 @@ var routePolicy = map[string]policy{
 	"POST /me/devices": authOnly(), "DELETE /me/devices/:token": authOnly(),
 	// дом
 	"POST /orgs/:orgId/invites": org(team), "GET /orgs/:orgId/members": org(team),
+	"PATCH /orgs/:orgId/members/:userId": org(team), "DELETE /orgs/:orgId/members/:userId": org(team),
+	"POST /orgs/:orgId/leave": org(all), "POST /orgs/:orgId/transfer-ownership": org(ownerOnly),
 	"GET /orgs/:orgId/invites": org(team), "DELETE /orgs/:orgId/invites/:id": org(team),
 	"POST /auth/password/reset/check":                    pub(),
 	"GET /orgs/:orgId/calendar":                          org(all),
@@ -90,6 +93,12 @@ var routePolicy = map[string]policy{
 	"GET /helper/api/recipes/:id":                         org(all),
 	"GET /helper/api/childcare/today":                     org(all), "POST /helper/api/childcare/today": org(schedule),
 	"DELETE /helper/api/childcare/today": org(schedule),
+}
+
+// Маршруты, после которых участник матрицы перестаёт быть в доме.
+var destructiveTeamRoutes = map[string]bool{
+	"DELETE /orgs/:orgId/members/:userId": true,
+	"POST /orgs/:orgId/leave":             true,
 }
 
 func concrete(path string, orgID uint, userID uint) string {
@@ -134,6 +143,9 @@ func TestRBACMatrix(t *testing.T) {
 		}
 		if p.kind == "auth" || strings.HasPrefix(key, "DELETE /auth/me") {
 			continue // проверено в TestTokenRevocation и smoke (удалять аккаунты здесь нельзя)
+		}
+		if destructiveTeamRoutes[key] {
+			continue // убирают людей из команды — права проверяет TestTeamRoles (team_test.go)
 		}
 		for _, role := range all {
 			a := who[role]

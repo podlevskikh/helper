@@ -30,7 +30,9 @@ type MemberView struct {
 	Role           models.Role             `json:"role"`
 	Status         models.MembershipStatus `json:"status"`
 	InvitedBy      *uint                   `json:"invited_by,omitempty"`
-	Name           string                  `json:"name"`
+	Name           string                  `json:"name"`         // имя в команде, иначе — из аккаунта
+	DisplayName    string                  `json:"display_name"` // как назвал админ (может быть пустым)
+	AccountName    string                  `json:"account_name"` // имя, которое человек указал сам
 	Email          string                  `json:"email"`
 	AvatarURL      string                  `json:"avatar_url,omitempty"`
 	CreatedAt      string                  `json:"created_at"`
@@ -78,25 +80,35 @@ func (h *OrgHandler) GetMembers(c *gin.Context) {
 	// Формируем ответ
 	result := make([]MemberView, 0, len(memberships))
 	for _, mb := range memberships {
-		u := userMap[mb.UserID]
-		result = append(result, MemberView{
-			ID:                  mb.ID,
-			UserID:              mb.UserID,
-			OrganizationID:      mb.OrganizationID,
-			Role:                mb.Role,
-			Status:              mb.Status,
-			InvitedBy:           mb.InvitedBy,
-			Name:                u.Name,
-			Email:               u.Email,
-			AvatarURL:           u.AvatarURL,
-			CreatedAt:           mb.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			DaysOff:             daysOffList(mb.DaysOff),
-			HolidayCountry:      calendar.PersonFrom(mb).Country,
-			VacationDaysPerYear: mb.VacationDaysPerYear,
-		})
+		result = append(result, memberView(mb, userMap[mb.UserID]))
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+// memberView — участник для ответа API: имя в команде важнее имени из аккаунта.
+func memberView(mb models.Membership, u models.User) MemberView {
+	name := mb.DisplayName
+	if name == "" {
+		name = u.Name
+	}
+	return MemberView{
+		ID:                  mb.ID,
+		UserID:              mb.UserID,
+		OrganizationID:      mb.OrganizationID,
+		Role:                mb.Role,
+		Status:              mb.Status,
+		InvitedBy:           mb.InvitedBy,
+		Name:                name,
+		DisplayName:         mb.DisplayName,
+		AccountName:         u.Name,
+		Email:               u.Email,
+		AvatarURL:           u.AvatarURL,
+		CreatedAt:           mb.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		DaysOff:             daysOffList(mb.DaysOff),
+		HolidayCountry:      calendar.PersonFrom(mb).Country,
+		VacationDaysPerYear: mb.VacationDaysPerYear,
+	}
 }
 
 // ── TaskCategory CRUD ────────────────────────────────────────────────────────

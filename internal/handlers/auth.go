@@ -54,6 +54,7 @@ type membershipView struct {
 	OrgName        string                  `json:"org_name"`
 	Role           models.Role             `json:"role"`
 	Status         models.MembershipStatus `json:"status"`
+	OwnerName      string                  `json:"owner_name"` // основной админ — «Покинуть команду Анны?»
 }
 
 type authResponse struct {
@@ -104,9 +105,21 @@ func (h *AuthHandler) loadMemberships(userID uint) ([]membershipView, error) {
 			OrgName:        org.Name,
 			Role:           m.Role,
 			Status:         m.Status,
+			OwnerName:      h.ownerName(m.OrganizationID),
 		})
 	}
 	return views, nil
+}
+
+// ownerName — как зовут основного админа дома (имя в команде, иначе из аккаунта).
+func (h *AuthHandler) ownerName(orgID uint) string {
+	var o models.Membership
+	if h.db.Where("organization_id = ? AND role = ? AND status = ?", orgID, models.RoleOwner, models.MembershipActive).First(&o).Error != nil {
+		return ""
+	}
+	var u models.User
+	h.db.First(&u, o.UserID)
+	return memberView(o, u).Name
 }
 
 // --- handlers ---

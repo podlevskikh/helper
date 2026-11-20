@@ -128,8 +128,18 @@ func TestDeleteMe(t *testing.T) {
 		}
 	})
 
+	t.Run("owner without decision", func(t *testing.T) {
+		// В доме ещё есть человек — без решения про дом ничего не удаляем (ROLE-12).
+		if w := call("DELETE", "/auth/me", reg.Access, map[string]string{"password": "owner-pass-1"}); w.Code != http.StatusConflict {
+			t.Fatalf("want 409, got %d %s", w.Code, w.Body)
+		}
+		if count(db, &models.Organization{}, "id = ?", orgID) != 1 || count(db, &models.User{}, "id = ?", reg.User.ID) != 1 {
+			t.Fatal("deleted without a decision about the home")
+		}
+	})
+
 	t.Run("owner", func(t *testing.T) {
-		if w := call("DELETE", "/auth/me", reg.Access, map[string]string{"password": "owner-pass-1"}); w.Code != http.StatusNoContent {
+		if w := call("DELETE", "/auth/me", reg.Access, map[string]any{"password": "owner-pass-1", "delete_home": true}); w.Code != http.StatusNoContent {
 			t.Fatalf("want 204, got %d %s", w.Code, w.Body)
 		}
 		for name, n := range map[string]int64{

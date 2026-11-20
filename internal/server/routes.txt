@@ -14,6 +14,7 @@ DELETE /helper/api/shopping-lists/:id
 DELETE /helper/api/shopping-lists/:id/items/:itemId
 DELETE /me/devices/:token
 DELETE /orgs/:orgId/invites/:id
+DELETE /orgs/:orgId/members/:userId
 DELETE /orgs/:orgId/members/:userId/day-overrides/:id
 DELETE /orgs/:orgId/task-categories/:id
 GET /
@@ -67,6 +68,7 @@ HEAD /static/*filepath
 HEAD /static2/*filepath
 PATCH /auth/me
 PATCH /helper/api/shopping-lists/:id/items/:itemId
+PATCH /orgs/:orgId/members/:userId
 PATCH /orgs/:orgId/members/:userId/schedule-settings
 POST /admin/api/childcare
 POST /admin/api/custom-tasks
@@ -103,9 +105,11 @@ POST /helper/api/tasks/:id/uncomplete
 POST /invites/:token/accept
 POST /me/devices
 POST /orgs/:orgId/invites
+POST /orgs/:orgId/leave
 POST /orgs/:orgId/members/:userId/day-overrides
 POST /orgs/:orgId/notification-prefs/test
 POST /orgs/:orgId/task-categories
+POST /orgs/:orgId/transfer-ownership
 PUT /admin/api/childcare/:id
 PUT /admin/api/mealtimes/:id
 PUT /admin/api/recipes/:id

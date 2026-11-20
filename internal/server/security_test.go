@@ -256,7 +256,7 @@ func TestDeleteOwnerLeavesNoOrgData(t *testing.T) {
 	e.expect("зона", e.do(req{method: "POST", path: "/admin/api/zones", token: o.Token, org: o.Org, body: map[string]any{"name": "кухня", "frequency_per_week": 3}}), 201)
 	e.expect("список", e.do(req{method: "POST", path: "/helper/api/shopping-lists", token: h.Token, org: o.Org, body: map[string]any{}}), 201)
 	e.expect("пуш", e.do(req{method: "POST", path: "/me/devices", token: o.Token, body: map[string]string{"token": "ExponentPushToken[" + uniq() + "]", "platform": "ios"}}), 200)
-	e.expect("удаление владельца", e.do(req{method: "DELETE", path: "/auth/me", token: o.Token, body: map[string]string{"password": o.Password}}), 204)
+	e.expect("удаление владельца вместе с домом", e.do(req{method: "DELETE", path: "/auth/me", token: o.Token, body: map[string]any{"password": o.Password, "delete_home": true}}), 204)
 
 	var tables []string
 	e.db.Raw(`SELECT table_name FROM information_schema.columns

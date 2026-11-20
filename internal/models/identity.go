@@ -67,6 +67,9 @@ type Membership struct {
 	Permissions    string           `gorm:"type:text" json:"permissions,omitempty"` // JSON-массив ключей разделов; в MVP пусто (права от роли)
 	Status         MembershipStatus `gorm:"default:'active'" json:"status"`
 	InvitedBy      *uint            `json:"invited_by,omitempty"`
+	// DisplayName — как человека зовут в этой команде («Мария», «Бабушка»): задаёт админ при приглашении
+	// и в карточке. Пусто — показываем имя из аккаунта.
+	DisplayName string `gorm:"size:80" json:"display_name"`
 	// Выходные и праздники (настраивает наниматель в карточке сотрудника)
 	DaysOff             string    `gorm:"default:'7'" json:"days_off"`                // ISO-дни недели через запятую: 1 = Пн … 7 = Вс
 	HolidayCountry      string    `gorm:"size:4;default:'CY'" json:"holiday_country"` // ISO-код страны праздников; "-" — без праздников
@@ -81,6 +84,7 @@ type Invite struct {
 	OrganizationID uint         `gorm:"index;not null" json:"organization_id"`
 	Email          string       `gorm:"index" json:"email"`
 	Role           Role         `gorm:"not null" json:"role"`
+	Name           string       `gorm:"size:80" json:"name"` // как админ назвал человека; станет его именем в команде
 	Token          string       `gorm:"uniqueIndex;not null" json:"token"`
 	Status         InviteStatus `gorm:"default:'pending'" json:"status"`
 	ExpiresAt      time.Time    `json:"expires_at"` // TTL 7 дней
@@ -134,4 +138,10 @@ type EmailChange struct {
 	RevertTokenHash *string    `gorm:"uniqueIndex" json:"-"`
 	RevertExpiresAt *time.Time `json:"-"`
 	RevertedAt      *time.Time `json:"-"`
+}
+
+// IsInvitableRole — роли, которые выдаются приглашением или в карточке человека.
+// Основной админ (owner) один на дом и появляется только при создании дома или передаче роли.
+func IsInvitableRole(r Role) bool {
+	return r == RoleAdmin || r == RoleManager || r == RoleHelper
 }

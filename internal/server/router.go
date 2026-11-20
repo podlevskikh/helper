@@ -53,7 +53,7 @@ func NewRouter(d Deps) *gin.Engine {
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     webOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Org-Id", "X-App-Version"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Org-Id", "X-App-Version", "X-App-Platform"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
@@ -92,6 +92,7 @@ func NewRouter(d Deps) *gin.Engine {
 	helperHandler := handlers.NewHelperHandler(db)
 	authHandler := handlers.NewAuthHandler(db)
 	inviteHandler := handlers.NewInviteHandler(db)
+	teamHandler := handlers.NewTeamHandler(db)
 	orgHandler := handlers.NewOrgHandler(db)
 	staffCalHandler := handlers.NewStaffCalendarHandler(db)
 	staffCalHandler.EnsureSchedule = func(date time.Time) {
@@ -166,6 +167,10 @@ func NewRouter(d Deps) *gin.Engine {
 	{
 		orgsGroup.POST("/:orgId/invites", middleware.Require(middleware.CapManageTeam), inviteHandler.CreateInvite)
 		orgsGroup.GET("/:orgId/members", middleware.Require(middleware.CapManageTeam), orgHandler.GetMembers)
+		orgsGroup.PATCH("/:orgId/members/:userId", middleware.Require(middleware.CapManageTeam), teamHandler.UpdateMember)
+		orgsGroup.DELETE("/:orgId/members/:userId", middleware.Require(middleware.CapManageTeam), teamHandler.RemoveMember)
+		orgsGroup.POST("/:orgId/leave", teamHandler.Leave)
+		orgsGroup.POST("/:orgId/transfer-ownership", loginLimit, middleware.Require(middleware.CapOwnHome), teamHandler.TransferOwnership)
 		orgsGroup.GET("/:orgId/invites", middleware.Require(middleware.CapManageTeam), inviteHandler.ListInvites)
 		orgsGroup.DELETE("/:orgId/invites/:id", middleware.Require(middleware.CapManageTeam), inviteHandler.RevokeInvite)
 

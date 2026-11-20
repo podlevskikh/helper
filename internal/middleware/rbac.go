@@ -21,6 +21,8 @@ const (
 	CapManageTeam     Capability = "manage_team"
 	CapManageSettings Capability = "manage_settings"
 	CapManageBilling  Capability = "manage_billing"
+	// CapOwnHome — только основной админ (owner): передать роль другому админу, удалить дом.
+	CapOwnHome Capability = "own_home"
 )
 
 // roleCapabilities — фиксированная матрица прав. Расширяемо до гранулярных позже.
@@ -29,13 +31,13 @@ var roleCapabilities = map[models.Role][]Capability{
 		CapViewSchedule, CapManageSchedule,
 		CapViewRecipes, CapManageRecipes,
 		CapViewShopping, CapManageShopping,
-		CapManageTeam, CapManageSettings, CapManageBilling,
+		CapManageTeam, CapManageSettings, CapManageBilling, CapOwnHome,
 	},
 	models.RoleAdmin: {
 		CapViewSchedule, CapManageSchedule,
 		CapViewRecipes, CapManageRecipes,
 		CapViewShopping, CapManageShopping,
-		CapManageTeam,
+		CapManageTeam, CapManageSettings,
 	},
 	models.RoleManager: {
 		CapViewSchedule, CapManageSchedule,
