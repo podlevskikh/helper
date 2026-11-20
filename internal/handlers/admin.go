@@ -13,6 +13,7 @@ import (
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/notify"
+	"podlevskikh/awesomeProject/internal/recipeimport"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -77,6 +78,13 @@ func (h *AdminHandler) CreateRecipe(c *gin.Context) {
 
 	recipe := input.Recipe
 	recipe.OrganizationID = h.orgID(c)
+	recipe.ImportID = nil
+	src, ok := cleanSource(recipe.SourceURL)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "source_url must be an http(s) link", "code": "bad_source_url"})
+		return
+	}
+	recipe.SourceURL = src
 	if !h.validDishType(c, recipe.DishTypeID) {
 		return
 	}
@@ -122,11 +130,21 @@ func (h *AdminHandler) UpdateRecipe(c *gin.Context) {
 	var input struct {
 		models.Recipe
 		MealTimeIDs []uint `json:"meal_time_ids"`
+		// Указатель: старые клиенты поле не шлют — источник не затираем.
+		SourceURL *string `json:"source_url"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	if input.SourceURL != nil {
+		src, ok := cleanSource(*input.SourceURL)
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "source_url must be an http(s) link", "code": "bad_source_url"})
+			return
+		}
+		recipe.SourceURL = src
 	}
 
 	// Текст рецепта правит любой участник (CapEditRecipes): кто готовит, тот и уточняет состав и способ.
@@ -196,53 +214,42 @@ func (h *AdminHandler) UpdateRecipe(c *gin.Context) {
 func (h *AdminHandler) DeleteRecipe(c *gin.Context) {
 	id := c.Param("id")
 
-	// First, get the recipe to ensure it exists
 	var recipe models.Recipe
 	if err := h.orgDB(c).First(&recipe, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
 		return
 	}
-
-	// Clear all associations before deleting the recipe
-	// 1. Clear MealTimes association (recipe_meal_times table)
-	if err := h.db.Model(&recipe).Association("MealTimes").Clear(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear meal times association"})
-		return
-	}
-
-	// 2. Clear any task associations (meal_recipes table - many-to-many)
-	// This removes the recipe from any scheduled tasks
-	if err := h.db.Exec("DELETE FROM meal_recipes WHERE recipe_id = ?", id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear task associations"})
-		return
-	}
-
-	// Замены блюд на день, где участвовал рецепт («Вернуть» к удалённому рецепту невозможно).
-	if err := h.db.Exec("DELETE FROM meal_swaps WHERE original_recipe_id = ? OR current_recipe_id = ?", id, id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear meal swaps"})
-		return
-	}
-
-	// 3. Clear deprecated RecipeID foreign key in schedule_tasks
-	// Set RecipeID to NULL for any tasks that reference this recipe
-	if err := h.db.Exec("UPDATE schedule_tasks SET recipe_id = NULL WHERE recipe_id = ?", id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear schedule task references"})
-		return
-	}
-
-	// 4. Delete any comments associated with this recipe
-	if err := h.db.Where("recipe_id = ?", id).Delete(&models.RecipeComment{}).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete recipe comments"})
-		return
-	}
-
-	// Now delete the recipe itself
-	if err := h.db.Delete(&recipe).Error; err != nil {
+	if err := h.db.Transaction(func(tx *gorm.DB) error { return deleteRecipe(tx, recipe) }); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"message": "Recipe deleted"})
+}
+
+// deleteRecipe удаляет рецепт и всё, что на него ссылается: ротации приёмов пищи, блюда задач (meal_recipes),
+// замены на день, старое поле schedule_tasks.recipe_id, блюда «Ритма дома» на день, заметки.
+// Общая для «Удалить рецепт» и «Отменить загрузку».
+func deleteRecipe(tx *gorm.DB, recipe models.Recipe) error {
+	if err := tx.Model(&recipe).Association("MealTimes").Clear(); err != nil {
+		return err
+	}
+	for _, q := range []string{
+		"DELETE FROM meal_recipes WHERE recipe_id = ?",
+		"UPDATE schedule_tasks SET recipe_id = NULL WHERE recipe_id = ?",
+		"UPDATE task_dishes SET recipe_id = NULL WHERE recipe_id = ?",
+	} {
+		if err := tx.Exec(q, recipe.ID).Error; err != nil {
+			return err
+		}
+	}
+	// Замены блюд на день, где участвовал рецепт («Вернуть» к удалённому рецепту невозможно).
+	if err := tx.Exec("DELETE FROM meal_swaps WHERE original_recipe_id = ? OR current_recipe_id = ?", recipe.ID, recipe.ID).Error; err != nil {
+		return err
+	}
+	if err := tx.Where("recipe_id = ?", recipe.ID).Delete(&models.RecipeComment{}).Error; err != nil {
+		return err
+	}
+	return tx.Delete(&recipe).Error
 }
 
 // MealTime handlers
@@ -1054,6 +1061,14 @@ func (h *AdminHandler) DeleteCustomTask(c *gin.Context) {
 }
 
 // validDishType — тип блюда этого дома (nil и 0 — без типа).
+// cleanSource — пустая строка или ссылка http(s).
+func cleanSource(v string) (string, bool) {
+	if strings.TrimSpace(v) == "" {
+		return "", true
+	}
+	return recipeimport.CleanURL(v)
+}
+
 func (h *AdminHandler) validDishType(c *gin.Context, id *uint) bool {
 	if id == nil || *id == 0 {
 		return true

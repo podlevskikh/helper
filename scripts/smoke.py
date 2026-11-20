@@ -339,6 +339,33 @@ try:
     check("SHOP-04 некупленное — в новом списке", len(carried) == 1 and carried[0].get("total") == 1,
           f"({[(l.get('id'), l.get('parent_list_id'), l.get('total')) for l in lists]})")
 
+    section("Загрузка рецептов")
+    call("POST", "/admin/api/recipes", {"name": "Smoke импорт", "ingredients": "Рис — 80 г", "family_member": "all",
+                                        "is_active": True, "servings": 1}, tokA, orgA)
+    text = ("## Smoke импорт\nИнгредиенты:\nРис — 80 г\n\n"
+            "## Smoke новый\nType: Smoke тип\nServings: 1 · Prep: 5 min · Cooking: 10 min\n"
+            "Link: https://example.com/smoke\nIngredients:\nEggs — 2 pcs\nHow to cook:\nFry.\n\n"
+            "## Smoke пустой\nИнгредиенты:\n")
+    s, _, _ = call("POST", "/admin/api/recipe-imports", {"text": text, "dry_run": True}, tokH, orgA)
+    expect("RIMP-02 помощник не загружает рецепты", s, 403)
+    s, js, _ = call("POST", "/admin/api/recipe-imports", {"text": text, "dry_run": True}, tokA, orgA)
+    st = [(i.get("status"), i.get("new_dish_type")) for i in (js or {}).get("items") or []]
+    check("RIMP-01 предпросмотр: дубль, новый с новым типом, ошибка",
+          s == 200 and st == [("duplicate", ""), ("new", "Smoke тип"), ("error", "")], f"({s} {st})")
+    s, js, _ = call("POST", "/admin/api/recipe-imports", {"text": text, "decisions": [
+        {"index": 1, "action": "skip"}, {"index": 2, "action": "create"}, {"index": 3, "action": "create"}]}, tokA, orgA)
+    check("RIMP-01 сохранить: 1 добавлен, 2 пропущены",
+          s == 201 and (js or {}).get("created") == 1 and (js or {}).get("skipped") == 2, f"({s} {js})")
+    imp_id = (js or {}).get("import_id")
+    new_id = ((js or {}).get("recipes") or [{}])[0].get("id")
+    s, js, _ = call("GET", f"/admin/api/recipes/{new_id}", token=tokA, org=orgA)
+    check("RIMP-01 рецепт: «готовим сейчас», источник, время", s == 200 and (js or {}).get("is_active")
+          and (js or {}).get("source_url") == "https://example.com/smoke" and (js or {}).get("cook_time") == 10, f"({s} {js})")
+    s, js, _ = call("DELETE", f"/admin/api/recipe-imports/{imp_id}", None, tokA, orgA)
+    check("RIMP-04 отменить загрузку", s == 200 and (js or {}).get("deleted") == 1, f"({s} {js})")
+    s, _, _ = call("GET", f"/admin/api/recipes/{new_id}", token=tokA, org=orgA)
+    expect("RIMP-04 рецепт загрузки удалён", s, 404)
+
     section("Изоляция домов")
     s, tokB, orgB = register("b")
     expect("AUTH-01 регистрация второго дома", s, 201)

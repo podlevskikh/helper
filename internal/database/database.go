@@ -90,6 +90,7 @@ func Initialize(databaseURL string) error {
 		&models.RoutineSkip{},
 		&models.RoutineDayDecision{},
 		&models.TaskDish{},
+		&models.RecipeImport{}, // загрузка рецептов списком
 		// Пуш-уведомления
 		&models.PushDevice{},
 		&models.NotificationPref{},

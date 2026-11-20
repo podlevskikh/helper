@@ -48,8 +48,13 @@ func TestIDORAllRoutesWithID(t *testing.T) {
 		AssignedToUserID: helperA.UserID, CreatedBy: a.UserID}
 	e.db.Omit("Dishes", "Checklist").Create(&routine)
 
+	imp := models.RecipeImport{OrganizationID: a.Org, UserID: a.UserID, Source: "text", Created: 1}
+	e.db.Create(&imp)
+
 	idFor := func(path string) string {
 		switch {
+		case strings.Contains(path, "/recipe-imports/:id"):
+			return fmt.Sprint(imp.ID)
 		case strings.Contains(path, "/comments/:id"):
 			return fmt.Sprint(comment.ID)
 		case strings.Contains(path, "/recipes/:id"):
@@ -80,7 +85,7 @@ func TestIDORAllRoutesWithID(t *testing.T) {
 		var parts []string
 		for _, tbl := range []string{"recipes", "recipe_comments", "meal_times", "cleaning_zones", "childcare_schedules",
 			"schedule_tasks", "recurring_tasks", "task_categories", "shopping_lists", "shopping_list_items", "staff_day_overrides",
-			"routines", "dish_types"} {
+			"routines", "dish_types", "recipe_imports"} {
 			var h string
 			e.db.Raw(fmt.Sprintf("SELECT coalesce(md5(string_agg(t::text, ',' ORDER BY t.id)), '') FROM %s t WHERE t.organization_id = ?", tbl), a.Org).Scan(&h)
 			parts = append(parts, tbl+"="+h)

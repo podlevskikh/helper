@@ -28,9 +28,13 @@ type Recipe struct {
 	UpdatedByID   *uint  `json:"updated_by_id,omitempty"`
 	UpdatedByName string `json:"updated_by_name,omitempty"`
 	// Тип блюда (свой у каждого дома: «Обед», «Суп»…) — по нему регулярная задача подбирает блюдо. Один тип у рецепта.
-	DishTypeID *uint     `gorm:"index" json:"dish_type_id,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	DishTypeID *uint `gorm:"index" json:"dish_type_id,omitempty"`
+	// Откуда рецепт (страница сайта) — в карточке «Источник». Видео — отдельно, в VideoURL.
+	SourceURL string `json:"source_url"`
+	// Загрузка списком, которой создан рецепт: «Отменить загрузку» удаляет созданные ею рецепты.
+	ImportID  *uint     `gorm:"index" json:"import_id,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	// Relations
 	MealTimes []MealTime `gorm:"many2many:recipe_meal_times;" json:"meal_times,omitempty"` // multiple meal types for this recipe

@@ -3,6 +3,7 @@ DELETE /admin/api/comments/:id
 DELETE /admin/api/custom-tasks/:id
 DELETE /admin/api/dish-types/:id
 DELETE /admin/api/mealtimes/:id
+DELETE /admin/api/recipe-imports/:id
 DELETE /admin/api/recipes/:id
 DELETE /admin/api/recurring-tasks/:id
 DELETE /admin/api/routines/:id
@@ -86,6 +87,7 @@ POST /admin/api/childcare
 POST /admin/api/custom-tasks
 POST /admin/api/dish-types
 POST /admin/api/mealtimes
+POST /admin/api/recipe-imports
 POST /admin/api/recipes
 POST /admin/api/recipes/:id/comments
 POST /admin/api/recurring-tasks
