@@ -119,6 +119,13 @@ for path in ["/", "/admin2/", "/helper2/"]:
 for path, ctype in [("/app/favicon.ico", "image/"), ("/app/site-icon.png", "image/png"), ("/app/site-touch-icon.png", "image/png")]:
     s, _, h = call("GET", path)
     check(f"PUB-07 иконка {path}", s == 200 and (h.get("Content-Type") or "").startswith(ctype), f"({s} {h.get('Content-Type')})")
+for path, icon in [("/app/", "favicon.ico?v="), ("/app/privacy", "site-icon.png?v="), ("/app/privacy", "site-touch-icon.png?v=")]:
+    try:
+        with opener.open(BASE + path, timeout=20) as r:
+            html = r.read().decode("utf-8", "replace")
+    except Exception as e:
+        html = str(e)
+    check(f"PUB-07 версия иконки {icon.split('?')[0]} в {path}", icon in html)
 s, js, _ = call("GET", "/healthz")
 check("PUB-05 /healthz", s == 200 and (js or {}).get("status") == "ok", f"({s} {js})")
 s, _, _ = call("DELETE", "/auth/me")
