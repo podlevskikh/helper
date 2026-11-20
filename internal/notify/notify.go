@@ -32,6 +32,7 @@ const (
 	KindListSent      Kind = "list_sent"      // Н1 нанимателю: прислан список покупок
 	KindListAdded     Kind = "list_added"     // Н2 нанимателю: дописано в список
 	KindDigest        Kind = "day_digest"     // Н3 нанимателю: итог дня
+	KindDayOff        Kind = "day_off_tomorrow" // вместе с итогом дня: завтра помощник отдыхает — его регулярные задачи на вас
 	KindImportantDone Kind = "important_done" // Н4 нанимателю: важная задача выполнена
 	KindMemberJoined  Kind = "member_joined"  // Н5 нанимателю: новый человек в доме
 	KindQuietSummary  Kind = "quiet_summary"  // склейка накопленного за тихие часы
@@ -52,7 +53,7 @@ func prefKey(k Kind) string {
 		return "bought"
 	case KindListSent, KindListAdded:
 		return "lists"
-	case KindDigest:
+	case KindDigest, KindDayOff:
 		return "digest"
 	case KindImportantDone:
 		return "important"
@@ -68,7 +69,7 @@ func channel(k Kind) string {
 	switch k {
 	case KindListSent, KindListAdded, KindListClosed:
 		return "shopping"
-	case KindDigest, KindQuietSummary:
+	case KindDigest, KindQuietSummary, KindDayOff:
 		return "digest"
 	case KindMemberJoined:
 		return "team"

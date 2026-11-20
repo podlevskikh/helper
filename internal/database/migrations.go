@@ -56,6 +56,8 @@ func dataMigrations(st migrationsState) []dataMigration {
 			}
 			return nil
 		}},
+		// «Ритм дома»: приёмы пищи, зоны, повторяющиеся задачи и распорядок ребёнка → регулярные задачи.
+		{id: "2026-11-routines-from-legacy", run: migrateRoutinesFromLegacy},
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/notify"
+	"podlevskikh/awesomeProject/internal/routines"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -91,10 +92,12 @@ func (h *HelperHandler) mergeChildcareTasks(c *gin.Context, schedule *models.Dai
 	}
 }
 
-// withRecurring добавляет в день повторяющиеся задачи и, если что-то создано,
-// перечитывает задачи дня (с категориями и фильтром помощника).
+// withRecurring добавляет в день повторяющиеся и регулярные задачи («Ритм дома») и, если что-то
+// создано, перечитывает задачи дня (с категориями и фильтром помощника).
 func (h *HelperHandler) withRecurring(c *gin.Context, schedule *models.DailySchedule, date time.Time) {
-	if !materializeRecurring(h.db, h.orgID(c), schedule, date) {
+	a := materializeRecurring(h.db, h.orgID(c), schedule, date)
+	b := routines.MaterializeDay(h.db, h.orgID(c), schedule, date)
+	if !a && !b {
 		return
 	}
 	var tasks []models.ScheduleTask
@@ -130,7 +133,7 @@ func (h *HelperHandler) respondSchedule(c *gin.Context, schedule models.DailySch
 		uid := middleware.MustMembership(c).UserID
 		kept := make([]models.ScheduleTask, 0)
 		for _, t := range schedule.Tasks {
-			if t.TaskType == "custom" && t.RecurringTaskID == nil && t.AssignedToUserID != nil && *t.AssignedToUserID == uid {
+			if t.TaskType == "custom" && t.RecurringTaskID == nil && t.RoutineID == nil && t.AssignedToUserID != nil && *t.AssignedToUserID == uid {
 				kept = append(kept, t)
 			}
 		}
@@ -164,7 +167,7 @@ func (h *HelperHandler) GetTodaySchedule(c *gin.Context) {
 		h.orgDB(c).Model(&models.ChildcareSchedule{}).
 			Where("date >= ? AND date < ?", utcDate, utcDate.AddDate(0, 0, 1)).
 			Count(&ccCount)
-		if ccCount == 0 && len(recurringFor(h.db, h.orgID(c), today)) == 0 {
+		if ccCount == 0 && len(recurringFor(h.db, h.orgID(c), today)) == 0 && !routines.HasAny(h.db, h.orgID(c)) {
 			c.JSON(http.StatusOK, gin.H{"message": "No schedule for today", "tasks": []models.ScheduleTask{}, "day_off": h.myDayOff(c, today)})
 			return
 		}
@@ -204,7 +207,7 @@ func (h *HelperHandler) GetScheduleByDate(c *gin.Context) {
 		h.orgDB(c).Model(&models.ChildcareSchedule{}).
 			Where("date >= ? AND date < ?", utcDate, utcDate.AddDate(0, 0, 1)).
 			Count(&ccCount)
-		if ccCount == 0 && len(recurringFor(h.db, h.orgID(c), date)) == 0 {
+		if ccCount == 0 && len(recurringFor(h.db, h.orgID(c), date)) == 0 && !routines.HasAny(h.db, h.orgID(c)) {
 			c.JSON(http.StatusOK, gin.H{"message": "No schedule for this date", "tasks": []models.ScheduleTask{}, "day_off": h.myDayOff(c, date)})
 			return
 		}

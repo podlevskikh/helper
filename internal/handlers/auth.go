@@ -176,9 +176,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		}
 		// Системные категории задач — сразу, а не после перезапуска сервера
 		database.EnsureDefaultCategories(tx, org.ID)
-		if err := database.EnsureDefaultMealTimes(tx, org.ID); err != nil {
-			return err
-		}
+		// Приёмов пищи по умолчанию больше нет: «Ритм дома» новый дом заполняет сам (типы блюд, рецепты, регулярные задачи).
 		return nil
 	})
 	if err != nil {

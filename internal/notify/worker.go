@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"podlevskikh/awesomeProject/internal/calendar"
+	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
+	"podlevskikh/awesomeProject/internal/routines"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -468,6 +470,7 @@ func (w *Worker) timedForOrg(orgID uint) {
 		if !p.Enabled(KindDigest) || !within(local, p.DigestTime, 10) {
 			continue
 		}
+		w.dayOffTomorrow(orgID, eid, local)
 		for _, hid := range helperIDs {
 			if hid == eid {
 				continue
@@ -494,6 +497,48 @@ func (w *Worker) timedForOrg(orgID uint) {
 				Params:   Params{Name: UserName(w.DB, hid), Done: done, Total: len(mine), Items: notDone, ItemTypes: notDoneTypes},
 				URL:      "/home"})
 		}
+	}
+}
+
+// dayOffTomorrow — вместе с итогом дня: завтра помощник отдыхает, его регулярные задачи перейдут
+// к тому, кто их поставил. Одно уведомление на помощника; переданные и отменённые не считаем.
+func (w *Worker) dayOffTomorrow(orgID, eid uint, local time.Time) {
+	tomorrow := clock.Day(local).AddDate(0, 0, 1)
+	var list []models.Routine
+	w.DB.Where("organization_id = ? AND active = ? AND start_date <= ?", orgID, true, tomorrow).Order("id").Find(&list)
+	type acc struct {
+		reason string
+		items  []string
+	}
+	by := map[uint]*acc{}
+	var order []uint
+	for _, r := range list {
+		if !routines.DueByRule(r, tomorrow) || routines.Owner(w.DB, r) != eid || r.AssignedToUserID == eid {
+			continue
+		}
+		st, _ := calendar.StatusOn(w.DB, orgID, r.AssignedToUserID, tomorrow)
+		if st.Working {
+			continue
+		}
+		var dec models.RoutineDayDecision
+		if w.DB.Where("routine_id = ? AND date = ?", r.ID, tomorrow).First(&dec).Error == nil && dec.Action != models.DecisionMe {
+			continue
+		}
+		a := by[r.AssignedToUserID]
+		if a == nil {
+			a = &acc{reason: st.Reason}
+			by[r.AssignedToUserID] = a
+			order = append(order, r.AssignedToUserID)
+		}
+		a.items = append(a.items, r.Title)
+	}
+	day := tomorrow.Format("2006-01-02")
+	for _, hid := range order {
+		a := by[hid]
+		Enqueue(w.DB, Item{OrgID: orgID, UserID: eid, Kind: KindDayOff,
+			DedupKey: fmt.Sprintf("dayoff:%d:%d:%d:%s", orgID, eid, hid, day),
+			Params:   Params{Name: UserName(w.DB, hid), Reason: a.reason, Count: len(a.items), Items: a.items},
+			URL:      "/day-off?date=" + day})
 	}
 }
 

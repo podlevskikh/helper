@@ -82,6 +82,14 @@ func Initialize(databaseURL string) error {
 		&models.HolidaySync{},
 		&models.StaffDayOverride{},
 		&models.RecipeComment{},
+		// «Ритм дома»: регулярные задачи
+		&models.DishType{},
+		&models.Routine{},
+		&models.RoutineDish{},
+		&models.RoutineChecklistItem{},
+		&models.RoutineSkip{},
+		&models.RoutineDayDecision{},
+		&models.TaskDish{},
 		// Пуш-уведомления
 		&models.PushDevice{},
 		&models.NotificationPref{},

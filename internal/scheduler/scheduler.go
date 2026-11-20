@@ -10,6 +10,7 @@ import (
 	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
+	"podlevskikh/awesomeProject/internal/routines"
 
 	"gorm.io/gorm"
 )
@@ -52,6 +53,14 @@ func (s *Scheduler) GenerateScheduleForDate(date time.Time) error {
 func (s *Scheduler) GenerateScheduleForOrgDate(orgID uint, date time.Time) error {
 	// День — полночь UTC календарной даты (как во всех daily_schedules).
 	date = clock.Day(date)
+
+	// «Ритм дома»: регулярные задачи ставятся в любой день, даже если помощник отдыхает —
+	// тогда задача уходит тому, кто её поставил (internal/routines). Идемпотентно.
+	if routines.HasAny(s.db, orgID) {
+		if sched, err := models.EnsureDailySchedule(s.db, orgID, date, false); err == nil {
+			routines.MaterializeDay(s.db, orgID, &sched, date)
+		}
+	}
 
 	log.Printf("Generating schedule for org %d, date: %s", orgID, date.Format("2006-01-02"))
 
@@ -120,7 +129,7 @@ func (s *Scheduler) GenerateScheduleForOrgDate(orgID uint, date time.Time) error
 // generateMealTasks creates meal tasks based on configured meal times
 func (s *Scheduler) generateMealTasks(schedule *models.DailySchedule, date time.Time) error {
 	var mealTimes []models.MealTime
-	if err := s.db.Where("organization_id = ? AND active = ?", schedule.OrganizationID, true).Find(&mealTimes).Error; err != nil {
+	if err := s.db.Where("organization_id = ? AND active = ? AND migrated_routine_id IS NULL", schedule.OrganizationID, true).Find(&mealTimes).Error; err != nil {
 		return err
 	}
 
@@ -298,7 +307,7 @@ func (s *Scheduler) generateCleaningTasks(schedule *models.DailySchedule, date t
 	var zones []models.CleaningZone
 	// Order by priority: high > medium > low
 	priorityOrder := "CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END"
-	if err := s.db.Where("organization_id = ?", schedule.OrganizationID).Order(priorityOrder).Find(&zones).Error; err != nil {
+	if err := s.db.Where("organization_id = ? AND migrated_routine_id IS NULL", schedule.OrganizationID).Order(priorityOrder).Find(&zones).Error; err != nil {
 		return err
 	}
 
@@ -363,7 +372,7 @@ func (s *Scheduler) shouldCleanZoneToday(zone models.CleaningZone, _ int, date t
 // Уже выбранные блюда остальных приёмов не меняются.
 func (s *Scheduler) RefreshMeals(orgID uint, days int) error {
 	var mealTimes []models.MealTime
-	s.db.Where("organization_id = ? AND active = ?", orgID, true).Find(&mealTimes)
+	s.db.Where("organization_id = ? AND active = ? AND migrated_routine_id IS NULL", orgID, true).Find(&mealTimes)
 	valid := map[string]bool{}
 	for _, mt := range mealTimes {
 		for _, slot := range s.getMealTimes(mt) {
@@ -378,7 +387,7 @@ func (s *Scheduler) RefreshMeals(orgID uint, days int) error {
 			continue // день ещё не собран — соберётся по новым правилам сам
 		}
 		var tasks []models.ScheduleTask
-		s.db.Where("schedule_id = ? AND task_type = 'meal' AND completed = false", schedule.ID).Find(&tasks)
+		s.db.Where("schedule_id = ? AND task_type = 'meal' AND completed = false AND routine_id IS NULL", schedule.ID).Find(&tasks)
 		for _, t := range tasks {
 			if valid[t.Title+"|"+t.Time] {
 				continue
@@ -410,11 +419,11 @@ func (s *Scheduler) RefreshCleaning(orgID uint, days int) error {
 		}
 		err := s.db.Transaction(func(tx *gorm.DB) error {
 			ids := tx.Model(&models.ScheduleTask{}).Select("id").
-				Where("schedule_id = ? AND task_type = 'cleaning' AND completed = false", schedule.ID)
+				Where("schedule_id = ? AND task_type = 'cleaning' AND completed = false AND routine_id IS NULL", schedule.ID)
 			if err := tx.Exec("DELETE FROM task_zones WHERE schedule_task_id IN (?)", ids).Error; err != nil {
 				return err
 			}
-			return tx.Where("schedule_id = ? AND task_type = 'cleaning' AND completed = false", schedule.ID).
+			return tx.Where("schedule_id = ? AND task_type = 'cleaning' AND completed = false AND routine_id IS NULL", schedule.ID).
 				Delete(&models.ScheduleTask{}).Error
 		})
 		if err != nil {
@@ -454,7 +463,7 @@ func (s *Scheduler) addChildcareTasks(schedule *models.DailySchedule, date time.
 	normalizedDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 	nextDay := normalizedDate.AddDate(0, 0, 1)
 
-	if err := s.db.Where("organization_id = ? AND date >= ? AND date < ?", schedule.OrganizationID, normalizedDate, nextDay).Find(&childcareSchedules).Error; err != nil {
+	if err := s.db.Where("organization_id = ? AND date >= ? AND date < ? AND migrated_routine_id IS NULL", schedule.OrganizationID, normalizedDate, nextDay).Find(&childcareSchedules).Error; err != nil {
 		return err
 	}
 
@@ -495,17 +504,17 @@ func (s *Scheduler) calculateDuration(startTime, endTime string) int {
 // hasTemplates — есть ли у дома из чего собрать день.
 func (s *Scheduler) hasTemplates(orgID uint, date time.Time) bool {
 	var n int64
-	s.db.Model(&models.MealTime{}).Where("organization_id = ? AND active = ?", orgID, true).Count(&n)
+	s.db.Model(&models.MealTime{}).Where("organization_id = ? AND active = ? AND migrated_routine_id IS NULL", orgID, true).Count(&n)
 	if n > 0 {
 		return true
 	}
-	s.db.Model(&models.CleaningZone{}).Where("organization_id = ?", orgID).Count(&n)
+	s.db.Model(&models.CleaningZone{}).Where("organization_id = ? AND migrated_routine_id IS NULL", orgID).Count(&n)
 	if n > 0 {
 		return true
 	}
 	day := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 	s.db.Model(&models.ChildcareSchedule{}).
-		Where("organization_id = ? AND date >= ? AND date < ?", orgID, day, day.AddDate(0, 0, 1)).Count(&n)
+		Where("organization_id = ? AND date >= ? AND date < ? AND migrated_routine_id IS NULL", orgID, day, day.AddDate(0, 0, 1)).Count(&n)
 	return n > 0
 }
 

@@ -27,6 +27,8 @@ type Recipe struct {
 	// Кто последним правил рецепт (имя на момент правки) — видно в карточке: «Изменила Мария, 20 нояб.».
 	UpdatedByID   *uint     `json:"updated_by_id,omitempty"`
 	UpdatedByName string    `json:"updated_by_name,omitempty"`
+	// Тип блюда (свой у каждого дома: «Обед», «Суп»…) — по нему регулярная задача подбирает блюдо. Один тип у рецепта.
+	DishTypeID *uint `gorm:"index" json:"dish_type_id,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 
@@ -43,6 +45,8 @@ type MealTime struct {
 	DefaultTimes   string    `gorm:"type:text" json:"default_times"` // JSON array of times ["09:00", "12:00", "15:00"]
 	FamilyMember   string    `json:"family_member"`                  // who this meal is for
 	Active         bool      `gorm:"default:true" json:"active"`
+	// Перенесено в регулярную задачу «Ритма дома»: старый генератор такую запись больше не ставит в день.
+	MigratedRoutineID *uint `gorm:"index" json:"migrated_routine_id,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 
@@ -58,6 +62,8 @@ type CleaningZone struct {
 	Description      string    `json:"description"`
 	FrequencyPerWeek int       `gorm:"not null" json:"frequency_per_week"` // how many times per week
 	Priority         string    `gorm:"default:'medium'" json:"priority"`   // high, medium, low
+	// Перенесено в регулярную задачу «Ритма дома»: старый генератор такую запись больше не ставит в день.
+	MigratedRoutineID *uint `gorm:"index" json:"migrated_routine_id,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
@@ -70,6 +76,8 @@ type ChildcareSchedule struct {
 	StartTime      string    `gorm:"not null" json:"start_time"` // HH:MM format
 	EndTime        string    `gorm:"not null" json:"end_time"`   // HH:MM format
 	Notes          string    `json:"notes"`
+	// Перенесено в регулярную задачу «Ритма дома»: старый генератор такую запись больше не ставит в день.
+	MigratedRoutineID *uint `gorm:"index" json:"migrated_routine_id,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
@@ -129,6 +137,10 @@ type ScheduleTask struct {
 	Priority string `json:"priority,omitempty"`
 	// Задача создана из повторяющейся (RecurringTask) — nil для разовых
 	RecurringTaskID *uint `gorm:"index" json:"recurring_task_id,omitempty"`
+	// Задача собрана из регулярной задачи «Ритма дома» (Routine) — nil для разовых.
+	RoutineID *uint `gorm:"index" json:"routine_id,omitempty"`
+	// «Что входит»: пункты на момент сборки дня и отметки — JSON [{"text":"Плита","done":false}].
+	Checklist string `gorm:"type:text" json:"checklist,omitempty"`
 	// Сколько порций готовить в этот приём пищи; 0 — по умолчанию (DefaultMealServings).
 	Servings  int       `gorm:"default:0" json:"servings"`
 	CreatedAt time.Time `json:"created_at"`
@@ -137,6 +149,7 @@ type ScheduleTask struct {
 	// Только в ответе (в базе нет): обычное число порций приёма пищи и замены блюд на этот день.
 	// Заполняет FillMealInfo.
 	UsualServings int            `gorm:"-" json:"usual_servings,omitempty"`
+	Dishes        []TaskDishView `gorm:"-" json:"dishes,omitempty"`
 	Swaps         []MealSwapView `gorm:"-" json:"swaps,omitempty"`
 
 	// Relations
@@ -213,6 +226,7 @@ func FillMealInfo(db *gorm.DB, tasks []ScheduleTask) {
 	if len(ids) == 0 {
 		return
 	}
+	fillRoutineDishes(db, tasks, ids, idx)
 	var swaps []MealSwap
 	if db.Where("task_id IN ?", ids).Order("id").Find(&swaps).Error != nil || len(swaps) == 0 {
 		return
@@ -374,6 +388,8 @@ type RecurringTask struct {
 	Weekdays  string    `gorm:"not null" json:"weekdays"`
 	StartDate time.Time `gorm:"not null" json:"start_date"`
 	Active    bool      `gorm:"default:true" json:"active"`
+	// Перенесено в регулярную задачу «Ритма дома»: старый генератор такую запись больше не ставит в день.
+	MigratedRoutineID *uint `gorm:"index" json:"migrated_routine_id,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 

@@ -14,6 +14,8 @@ type Capability string
 const (
 	CapViewSchedule   Capability = "view_schedule"
 	CapManageSchedule Capability = "manage_schedule"
+	// CapManageRoutines — «Ритм дома»: создавать и менять регулярные задачи (договорённость — только админы).
+	CapManageRoutines Capability = "manage_routines"
 	CapViewRecipes    Capability = "view_recipes"
 	CapManageRecipes  Capability = "manage_recipes"
 	// CapEditRecipes — править текст рецепта (состав, как готовить, время). Есть у всех: кто готовит,
@@ -31,13 +33,13 @@ const (
 // roleCapabilities — фиксированная матрица прав. Расширяемо до гранулярных позже.
 var roleCapabilities = map[models.Role][]Capability{
 	models.RoleOwner: {
-		CapViewSchedule, CapManageSchedule,
+		CapViewSchedule, CapManageSchedule, CapManageRoutines,
 		CapViewRecipes, CapEditRecipes, CapManageRecipes,
 		CapViewShopping, CapManageShopping,
 		CapManageTeam, CapManageSettings, CapManageBilling, CapOwnHome,
 	},
 	models.RoleAdmin: {
-		CapViewSchedule, CapManageSchedule,
+		CapViewSchedule, CapManageSchedule, CapManageRoutines,
 		CapViewRecipes, CapEditRecipes, CapManageRecipes,
 		CapViewShopping, CapManageShopping,
 		CapManageTeam, CapManageSettings,

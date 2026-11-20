@@ -77,6 +77,12 @@ func (h *AdminHandler) CreateRecipe(c *gin.Context) {
 
 	recipe := input.Recipe
 	recipe.OrganizationID = h.orgID(c)
+	if !h.validDishType(c, recipe.DishTypeID) {
+		return
+	}
+	if recipe.DishTypeID != nil && *recipe.DishTypeID == 0 {
+		recipe.DishTypeID = nil
+	}
 
 	// Create the recipe first
 	if err := h.db.Create(&recipe).Error; err != nil {
@@ -142,6 +148,16 @@ func (h *AdminHandler) UpdateRecipe(c *gin.Context) {
 		recipe.FamilyMember = input.FamilyMember
 		recipe.ImageURL = input.ImageURL
 		recipe.IsActive = input.IsActive
+		// Тип блюда — только если прислали (старые клиенты поле не шлют — тип не затираем).
+		if input.DishTypeID != nil {
+			if !h.validDishType(c, input.DishTypeID) {
+				return
+			}
+			recipe.DishTypeID = input.DishTypeID
+			if *input.DishTypeID == 0 {
+				recipe.DishTypeID = nil
+			}
+		}
 	}
 
 	var editor models.User
@@ -1027,4 +1043,18 @@ func (h *AdminHandler) DeleteCustomTask(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Custom task deleted"})
+}
+
+// validDishType — тип блюда этого дома (nil и 0 — без типа).
+func (h *AdminHandler) validDishType(c *gin.Context, id *uint) bool {
+	if id == nil || *id == 0 {
+		return true
+	}
+	var n int64
+	h.db.Model(&models.DishType{}).Where("id = ? AND organization_id = ?", *id, h.orgID(c)).Count(&n)
+	if n == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown dish_type_id", "code": "bad_dish_type"})
+		return false
+	}
+	return true
 }

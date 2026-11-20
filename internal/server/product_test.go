@@ -9,21 +9,20 @@ import (
 
 	"podlevskikh/awesomeProject/internal/auth"
 	"podlevskikh/awesomeProject/internal/clock"
+	"podlevskikh/awesomeProject/internal/database"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/scheduler"
 )
 
-// MEAL-01: у нового дома сразу есть завтрак, обед и ужин — рецепты попадают в меню без ручной настройки.
-func TestNewHomeHasDefaultMealTimes(t *testing.T) {
+// RT-00: новый дом начинает с пустого «Ритма дома»: ни приёмов пищи, ни регулярных задач, ни типов блюд —
+// их заводит тот, кто ведёт дом.
+func TestNewHomeStartsEmpty(t *testing.T) {
 	e := newEnv(t, 1000)
 	o := e.owner("meal")
-	list := e.jsonList(e.do(req{method: "GET", path: "/admin/api/mealtimes", token: o.Token, org: o.Org}))
-	names := map[string]bool{}
-	for _, m := range list {
-		names[fmt.Sprint(m["name"])] = true
-	}
-	if len(list) != 3 || !names["breakfast"] || !names["lunch"] || !names["dinner"] {
-		t.Errorf("приёмы пищи нового дома: %v", list)
+	for _, p := range []string{"/admin/api/mealtimes", "/admin/api/routines", "/admin/api/dish-types"} {
+		if list := e.jsonList(e.do(req{method: "GET", path: p, token: o.Token, org: o.Org})); len(list) != 0 {
+			t.Errorf("%s у нового дома: %v", p, list)
+		}
 	}
 }
 
@@ -108,6 +107,10 @@ func TestCleaningOnlyOnWorkdays(t *testing.T) {
 func TestMealChangesRefreshGeneratedDays(t *testing.T) {
 	e := newEnv(t, 1000)
 	o := e.owner("mealref")
+	// Старые приёмы пищи (у новых домов их нет — только у тех, что жили до «Ритма дома»).
+	if err := database.EnsureDefaultMealTimes(e.db, o.Org); err != nil {
+		t.Fatal(err)
+	}
 	day := clock.OrgToday(e.db, o.Org).AddDate(0, 0, 1)
 	if err := scheduler.NewScheduler(e.db).GenerateScheduleForOrgDate(o.Org, day); err != nil {
 		t.Fatal(err)
@@ -422,6 +425,9 @@ func TestHelperEditsRecipeText(t *testing.T) {
 	e := newEnv(t, 1000)
 	o := e.owner("recedit")
 	h := e.member(o, "helper", "recedit")
+	// Новый дом без приёмов пищи — заводим один (старые приёмы пищи ещё живут у старых клиентов).
+	e.expect("приём пищи", e.do(req{method: "POST", path: "/admin/api/mealtimes", token: o.Token, org: o.Org,
+		body: map[string]any{"name": "breakfast", "default_time": "08:30", "family_member": "all", "active": true}}), 201)
 	meals := e.jsonList(e.do(req{method: "GET", path: "/admin/api/mealtimes", token: o.Token, org: o.Org}))
 	w := e.do(req{method: "POST", path: "/admin/api/recipes", token: o.Token, org: o.Org, body: map[string]any{
 		"name": "Сырники", "ingredients": "Творог — 150 г", "instructions": "Смешать", "family_member": "adult",

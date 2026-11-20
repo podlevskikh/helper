@@ -44,7 +44,7 @@ func utcDay(d time.Time) time.Time {
 func recurringFor(db *gorm.DB, orgID uint, date time.Time) []models.RecurringTask {
 	day := utcDay(date)
 	var list []models.RecurringTask
-	if err := db.Where("organization_id = ? AND active = ? AND start_date <= ?", orgID, true, day).
+	if err := db.Where("organization_id = ? AND active = ? AND start_date <= ? AND migrated_routine_id IS NULL", orgID, true, day).
 		Find(&list).Error; err != nil {
 		return nil
 	}
@@ -107,7 +107,7 @@ func materializeRecurring(db *gorm.DB, orgID uint, schedule *models.DailySchedul
 // GET /admin/api/recurring-tasks
 func (h *AdminHandler) GetRecurringTasks(c *gin.Context) {
 	var list []models.RecurringTask
-	if err := h.orgDB(c).Preload("TaskCategory").Where("active = ?", true).
+	if err := h.orgDB(c).Preload("TaskCategory").Where("active = ? AND migrated_routine_id IS NULL", true).
 		Order("created_at").Find(&list).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

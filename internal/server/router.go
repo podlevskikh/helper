@@ -271,6 +271,20 @@ func NewRouter(d Deps) *gin.Engine {
 			api.POST("/tasks/:id/zones", middleware.Require(middleware.CapManageSchedule), adminHandler.AddZoneToTask)
 			api.DELETE("/tasks/:id/zones/:zone_id", middleware.Require(middleware.CapManageSchedule), adminHandler.RemoveZoneFromTask)
 
+			// «Ритм дома»: регулярные задачи и типы блюд
+			api.GET("/routines", middleware.Require(middleware.CapManageSchedule), adminHandler.GetRoutines)
+			api.GET("/routines/day-off", middleware.Require(middleware.CapManageSchedule), adminHandler.GetRoutinesDayOff)
+			api.GET("/routines/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.GetRoutine)
+			api.POST("/routines", middleware.Require(middleware.CapManageRoutines), adminHandler.CreateRoutine)
+			api.PUT("/routines/:id", middleware.Require(middleware.CapManageRoutines), adminHandler.UpdateRoutine)
+			api.PATCH("/routines/:id/active", middleware.Require(middleware.CapManageRoutines), adminHandler.SetRoutineActive)
+			api.DELETE("/routines/:id", middleware.Require(middleware.CapManageRoutines), adminHandler.DeleteRoutine)
+			api.PUT("/routines/:id/day-decision", middleware.Require(middleware.CapManageSchedule), adminHandler.SetRoutineDayDecision)
+			api.GET("/dish-types", adminHandler.GetDishTypes)
+			api.POST("/dish-types", middleware.Require(middleware.CapManageRecipes), adminHandler.CreateDishType)
+			api.PUT("/dish-types/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.UpdateDishType)
+			api.DELETE("/dish-types/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.DeleteDishType)
+
 			// Custom one-off tasks
 			api.POST("/custom-tasks", middleware.Require(middleware.CapManageSchedule), adminHandler.CreateCustomTask)
 			api.DELETE("/custom-tasks/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.DeleteCustomTask)
@@ -363,6 +377,7 @@ func NewRouter(d Deps) *gin.Engine {
 			// Tasks
 			api.POST("/tasks/:id/complete", helperHandler.CompleteTask)
 			api.POST("/tasks/:id/uncomplete", helperHandler.UncompleteTask)
+			api.POST("/tasks/:id/checklist/:index", helperHandler.SetChecklistItem)
 
 			// Shopping list
 			// Старые /helper/api/shopping* (без списков и без проверки прав) удалены: клиент давно на /shopping-lists.

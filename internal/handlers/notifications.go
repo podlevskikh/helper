@@ -9,6 +9,7 @@ import (
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/notify"
+	"podlevskikh/awesomeProject/internal/routines"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -133,7 +134,7 @@ func clipStr(s string, n int) string {
 // появляются в расписании, даже если сегодня приложение ещё никто не открывал.
 func EnsureDay(db *gorm.DB) func(orgID uint, day time.Time) {
 	return func(orgID uint, day time.Time) {
-		if len(recurringFor(db, orgID, day)) == 0 {
+		if len(recurringFor(db, orgID, day)) == 0 && !routines.HasAny(db, orgID) {
 			return
 		}
 		from, to := day.Add(-12*time.Hour), day.Add(12*time.Hour)
@@ -145,5 +146,6 @@ func EnsureDay(db *gorm.DB) func(orgID uint, day time.Time) {
 			}
 		}
 		materializeRecurring(db, orgID, &schedule, day)
+		routines.MaterializeDay(db, orgID, &schedule, day)
 	}
 }

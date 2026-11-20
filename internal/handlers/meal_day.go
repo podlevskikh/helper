@@ -59,6 +59,14 @@ func (h *AdminHandler) SetTaskServings(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "servings must be 0..20", "code": "bad_servings"})
 		return
 	}
+	// «Как обычно» у задачи «Ритма дома» — стандартные порции регулярной задачи.
+	if n == 0 && task.RoutineID != nil {
+		var dishes []models.RoutineDish
+		h.db.Where("routine_id = ?", *task.RoutineID).Find(&dishes)
+		if len(dishes) > 0 {
+			n = models.StandardServings(dishes)
+		}
+	}
 	old := task.Servings
 	err := h.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&models.ScheduleTask{}).Where("id = ?", task.ID).Update("servings", n).Error; err != nil {
@@ -108,6 +116,11 @@ func replaceDish(tx *gorm.DB, task *models.ScheduleTask, from uint, to models.Re
 	// Связь пишем напрямую: Association().Append сохранил бы и прежние блюда из task.Recipes.
 	if err := tx.Exec("INSERT INTO meal_recipes (schedule_task_id, recipe_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
 		task.ID, to.ID).Error; err != nil {
+		return err
+	}
+	// Блюдо «Ритма дома» на своём номере — тот же номер и порции, другой рецепт.
+	if err := tx.Model(&models.TaskDish{}).Where("task_id = ? AND recipe_id = ?", task.ID, from).
+		Update("recipe_id", to.ID).Error; err != nil {
 		return err
 	}
 	kept := []models.Recipe{to}

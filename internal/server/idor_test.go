@@ -41,6 +41,12 @@ func TestIDORAllRoutesWithID(t *testing.T) {
 	e.db.Create(&item)
 	ov := models.StaffDayOverride{OrganizationID: a.Org, UserID: helperA.UserID, Kind: "day_off", StartDate: day, EndDate: day}
 	e.db.Create(&ov)
+	dish := models.DishType{OrganizationID: a.Org, Name: "Обед-idor"}
+	e.db.Create(&dish)
+	routine := models.Routine{OrganizationID: a.Org, Kind: "other", Title: "полить цветы", Active: true, RepeatKind: "weekdays",
+		Weekdays: "1,2,3,4,5,6,7", EveryN: 1, StartDate: day, AnchorDate: day, TimeMode: "any", Times: "[]",
+		AssignedToUserID: helperA.UserID, CreatedBy: a.UserID}
+	e.db.Omit("Dishes", "Checklist").Create(&routine)
 
 	idFor := func(path string) string {
 		switch {
@@ -62,6 +68,10 @@ func TestIDORAllRoutesWithID(t *testing.T) {
 			return fmt.Sprint(list.ID)
 		case strings.Contains(path, "/day-overrides/:id"):
 			return fmt.Sprint(ov.ID)
+		case strings.Contains(path, "/routines/:id"):
+			return fmt.Sprint(routine.ID)
+		case strings.Contains(path, "/dish-types/:id"):
+			return fmt.Sprint(dish.ID)
 		default: // tasks/:id, custom-tasks/:id
 			return fmt.Sprint(task.ID)
 		}
@@ -69,7 +79,8 @@ func TestIDORAllRoutesWithID(t *testing.T) {
 	snapshot := func() string {
 		var parts []string
 		for _, tbl := range []string{"recipes", "recipe_comments", "meal_times", "cleaning_zones", "childcare_schedules",
-			"schedule_tasks", "recurring_tasks", "task_categories", "shopping_lists", "shopping_list_items", "staff_day_overrides"} {
+			"schedule_tasks", "recurring_tasks", "task_categories", "shopping_lists", "shopping_list_items", "staff_day_overrides",
+			"routines", "dish_types"} {
 			var h string
 			e.db.Raw(fmt.Sprintf("SELECT coalesce(md5(string_agg(t::text, ',' ORDER BY t.id)), '') FROM %s t WHERE t.organization_id = ?", tbl), a.Org).Scan(&h)
 			parts = append(parts, tbl+"="+h)

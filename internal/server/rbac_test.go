@@ -81,6 +81,12 @@ var routePolicy = map[string]policy{
 	"POST /admin/api/tasks/:id/swap/undo": org(schedule),
 	"POST /admin/api/tasks/:id/zones":     org(schedule), "DELETE /admin/api/tasks/:id/zones/:zone_id": org(schedule),
 	"POST /admin/api/custom-tasks": org(schedule), "DELETE /admin/api/custom-tasks/:id": org(schedule),
+	// «Ритм дома»
+	"GET /admin/api/routines": org(schedule), "GET /admin/api/routines/day-off": org(schedule), "GET /admin/api/routines/:id": org(schedule),
+	"POST /admin/api/routines": org(team), "PUT /admin/api/routines/:id": org(team), "PATCH /admin/api/routines/:id/active": org(team),
+	"DELETE /admin/api/routines/:id": org(team), "PUT /admin/api/routines/:id/day-decision": org(schedule),
+	"GET /admin/api/dish-types": org(all), "POST /admin/api/dish-types": org(recipes), "PUT /admin/api/dish-types/:id": org(recipes),
+	"DELETE /admin/api/dish-types/:id": org(recipes), "POST /helper/api/tasks/:id/checklist/:index": org(all),
 	"GET /admin/api/recurring-tasks": org(all), "POST /admin/api/recurring-tasks": org(schedule),
 	"DELETE /admin/api/recurring-tasks/:id": org(schedule), "POST /admin/api/regenerate-schedule": org(schedule),
 

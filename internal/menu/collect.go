@@ -34,6 +34,33 @@ type DayMeal struct {
 	Passed   bool        `json:"passed"` // сегодня и уже прошёл (или отмечен сделанным) — не покупаем
 	Recipes  []DayRecipe `json:"recipes"`
 	recipes  []models.Recipe
+	// Свои порции блюд (суп ×1 при остальных ×2): recipe_id → порции. Нет — порции приёма пищи.
+	perRecipe map[uint]int
+}
+
+// servingsOf — сколько порций готовить этого блюда.
+func (m DayMeal) servingsOf(recipeID uint) int {
+	if v, ok := m.perRecipe[recipeID]; ok && v > 0 {
+		return v
+	}
+	return m.Servings
+}
+
+// DishOverrides — свои порции блюд задач (task_dishes.servings > 0): task_id → recipe_id → порции.
+func DishOverrides(db *gorm.DB, taskIDs []uint) map[uint]map[uint]int {
+	out := map[uint]map[uint]int{}
+	if len(taskIDs) == 0 {
+		return out
+	}
+	var rows []models.TaskDish
+	db.Where("task_id IN ? AND servings > 0 AND recipe_id IS NOT NULL", taskIDs).Find(&rows)
+	for _, r := range rows {
+		if out[r.TaskID] == nil {
+			out[r.TaskID] = map[uint]int{}
+		}
+		out[r.TaskID][*r.RecipeID] = r.Servings
+	}
+	return out
 }
 
 type DayRecipe struct {
@@ -115,6 +142,11 @@ func Menu(db *gorm.DB, orgID uint, from, to time.Time, now time.Time) ([]Day, er
 			dateOf[s.ID] = s.Date.UTC().Format("2006-01-02")
 		}
 	}
+	taskIDs := make([]uint, 0, len(tasks))
+	for _, t := range tasks {
+		taskIDs = append(taskIDs, t.ID)
+	}
+	overrides := DishOverrides(db, taskIDs)
 	today := now.Format("2006-01-02")
 	hm := now.Format("15:04")
 	byDate := map[string][]DayMeal{}
@@ -125,7 +157,7 @@ func Menu(db *gorm.DB, orgID uint, from, to time.Time, now time.Time) ([]Day, er
 		}
 		recipes := TaskRecipes(t)
 		m := DayMeal{TaskID: t.ID, Time: t.Time, Meal: MealLabel(t.Title), Servings: Servings(t), recipes: recipes,
-			Recipes: []DayRecipe{}}
+			Recipes: []DayRecipe{}, perRecipe: overrides[t.ID]}
 		m.Passed = t.Completed || (d == today && t.Time != "" && t.Time < hm)
 		for _, r := range recipes {
 			m.Recipes = append(m.Recipes, DayRecipe{ID: r.ID, Name: r.Name})
@@ -178,9 +210,10 @@ func Needs(days []Day) ([]Need, []string) {
 						order = append(order, key)
 					}
 					// Рецепт записан на r.Servings порций (наши — на 1, старые — на 2–4): на порцию — делим.
-					raw[key] += ing.Amount * float64(m.Servings) / float64(recipeBase(r))
+					sv := m.servingsOf(r.ID)
+					raw[key] += ing.Amount * float64(sv) / float64(recipeBase(r))
 					n.Sources = append(n.Sources, Source{TaskID: m.TaskID, RecipeID: r.ID, Recipe: r.Name, Date: d.Date,
-						Meal: m.Meal, Servings: m.Servings, PerPortion: ing.Raw})
+						Meal: m.Meal, Servings: sv, PerPortion: ing.Raw})
 				}
 			}
 		}
@@ -287,7 +320,7 @@ func applyNeeds(tx *gorm.DB, task models.ScheduleTask, recipes []models.Recipe, 
 	if len(lists) == 0 {
 		return nil
 	}
-	needs := taskNeeds(task, date, recipes, servings)
+	needs := taskNeeds(tx, task, date, recipes, servings)
 	for _, l := range lists {
 		if err := applyToList(tx, l, needs, sign); err != nil {
 			return err
@@ -296,9 +329,9 @@ func applyNeeds(tx *gorm.DB, task models.ScheduleTask, recipes []models.Recipe, 
 	return nil
 }
 
-func taskNeeds(task models.ScheduleTask, date string, recipes []models.Recipe, servings int) []Need {
+func taskNeeds(tx *gorm.DB, task models.ScheduleTask, date string, recipes []models.Recipe, servings int) []Need {
 	day := Day{Date: date, Meals: []DayMeal{{TaskID: task.ID, Meal: MealLabel(task.Title), Servings: servings,
-		recipes: recipes}}}
+		recipes: recipes, perRecipe: DishOverrides(tx, []uint{task.ID})[task.ID]}}}
 	needs, _ := Needs([]Day{day})
 	return needs
 }

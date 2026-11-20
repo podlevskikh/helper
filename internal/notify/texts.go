@@ -28,6 +28,30 @@ type Params struct {
 	Left      int      `json:"left,omitempty"`
 	At        string   `json:"at,omitempty"` // время отметки HH:MM
 	Titles    []string `json:"titles,omitempty"`
+	Reason    string   `json:"reason,omitempty"` // почему помощник отдыхает: weekly | holiday | vacation | day_off
+}
+
+func dayOffReason(reason string, ru bool) string {
+	if ru {
+		switch reason {
+		case "holiday":
+			return "праздник"
+		case "vacation":
+			return "отпуск"
+		case "day_off":
+			return "отгул"
+		}
+		return "выходной"
+	}
+	switch reason {
+	case "holiday":
+		return "a holiday"
+	case "vacation":
+		return "on vacation"
+	case "day_off":
+		return "a day off"
+	}
+	return "a day off"
 }
 
 const maxTitle = 60
@@ -288,6 +312,15 @@ func Render(kind Kind, locale string, p Params) (title, body string) {
 		} else {
 			title = "Done · " + task
 			body = p.Actor + " · checked at " + p.At
+		}
+	case KindDayOff:
+		if ru {
+			title = "Завтра у " + p.Name + ": " + dayOffReason(p.Reason, true)
+			body = fmt.Sprintf("%d %s перейдут к вам: %s", p.Count, pluralRu(p.Count, "регулярная задача", "регулярные задачи", "регулярных задач"),
+				plainList(p.Items, 3))
+		} else {
+			title = "Tomorrow " + p.Name + " is " + dayOffReason(p.Reason, false)
+			body = fmt.Sprintf("%d recurring %s will be yours: %s", p.Count, pluralEn(p.Count, "task", "tasks"), plainList(p.Items, 3))
 		}
 	case KindMemberJoined:
 		if ru {

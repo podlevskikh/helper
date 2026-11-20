@@ -26,14 +26,21 @@ func ServingsChanged(tx *gorm.DB, task models.ScheduleTask, oldServings, newServ
 	}
 	// Разница между тем, сколько продуктов нужно этому приёму пищи «после» и «до» (с тем же
 	// округлением, что и при сборке списка), — чтобы правки туда-обратно не копили погрешность.
-	recipes := TaskRecipes(task)
+	// Меняются только блюда со стандартным числом порций; блюда со своими (суп ×1) остаются как есть.
+	own := DishOverrides(tx, []uint{task.ID})[task.ID]
+	recipes := []models.Recipe{}
+	for _, r := range TaskRecipes(task) {
+		if _, ok := own[r.ID]; !ok {
+			recipes = append(recipes, r)
+		}
+	}
 	key := func(n Need) string { return Key(n.Name) + "|" + n.Unit }
 	was := map[string]float64{}
-	for _, n := range taskNeeds(task, date, recipes, before) {
+	for _, n := range taskNeeds(tx, task, date, recipes, before) {
 		was[key(n)] = n.Amount
 	}
 	var plus, minus []Need
-	for _, n := range taskNeeds(task, date, recipes, after) {
+	for _, n := range taskNeeds(tx, task, date, recipes, after) {
 		d := n.Amount - was[key(n)]
 		delete(was, key(n))
 		if d > 0 {
@@ -44,7 +51,7 @@ func ServingsChanged(tx *gorm.DB, task models.ScheduleTask, oldServings, newServ
 			minus = append(minus, n)
 		}
 	}
-	for _, n := range taskNeeds(task, date, recipes, before) {
+	for _, n := range taskNeeds(tx, task, date, recipes, before) {
 		if amt, ok := was[key(n)]; ok && amt > 0 {
 			n.Amount = amt
 			minus = append(minus, n)
@@ -70,7 +77,7 @@ func ServingsChanged(tx *gorm.DB, task models.ScheduleTask, oldServings, newServ
 			seen := map[uint]bool{}
 			changed := false
 			for _, s := range src {
-				if s.TaskID == task.ID {
+				if s.TaskID == task.ID && own[s.RecipeID] == 0 {
 					if seen[s.RecipeID] {
 						changed = true
 						continue
@@ -127,7 +134,7 @@ func RecipeRestored(tx *gorm.DB, task models.ScheduleTask, recipe models.Recipe)
 			}
 		}
 		if !found {
-			if err := applyToList(tx, l, taskNeeds(task, date, []models.Recipe{recipe}, Servings(task)), 1); err != nil {
+			if err := applyToList(tx, l, taskNeeds(tx, task, date, []models.Recipe{recipe}, Servings(task)), 1); err != nil {
 				return err
 			}
 		}
