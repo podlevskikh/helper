@@ -45,3 +45,4 @@ cmd/regenerate/regenerate
 # Data directory
 data/
 
+__pycache__/

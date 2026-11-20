@@ -67,6 +67,8 @@ func TestUpdateMemberRole(t *testing.T) {
 	e.expect("имя основного админа можно", e.do(req{method: "PATCH", path: memberPath(o, o.UserID), token: a.Token, org: o.Org, body: map[string]string{"name": "Анна"}}), 200)
 	e.expect("свою роль не поменять", e.do(req{method: "PATCH", path: memberPath(o, a.UserID), token: a.Token, org: o.Org, body: map[string]string{"role": "helper"}}), 400)
 	e.expect("модератор не меняет роли", e.do(req{method: "PATCH", path: memberPath(o, h.UserID), token: mgr.Token, org: o.Org, body: map[string]string{"role": "helper"}}), 403)
+	e.expect("невидимые символы в имени", e.do(req{method: "PATCH", path: memberPath(o, h.UserID), token: o.Token, org: o.Org, body: map[string]string{"name": "Ма\u0000рия"}}), 400)
+	e.expect("смена направления текста в имени", e.do(req{method: "PATCH", path: memberPath(o, h.UserID), token: o.Token, org: o.Org, body: map[string]string{"name": "Анна\u202e"}}), 400)
 	e.expect("не участник — 404", e.do(req{method: "PATCH", path: memberPath(o, 999999999), token: o.Token, org: o.Org, body: map[string]string{"role": "helper"}}), 404)
 
 	// Права меняются сразу: бывший помощник-модератор ставит задачи, бывший админ — нет.
@@ -104,6 +106,13 @@ func TestRemoveAndLeave(t *testing.T) {
 	if e.db.First(&u, h.UserID).Error != nil {
 		t.Error("аккаунт убранного удалён")
 	}
+
+	// Ссылка, созданная до того, как человека убрали, его не возвращает; его собственные ссылки отозваны.
+	old := e.do(req{method: "POST", path: fmt.Sprintf("/orgs/%d/invites", o.Org), token: a.Token, org: o.Org, body: map[string]string{"role": "admin"}})
+	oldTok, _ := e.json(old)["token"].(string)
+	e.expect("основной админ убирает админа", e.do(req{method: "DELETE", path: memberPath(o, a.UserID), token: o.Token, org: o.Org}), 204)
+	e.expect("своя старая ссылка не возвращает", e.do(req{method: "POST", path: "/invites/" + oldTok + "/accept", body: map[string]string{"name": "x", "password": a.Password, "email": a.Email}}), 410)
+	e.expect("после неё дома нет", e.do(req{method: "GET", path: fmt.Sprintf("/orgs/%d/members", o.Org), token: a.Token, org: o.Org}), 403)
 
 	e.expect("модератор покидает команду", e.do(req{method: "POST", path: fmt.Sprintf("/orgs/%d/leave", o.Org), token: mgr.Token, org: o.Org}), 204)
 	e.expect("после выхода дома нет", e.do(req{method: "GET", path: "/helper/api/schedule/today", token: mgr.Token, org: o.Org}), 403)

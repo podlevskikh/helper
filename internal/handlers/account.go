@@ -62,6 +62,10 @@ func (h *AuthHandler) DeleteMe(c *gin.Context) {
 		}
 		return DeleteAccount(tx, user.ID)
 	})
+	if errors.Is(err, errTeamChanged) || errors.Is(err, errNotAdmin) {
+		c.JSON(http.StatusConflict, gin.H{"error": "the team has changed, reload", "code": "team_changed"})
+		return
+	}
 	if errors.Is(err, errDecisionRequired) {
 		c.JSON(http.StatusConflict, gin.H{"error": "decide what happens to the home", "code": "home_decision_required", "homes": pending})
 		return

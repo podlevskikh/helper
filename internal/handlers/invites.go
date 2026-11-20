@@ -264,6 +264,10 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 		if tx.Where("user_id = ? AND organization_id = ?", user.ID, invite.OrganizationID).First(&existing).Error == nil {
 			// Уже в доме — роль не трогаем (иначе владелец, открыв ссылку «помощник», понизил бы себя сам;
 			// роль меняют в «Команде»). Ушедшего раньше — возвращаем с ролью из приглашения.
+			// Убранного из команды возвращает только ссылка, созданная после этого.
+			if existing.Status != models.MembershipActive && invite.CreatedAt.Before(existing.UpdatedAt) {
+				return errInviteGone
+			}
 			if existing.Status != models.MembershipActive {
 				if txErr := tx.Model(&existing).Updates(map[string]interface{}{
 					"role":         invite.Role,

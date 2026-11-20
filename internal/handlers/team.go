@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
@@ -33,9 +34,16 @@ func NewTeamHandler(db *gorm.DB) *TeamHandler {
 
 const maxTeamName = 80
 
-// cleanTeamName — имя человека в команде: без лишних пробелов, не длиннее maxTeamName символов.
+// cleanTeamName — имя человека в команде: без лишних пробелов, не длиннее maxTeamName символов,
+// без управляющих и невидимых символов (NUL ломает запрос к базе, смена направления текста и
+// символы нулевой ширины позволяют подделать, как имя выглядит у других).
 func cleanTeamName(s string) (string, bool) {
 	s = strings.Join(strings.Fields(s), " ")
+	for _, r := range s {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return "", false
+		}
+	}
 	return s, utf8.RuneCountInString(s) <= maxTeamName
 }
 
@@ -94,8 +102,19 @@ func (h *TeamHandler) UpdateMember(c *gin.Context) {
 		updates["display_name"] = name
 	}
 	if len(updates) > 0 {
-		if err := h.db.Model(t).Updates(updates).Error; err != nil {
+		// Роль могла поменяться между чтением и записью (передача роли основного админа, выход) —
+		// пишем, только если человек всё ещё активен и не стал основным админом.
+		q := h.db.Model(&models.Membership{}).Where("id = ? AND status = ?", t.ID, models.MembershipActive)
+		if _, ok := updates["role"]; ok {
+			q = q.Where("role <> ?", models.RoleOwner)
+		}
+		res := q.Updates(updates)
+		if res.Error != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+			return
+		}
+		if res.RowsAffected != 1 {
+			c.JSON(http.StatusConflict, gin.H{"error": "the team has changed, reload", "code": "team_changed"})
 			return
 		}
 	}
@@ -121,11 +140,24 @@ func (h *TeamHandler) RemoveMember(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "use leave to leave the team", "code": "use_leave"})
 		return
 	}
-	if err := h.db.Transaction(func(tx *gorm.DB) error { return deactivateMember(tx, t) }); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+	if !h.deactivate(c, t) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// deactivate — deactivateMember в транзакции с ответом об ошибке; false — ответ уже отправлен.
+func (h *TeamHandler) deactivate(c *gin.Context, m *models.Membership) bool {
+	err := h.db.Transaction(func(tx *gorm.DB) error { return deactivateMember(tx, m) })
+	if errors.Is(err, errTeamChanged) {
+		c.JSON(http.StatusConflict, gin.H{"error": "the team has changed, reload", "code": "team_changed"})
+		return false
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+		return false
+	}
+	return true
 }
 
 // Leave — POST /orgs/:orgId/leave: покинуть команду (все, кроме основного админа).
@@ -135,17 +167,31 @@ func (h *TeamHandler) Leave(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "the main admin must transfer the role or delete the home", "code": "owner_cannot_leave"})
 		return
 	}
-	if err := h.db.Transaction(func(tx *gorm.DB) error { return deactivateMember(tx, me) }); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+	if !h.deactivate(c, me) {
 		return
 	}
 	c.Status(http.StatusNoContent)
 }
 
+var errTeamChanged = errors.New("membership changed concurrently")
+
 // deactivateMember — человек больше не в команде: членство выключено (по новой ссылке вернётся),
-// его регулярные задачи и несделанные задачи с сегодняшнего дня остаются без исполнителя.
+// его ссылки-приглашения отозваны, регулярные задачи и несделанные задачи с сегодняшнего дня
+// остаются без исполнителя. Основного админа так не выключить — даже если он стал им только что.
 func deactivateMember(tx *gorm.DB, m *models.Membership) error {
-	if err := tx.Model(&models.Membership{}).Where("id = ?", m.ID).Update("status", models.MembershipDisabled).Error; err != nil {
+	res := tx.Model(&models.Membership{}).
+		Where("id = ? AND status = ? AND role <> ?", m.ID, models.MembershipActive, models.RoleOwner).
+		Update("status", models.MembershipDisabled)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected != 1 {
+		return errTeamChanged
+	}
+	// Ссылки, которые он создал, больше не работают — иначе мог бы вернуться по своей же ссылке.
+	if err := tx.Model(&models.Invite{}).
+		Where("organization_id = ? AND invited_by = ? AND status = ?", m.OrganizationID, m.UserID, models.InvitePending).
+		Update("status", models.InviteRevoked).Error; err != nil {
 		return err
 	}
 	if err := tx.Model(&models.RecurringTask{}).
@@ -187,6 +233,10 @@ func (h *TeamHandler) TransferOwnership(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "the new main admin must be an admin of this home", "code": "successor_not_admin"})
 		return
 	}
+	if errors.Is(err, errTeamChanged) {
+		c.JSON(http.StatusConflict, gin.H{"error": "the team has changed, reload", "code": "team_changed"})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
@@ -197,11 +247,22 @@ func (h *TeamHandler) TransferOwnership(c *gin.Context) {
 var errNotAdmin = errors.New("successor is not an active admin")
 
 // transferOwnership — to (активный админ) становится основным админом, from — админом.
+// Сначала понижаем from: две одновременные передачи не дадут двух основных админов —
+// вторая не найдёт from основным админом и откатится. Вызывать внутри транзакции.
 func transferOwnership(tx *gorm.DB, orgID, from, to uint) error {
 	if from == to {
 		return errNotAdmin
 	}
 	res := tx.Model(&models.Membership{}).
+		Where("organization_id = ? AND user_id = ? AND status = ? AND role = ?", orgID, from, models.MembershipActive, models.RoleOwner).
+		Update("role", models.RoleAdmin)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected != 1 {
+		return errTeamChanged
+	}
+	res = tx.Model(&models.Membership{}).
 		Where("organization_id = ? AND user_id = ? AND status = ? AND role = ?", orgID, to, models.MembershipActive, models.RoleAdmin).
 		Update("role", models.RoleOwner)
 	if res.Error != nil {
@@ -210,7 +271,5 @@ func transferOwnership(tx *gorm.DB, orgID, from, to uint) error {
 	if res.RowsAffected != 1 {
 		return errNotAdmin
 	}
-	return tx.Model(&models.Membership{}).
-		Where("organization_id = ? AND user_id = ? AND role = ?", orgID, from, models.RoleOwner).
-		Update("role", models.RoleAdmin).Error
+	return nil
 }
