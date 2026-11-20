@@ -16,8 +16,10 @@ import (
 	"podlevskikh/awesomeProject/internal/models"
 )
 
-// Языки интерфейса, которые есть в приложении.
-var supportedLocales = map[string]bool{"ru": true, "en": true}
+// Языки интерфейса, которые есть в приложении (LOCALES в src/i18n/index.ts фронта).
+var supportedLocales = map[string]bool{
+	"en": true, "ru": true, "es": true, "fil": true, "id": true, "el": true, "uk": true, "ne": true, "si": true,
+}
 
 // defaultLocale — язык интерфейса по умолчанию: английский.
 const defaultLocale = "en"
