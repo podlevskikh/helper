@@ -134,6 +134,11 @@ type ScheduleTask struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
+	// Только в ответе (в базе нет): обычное число порций приёма пищи и замены блюд на этот день.
+	// Заполняет FillMealInfo.
+	UsualServings int            `gorm:"-" json:"usual_servings,omitempty"`
+	Swaps         []MealSwapView `gorm:"-" json:"swaps,omitempty"`
+
 	// Relations
 	Recipe       *Recipe        `gorm:"foreignKey:RecipeID" json:"recipe,omitempty"` // deprecated, use Recipes
 	Recipes      []Recipe       `gorm:"many2many:meal_recipes;" json:"recipes,omitempty"`
@@ -169,6 +174,65 @@ type ShoppingListItem struct {
 
 // DefaultMealServings — порций в приёме пищи, пока у задачи не задано своё число.
 const DefaultMealServings = 2
+
+// MealSwap — блюдо приёма пищи заменили на этот день. Одна строка на заменённое блюдо задачи:
+// повторная замена меняет CurrentRecipeID, OriginalRecipeID остаётся первым — «Вернуть» возвращает его.
+type MealSwap struct {
+	ID               uint      `gorm:"primaryKey" json:"id"`
+	OrganizationID   uint      `gorm:"index;not null" json:"organization_id"`
+	TaskID           uint      `gorm:"index;not null" json:"task_id"`
+	OriginalRecipeID uint      `gorm:"not null" json:"original_recipe_id"`
+	CurrentRecipeID  uint      `gorm:"not null" json:"current_recipe_id"`
+	CreatedByUserID  *uint     `json:"created_by_user_id,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// MealSwapView — замена в ответе задачи.
+type MealSwapView struct {
+	OriginalRecipeID uint   `json:"original_recipe_id"`
+	OriginalName     string `json:"original_name"`
+	CurrentRecipeID  uint   `json:"current_recipe_id"`
+}
+
+// MaxMealServings — больше порций на один приём пищи не ставим.
+const MaxMealServings = 20
+
+// FillMealInfo дописывает задачам еды обычное число порций и замены блюд (для ответа API).
+func FillMealInfo(db *gorm.DB, tasks []ScheduleTask) {
+	ids := []uint{}
+	idx := map[uint]int{}
+	for i := range tasks {
+		if tasks[i].TaskType != "meal" {
+			continue
+		}
+		tasks[i].UsualServings = DefaultMealServings
+		ids = append(ids, tasks[i].ID)
+		idx[tasks[i].ID] = i
+	}
+	if len(ids) == 0 {
+		return
+	}
+	var swaps []MealSwap
+	if db.Where("task_id IN ?", ids).Order("id").Find(&swaps).Error != nil || len(swaps) == 0 {
+		return
+	}
+	rids := []uint{}
+	for _, s := range swaps {
+		rids = append(rids, s.OriginalRecipeID)
+	}
+	var recipes []Recipe
+	db.Select("id", "name").Where("id IN ?", rids).Find(&recipes)
+	names := map[uint]string{}
+	for _, r := range recipes {
+		names[r.ID] = r.Name
+	}
+	for _, s := range swaps {
+		i := idx[s.TaskID]
+		tasks[i].Swaps = append(tasks[i].Swaps, MealSwapView{OriginalRecipeID: s.OriginalRecipeID,
+			OriginalName: names[s.OriginalRecipeID], CurrentRecipeID: s.CurrentRecipeID})
+	}
+}
 
 // Статусы списка покупок.
 const (

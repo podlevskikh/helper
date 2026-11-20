@@ -73,6 +73,8 @@ POST /admin/api/recipes/:id/comments
 POST /admin/api/recurring-tasks
 POST /admin/api/regenerate-schedule
 POST /admin/api/tasks/:id/recipes
+POST /admin/api/tasks/:id/swap
+POST /admin/api/tasks/:id/swap/undo
 POST /admin/api/tasks/:id/zones
 POST /admin/api/zones
 POST /auth/email
@@ -108,6 +110,7 @@ PUT /admin/api/childcare/:id
 PUT /admin/api/mealtimes/:id
 PUT /admin/api/recipes/:id
 PUT /admin/api/tasks/:id
+PUT /admin/api/tasks/:id/servings
 PUT /admin/api/zones/:id
 PUT /orgs/:orgId/notification-prefs
 PUT /orgs/:orgId/settings

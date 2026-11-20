@@ -754,8 +754,9 @@ func (h *AdminHandler) GetTask(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
-
-	c.JSON(http.StatusOK, task)
+	list := []models.ScheduleTask{task}
+	models.FillMealInfo(h.db, list)
+	c.JSON(http.StatusOK, list[0])
 }
 
 // AddRecipeToTask adds a recipe to a meal task

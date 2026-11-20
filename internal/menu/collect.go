@@ -2,6 +2,7 @@ package menu
 
 import (
 	"encoding/json"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -62,6 +63,18 @@ func MealLabel(title string) string {
 	return strings.TrimSpace(title)
 }
 
+// TaskRecipes — блюда приёма пищи. Планировщик пишет блюдо в старое поле recipe_id, а связь
+// meal_recipes остаётся пустой; тогда блюдо — это Recipe (нужен Preload("Recipe")).
+func TaskRecipes(t models.ScheduleTask) []models.Recipe {
+	if len(t.Recipes) > 0 {
+		return t.Recipes
+	}
+	if t.Recipe != nil {
+		return []models.Recipe{*t.Recipe}
+	}
+	return nil
+}
+
 // Servings — сколько порций готовить в задаче.
 func Servings(t models.ScheduleTask) int {
 	if t.Servings > 0 {
@@ -78,7 +91,7 @@ func Menu(db *gorm.DB, orgID uint, from, to time.Time, now time.Time) ([]Day, er
 	if err := db.Joins("JOIN daily_schedules ds ON ds.id = schedule_tasks.schedule_id").
 		Where("schedule_tasks.organization_id = ? AND schedule_tasks.task_type = ? AND ds.date >= ? AND ds.date <= ?",
 			orgID, "meal", from, to).
-		Preload("Recipes").Order("schedule_tasks.time ASC, schedule_tasks.id ASC").
+		Preload("Recipes").Preload("Recipe").Order("schedule_tasks.time ASC, schedule_tasks.id ASC").
 		Find(&tasks).Error; err != nil {
 		return nil, err
 	}
@@ -102,10 +115,11 @@ func Menu(db *gorm.DB, orgID uint, from, to time.Time, now time.Time) ([]Day, er
 		if d == "" {
 			continue
 		}
-		m := DayMeal{TaskID: t.ID, Time: t.Time, Meal: MealLabel(t.Title), Servings: Servings(t), recipes: t.Recipes,
+		recipes := TaskRecipes(t)
+		m := DayMeal{TaskID: t.ID, Time: t.Time, Meal: MealLabel(t.Title), Servings: Servings(t), recipes: recipes,
 			Recipes: []DayRecipe{}}
 		m.Passed = t.Completed || (d == today && t.Time != "" && t.Time < hm)
-		for _, r := range t.Recipes {
+		for _, r := range recipes {
 			m.Recipes = append(m.Recipes, DayRecipe{ID: r.ID, Name: r.Name})
 		}
 		byDate[d] = append(byDate[d], m)
@@ -246,6 +260,16 @@ func taskDate(tx *gorm.DB, t models.ScheduleTask) string {
 // RecipeAdded — в приём пищи добавили блюдо (наниматель заменил блюдо): продукты для него
 // сами дописываются в открытые списки «под меню» на этот день. Помощнику ничего делать не нужно.
 func RecipeAdded(tx *gorm.DB, task models.ScheduleTask, recipe models.Recipe) error {
+	return applyNeeds(tx, task, []models.Recipe{recipe}, Servings(task), 1)
+}
+
+// applyNeeds прибавляет (sign = 1) или вычитает (sign = -1) продукты блюд × servings порций
+// в открытых списках «под меню» на день задачи. Купленное не трогаем; при вычитании строку
+// не удаляем и ниже нуля не опускаем; новых строк при вычитании не создаём.
+func applyNeeds(tx *gorm.DB, task models.ScheduleTask, recipes []models.Recipe, servings int, sign float64) error {
+	if servings <= 0 || len(recipes) == 0 {
+		return nil
+	}
 	date := taskDate(tx, task)
 	if date == "" {
 		return nil
@@ -254,53 +278,74 @@ func RecipeAdded(tx *gorm.DB, task models.ScheduleTask, recipe models.Recipe) er
 	if len(lists) == 0 {
 		return nil
 	}
-	day := Day{Date: date, Meals: []DayMeal{{TaskID: task.ID, Meal: MealLabel(task.Title), Servings: Servings(task),
-		recipes: []models.Recipe{recipe}}}}
-	needs, _ := Needs([]Day{day})
+	needs := taskNeeds(task, date, recipes, servings)
 	for _, l := range lists {
-		var items []models.ShoppingListItem
-		tx.Where("list_id = ?", l.ID).Order("position ASC, id ASC").Find(&items)
-		maxPos := 0
-		for _, it := range items {
-			if it.Position > maxPos {
-				maxPos = it.Position
+		if err := applyToList(tx, l, needs, sign); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func taskNeeds(task models.ScheduleTask, date string, recipes []models.Recipe, servings int) []Need {
+	day := Day{Date: date, Meals: []DayMeal{{TaskID: task.ID, Meal: MealLabel(task.Title), Servings: servings,
+		recipes: recipes}}}
+	needs, _ := Needs([]Day{day})
+	return needs
+}
+
+// applyToList — прибавить или вычесть продукты в одном открытом списке.
+func applyToList(tx *gorm.DB, l models.ShoppingList, needs []Need, sign float64) error {
+	var items []models.ShoppingListItem
+	tx.Where("list_id = ?", l.ID).Order("position ASC, id ASC").Find(&items)
+	maxPos := 0
+	for _, it := range items {
+		if it.Position > maxPos {
+			maxPos = it.Position
+		}
+	}
+	for _, n := range needs {
+		var hit *models.ShoppingListItem
+		for i := range items {
+			it := &items[i]
+			if it.FromMenu && !it.Purchased && Key(it.Item) == Key(n.Name) && it.Unit == n.Unit {
+				hit = it
+				break
 			}
 		}
-		for _, n := range needs {
-			var hit *models.ShoppingListItem
+		add := n.Amount
+		if hit == nil && n.Unit == "г" && PieceGrams(n.Name) > 0 { // в списке этот продукт в штуках
 			for i := range items {
 				it := &items[i]
-				if it.FromMenu && !it.Purchased && Key(it.Item) == Key(n.Name) && it.Unit == n.Unit {
-					hit = it
+				if it.FromMenu && !it.Purchased && Key(it.Item) == Key(n.Name) && it.Unit == "шт" {
+					hit, add = it, Round(n.Amount/PieceGrams(n.Name), "шт")
 					break
 				}
 			}
-			add := n.Amount
-			if hit == nil && n.Unit == "г" && PieceGrams(n.Name) > 0 { // в списке этот продукт в штуках
-				for i := range items {
-					it := &items[i]
-					if it.FromMenu && !it.Purchased && Key(it.Item) == Key(n.Name) && it.Unit == "шт" {
-						hit, add = it, Round(n.Amount/PieceGrams(n.Name), "шт")
-						break
-					}
-				}
-			}
-			if hit != nil {
+		}
+		if hit != nil {
+			if sign > 0 {
 				// Добавляем к тому, что уже берём; лишнее не убираем — это решение того, кто заменил блюдо.
 				hit.NeedAmount += add
 				hit.BuyAmount += add
-				hit.Quantity = Format(hit.BuyAmount, hit.Unit)
 				hit.Sources = encodeSources(append(decodeSources(hit.Sources), n.Sources...))
-				if err := tx.Save(hit).Error; err != nil {
-					return err
-				}
-				continue
+			} else {
+				hit.NeedAmount = math.Max(0, hit.NeedAmount-add)
+				hit.BuyAmount = math.Max(0, hit.BuyAmount-add)
 			}
-			maxPos++
-			it := Item(l.OrganizationID, l.ID, n, maxPos, "menu", nil)
-			if err := tx.Create(&it).Error; err != nil {
+			hit.Quantity = Format(hit.BuyAmount, hit.Unit)
+			if err := tx.Save(hit).Error; err != nil {
 				return err
 			}
+			continue
+		}
+		if sign < 0 {
+			continue
+		}
+		maxPos++
+		it := Item(l.OrganizationID, l.ID, n, maxPos, "menu", nil)
+		if err := tx.Create(&it).Error; err != nil {
+			return err
 		}
 	}
 	return nil
