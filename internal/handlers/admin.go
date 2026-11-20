@@ -9,6 +9,7 @@ import (
 
 	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/clock"
+	"podlevskikh/awesomeProject/internal/menu"
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/notify"
@@ -122,20 +123,32 @@ func (h *AdminHandler) UpdateRecipe(c *gin.Context) {
 		return
 	}
 
-	// Update recipe fields
+	// Текст рецепта правит любой участник (CapEditRecipes): кто готовит, тот и уточняет состав и способ.
 	recipe.Name = input.Name
 	recipe.Description = input.Description
 	recipe.Ingredients = input.Ingredients
 	recipe.Instructions = input.Instructions
-	recipe.FamilyMember = input.FamilyMember
 	recipe.Tags = input.Tags
-	recipe.ImageURL = input.ImageURL
 	recipe.VideoURL = input.VideoURL
 	recipe.Rating = input.Rating
 	recipe.PrepTime = input.PrepTime
 	recipe.CookTime = input.CookTime
 	recipe.Servings = input.Servings
-	recipe.IsActive = input.IsActive
+
+	// Для кого блюдо, фото, «готовим сейчас» и приёмы пищи влияют на меню — только с CapManageRecipes.
+	m := middleware.MustMembership(c)
+	canManage := middleware.Can(m, middleware.CapManageRecipes)
+	if canManage {
+		recipe.FamilyMember = input.FamilyMember
+		recipe.ImageURL = input.ImageURL
+		recipe.IsActive = input.IsActive
+	}
+
+	var editor models.User
+	if err := h.db.Select("id", "name").First(&editor, m.UserID).Error; err == nil {
+		recipe.UpdatedByID = &editor.ID
+		recipe.UpdatedByName = editor.Name
+	}
 
 	if err := h.db.Save(&recipe).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -143,7 +156,7 @@ func (h *AdminHandler) UpdateRecipe(c *gin.Context) {
 	}
 
 	// Update meal time associations
-	if input.MealTimeIDs != nil {
+	if canManage && input.MealTimeIDs != nil {
 		var mealTimes []models.MealTime
 		if len(input.MealTimeIDs) > 0 {
 			if err := h.orgDB(c).Find(&mealTimes, input.MealTimeIDs).Error; err != nil {
@@ -687,9 +700,32 @@ func (h *AdminHandler) UpdateTask(c *gin.Context) {
 			return
 		}
 	}
+	oldRecipes := map[uint]bool{}
+	for _, r := range task.Recipes {
+		oldRecipes[r.ID] = true
+	}
 	if err := h.db.Model(&task).Association("Recipes").Replace(recipes); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update recipes"})
 		return
+	}
+	// Блюдо заменили — открытые списки «под меню» на этот день обновляются сами.
+	if task.TaskType == "meal" {
+		kept := map[uint]bool{}
+		for _, r := range recipes {
+			kept[r.ID] = true
+			if !oldRecipes[r.ID] {
+				if err := menu.RecipeAdded(h.db, task, r); err != nil {
+					log.Printf("shopping from menu: add recipe %d to task %d: %v", r.ID, task.ID, err)
+				}
+			}
+		}
+		for id := range oldRecipes {
+			if !kept[id] {
+				if err := menu.RecipeRemoved(h.db, task, id); err != nil {
+					log.Printf("shopping from menu: remove recipe %d from task %d: %v", id, task.ID, err)
+				}
+			}
+		}
 	}
 
 	// Also update the legacy RecipeID FK: set to first recipe if any
@@ -718,8 +754,9 @@ func (h *AdminHandler) GetTask(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
-
-	c.JSON(http.StatusOK, task)
+	list := []models.ScheduleTask{task}
+	models.FillMealInfo(h.db, list)
+	c.JSON(http.StatusOK, list[0])
 }
 
 // AddRecipeToTask adds a recipe to a meal task
@@ -755,8 +792,14 @@ func (h *AdminHandler) AddRecipeToTask(c *gin.Context) {
 		return
 	}
 
-	// Add recipe to task using Association
-	if err := h.db.Model(&task).Association("Recipes").Append(&recipe); err != nil {
+	// Add recipe to task using Association; продукты нового блюда сами дописываются
+	// в открытые списки «под меню» на этот день.
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&task).Association("Recipes").Append(&recipe); err != nil {
+			return err
+		}
+		return menu.RecipeAdded(tx, task, recipe)
+	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -789,8 +832,13 @@ func (h *AdminHandler) RemoveRecipeFromTask(c *gin.Context) {
 		return
 	}
 
-	// Remove recipe from task
-	if err := h.db.Model(&task).Association("Recipes").Delete(&recipe); err != nil {
+	// Remove recipe from task; в списках «под меню» продукты этого блюда помечаются «можно убрать».
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&task).Association("Recipes").Delete(&recipe); err != nil {
+			return err
+		}
+		return menu.RecipeRemoved(tx, task, recipe.ID)
+	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

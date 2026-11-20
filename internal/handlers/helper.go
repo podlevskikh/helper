@@ -136,6 +136,7 @@ func (h *HelperHandler) respondSchedule(c *gin.Context, schedule models.DailySch
 		}
 		schedule.Tasks = kept
 	}
+	models.FillMealInfo(h.db, schedule.Tasks)
 	c.JSON(http.StatusOK, scheduleResponse{DailySchedule: schedule, DayOff: off})
 }
 
@@ -261,6 +262,7 @@ func (h *HelperHandler) GetUpcomingSchedules(c *gin.Context) {
 	for i := range schedules {
 		h.mergeChildcareTasks(c, &schedules[i], schedules[i].Date)
 		h.withRecurring(c, &schedules[i], schedules[i].Date)
+		models.FillMealInfo(h.db, schedules[i].Tasks)
 	}
 
 	c.JSON(http.StatusOK, schedules)

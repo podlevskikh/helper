@@ -415,3 +415,140 @@ func TestInviteAcceptOnceAndNoDowngrade(t *testing.T) {
 		t.Errorf("приглашение понизило владельца до %q", m.Role)
 	}
 }
+
+// REC-03: помощник правит текст рецепта (состав, как готовить); для кого блюдо, «готовим сейчас» и приёмы пищи
+// остаются как были; в рецепте видно, кто правил последним. Создать и удалить рецепт помощник не может.
+func TestHelperEditsRecipeText(t *testing.T) {
+	e := newEnv(t, 1000)
+	o := e.owner("recedit")
+	h := e.member(o, "helper", "recedit")
+	meals := e.jsonList(e.do(req{method: "GET", path: "/admin/api/mealtimes", token: o.Token, org: o.Org}))
+	w := e.do(req{method: "POST", path: "/admin/api/recipes", token: o.Token, org: o.Org, body: map[string]any{
+		"name": "Сырники", "ingredients": "Творог — 150 г", "instructions": "Смешать", "family_member": "adult",
+		"is_active": true, "servings": 1, "tags": "завтрак", "meal_time_ids": []any{meals[0]["id"]}}})
+	e.expect("создание", w, 201)
+	path := fmt.Sprintf("/admin/api/recipes/%.0f", e.json(w)["id"])
+
+	w = e.do(req{method: "PUT", path: path, token: h.Token, org: h.Org, body: map[string]any{
+		"name": "Сырники", "ingredients": "Творог — 150 г\nМука — 1 ст. л.", "instructions": "Смешать, жарить 3 мин с каждой стороны",
+		"family_member": "baby", "is_active": false, "servings": 1, "tags": "завтрак", "meal_time_ids": []any{}}})
+	e.expect("правка помощником", w, 200)
+	r := e.json(w)
+	if r["ingredients"] != "Творог — 150 г\nМука — 1 ст. л." || r["instructions"] != "Смешать, жарить 3 мин с каждой стороны" {
+		t.Errorf("текст не сохранился: %v", r)
+	}
+	if r["family_member"] != "adult" || r["is_active"] != true {
+		t.Errorf("помощник поменял, для кого блюдо или «готовим сейчас»: %v %v", r["family_member"], r["is_active"])
+	}
+	if mt, _ := r["meal_times"].([]any); len(mt) != 1 {
+		t.Errorf("помощник поменял приёмы пищи: %v", r["meal_times"])
+	}
+	if r["updated_by_name"] != "helper recedit" {
+		t.Errorf("кто правил: %v", r["updated_by_name"])
+	}
+
+	e.expect("создание помощником", e.do(req{method: "POST", path: "/admin/api/recipes", token: h.Token, org: h.Org,
+		body: map[string]any{"name": "x"}}), 403)
+	e.expect("удаление помощником", e.do(req{method: "DELETE", path: path, token: h.Token, org: h.Org}), 403)
+}
+
+// SHOP-04: список под меню — продукты рецептов (на 1 порцию) × порции, сложены, по отделам;
+// вода не покупается, соль — «проверьте»; прошедшие приёмы не считаются; помощник меняет «берём»;
+// наниматель заменил блюдо — продукты нового сами дописались в список, у старых пометка «убрано».
+func TestShoppingFromMenu(t *testing.T) {
+	e := newEnv(t, 1000)
+	o := e.owner("shopmenu")
+	h := e.member(o, "helper", "shopmenu")
+	mk := func(name, ingr string) uint {
+		w := e.do(req{method: "POST", path: "/admin/api/recipes", token: o.Token, org: o.Org, body: map[string]any{
+			"name": name, "ingredients": ingr, "family_member": "all", "is_active": true, "servings": 1}})
+		e.expect("рецепт "+name, w, 201)
+		return uint(e.json(w)["id"].(float64))
+	}
+	borsch := mk("Борщ тест", "Говядина на кости — 100 г\nСвёкла — 70 г\nВода — 400 мл\nСоль\nСметана — 1 ст. л.")
+	chicken := mk("Курица тест", "Курица (бёдра) — 250 г\nКартофель — 2 шт\nСоль")
+
+	today := clock.OrgToday(e.db, o.Org)
+	task := func(day time.Time, recipe uint, done bool) models.ScheduleTask {
+		s, err := models.EnsureDailySchedule(e.db, o.Org, day, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tk := models.ScheduleTask{OrganizationID: o.Org, ScheduleID: s.ID, TaskType: "meal", Title: "Обед - all",
+			Time: "13:00", Completed: done}
+		e.db.Create(&tk)
+		var r models.Recipe
+		e.db.First(&r, recipe)
+		_ = e.db.Model(&tk).Association("Recipes").Append(&r)
+		return tk
+	}
+	task(today, chicken, true) // уже сделано — не покупаем
+	lunch := task(today.AddDate(0, 0, 1), borsch, false)
+
+	e.expect("0 дней", e.do(req{method: "POST", path: "/helper/api/shopping-lists/from-menu", token: h.Token, org: h.Org, body: map[string]any{"days": 0}}), 400)
+	e.expect("8 дней", e.do(req{method: "GET", path: "/helper/api/shopping-lists/menu?days=8", token: h.Token, org: h.Org}), 400)
+
+	w := e.do(req{method: "GET", path: "/helper/api/shopping-lists/menu?days=3", token: h.Token, org: h.Org})
+	e.expect("меню", w, 200)
+	if days, _ := e.json(w)["days"].([]any); len(days) != 3 {
+		t.Fatalf("дней в меню: %v", e.json(w)["days"])
+	}
+
+	w = e.do(req{method: "POST", path: "/helper/api/shopping-lists/from-menu", token: h.Token, org: h.Org, body: map[string]any{"days": 3}})
+	e.expect("список из меню", w, 201)
+	l := e.json(w)
+	if l["status"] != "draft" || l["menu_from"] != today.Format("2006-01-02") || l["menu_pantry"] != "Соль" {
+		t.Errorf("список: статус %v, с %v, есть дома %q", l["status"], l["menu_from"], l["menu_pantry"])
+	}
+	listID := l["id"].(float64)
+	byName := func(m map[string]any) map[string]map[string]any {
+		out := map[string]map[string]any{}
+		items, _ := m["items"].([]any)
+		for _, x := range items {
+			it := x.(map[string]any)
+			out[it["item"].(string)] = it
+		}
+		return out
+	}
+	items := byName(l)
+	if len(items) != 3 || items["Вода"] != nil || items["Курица (бёдра)"] != nil {
+		t.Fatalf("пункты: %v", items)
+	}
+	beet := items["Свёкла"]
+	if beet["need_amount"] != 150.0 || beet["quantity"] != "150 г" || beet["category"] != "produce" {
+		t.Errorf("свёкла (70 г × 2 → 150 г, овощи): %v", beet)
+	}
+	if items["Сметана"]["quantity"] != "2 ст. л." || items["Говядина на кости"]["category"] != "meat" {
+		t.Errorf("сметана / говядина: %v %v", items["Сметана"], items["Говядина на кости"])
+	}
+
+	w = e.do(req{method: "PATCH", path: fmt.Sprintf("/helper/api/shopping-lists/%.0f/items/%.0f", listID, beet["id"]),
+		token: h.Token, org: h.Org, body: map[string]any{"buy_amount": 100}})
+	e.expect("берём меньше", w, 200)
+	if e.json(w)["quantity"] != "100 г" {
+		t.Errorf("после правки: %v", e.json(w)["quantity"])
+	}
+
+	e.expect("убрать борщ", e.do(req{method: "DELETE", path: fmt.Sprintf("/admin/api/tasks/%d/recipes/%d", lunch.ID, borsch), token: o.Token, org: o.Org}), 200)
+	e.expect("поставить курицу", e.do(req{method: "POST", path: fmt.Sprintf("/admin/api/tasks/%d/recipes", lunch.ID), token: o.Token, org: o.Org,
+		body: map[string]any{"recipe_id": chicken}}), 200)
+
+	items = byName(e.json(e.do(req{method: "GET", path: fmt.Sprintf("/helper/api/shopping-lists/%.0f", listID), token: h.Token, org: h.Org})))
+	if ch := items["Курица (бёдра)"]; ch == nil || ch["quantity"] != "500 г" {
+		t.Errorf("курица не дописалась сама: %v", ch)
+	}
+	if items["Свёкла"]["quantity"] != "100 г" || !strings.Contains(items["Свёкла"]["sources"].(string), `"removed":true`) {
+		t.Errorf("свёкла после замены: %v", items["Свёкла"])
+	}
+
+	// Так меняет блюдо приложение («Меню на завтра → Другое»): PUT задачи с recipe_ids.
+	e.expect("вернуть борщ", e.do(req{method: "PUT", path: fmt.Sprintf("/admin/api/tasks/%d", lunch.ID), token: o.Token, org: o.Org,
+		body: map[string]any{"time": "13:00", "end_time": "", "title": "Обед - all", "description": "", "recipe_ids": []uint{borsch}}}), 200)
+	items = byName(e.json(e.do(req{method: "GET", path: fmt.Sprintf("/helper/api/shopping-lists/%.0f", listID), token: h.Token, org: h.Org})))
+	if items["Свёкла"]["quantity"] != "250 г" {
+		t.Errorf("свёкла после возврата борща (100 + 150): %v", items["Свёкла"]["quantity"])
+	}
+	if !strings.Contains(items["Курица (бёдра)"]["sources"].(string), `"removed":true`) {
+		t.Errorf("курица после замены на борщ: %v", items["Курица (бёдра)"])
+	}
+}

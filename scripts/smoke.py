@@ -332,6 +332,30 @@ try:
     s, js, _ = call("GET", "/admin/api/mealtimes", token=tokB, org=orgB)
     check("MEAL-01 у нового дома завтрак, обед и ужин", s == 200 and len(js or []) == 3, f"({s} {js})")
 
+    # Еда в дне: порции на день и замена блюда с «Вернуть» (дом A, сегодняшний приём пищи; блюдо ставим сами).
+    mealA = next((t for t in tasksA if t.get("task_type") == "meal"), None)
+    if mealA:
+        ids = []
+        for name in ("Smoke блюдо", "Smoke замена"):
+            _, rec, _ = call("POST", "/admin/api/recipes", {"name": name, "ingredients": "Рис — 80 г",
+                                                             "family_member": "all", "is_active": True, "servings": 1}, tokA, orgA)
+            ids.append((rec or {}).get("id"))
+        dish, alt = ids
+        call("POST", f"/admin/api/tasks/{mealA['id']}/recipes", {"recipe_id": dish}, tokA, orgA)
+        s, js, _ = call("PUT", f"/admin/api/tasks/{mealA['id']}/servings", {"servings": 3}, tokA, orgA)
+        check("MEALDAY-01 порции на день", s == 200 and (js or {}).get("servings") == 3 and (js or {}).get("usual_servings"), f"({s} {js})")
+        s, _, _ = call("PUT", f"/admin/api/tasks/{mealA['id']}/servings", {"servings": 2}, tokH, orgA)
+        expect("MEALDAY-01 помощник не меняет порции", s, 403)
+        call("PUT", f"/admin/api/tasks/{mealA['id']}/servings", {"servings": 0}, tokA, orgA)
+        s, js, _ = call("POST", f"/admin/api/tasks/{mealA['id']}/swap", {"from_recipe_id": dish, "to_recipe_id": alt}, tokA, orgA)
+        sw = ((js or {}).get("swaps") or [{}])[0]
+        check("MEALDAY-02 замена блюда", s == 200 and sw.get("original_recipe_id") == dish and sw.get("current_recipe_id") == alt, f"({s} {js})")
+        s, js, _ = call("POST", f"/admin/api/tasks/{mealA['id']}/swap/undo", {"recipe_id": alt}, tokA, orgA)
+        got = [r.get("id") for r in (js or {}).get("recipes") or []]
+        check("MEALDAY-02 «Вернуть» — снова исходное блюдо", s == 200 and got == [dish] and not (js or {}).get("swaps"), f"({s} {js})")
+    else:
+        check("MEALDAY-01 в дне дома A есть приём пищи", False, f"({titlesA})")
+
     section("Команда и роли")
     s, js, _ = call("POST", f"/orgs/{orgA}/invites", {"email": email("adm"), "role": "admin", "name": "Smoke Админ"}, tokA, orgA)
     expect("ROLE-16 приглашение с именем", s, 201)

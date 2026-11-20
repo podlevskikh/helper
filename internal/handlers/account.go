@@ -246,6 +246,7 @@ func deleteOrganization(tx *gorm.DB, orgID uint) error {
 		&models.RecipeComment{},
 		&models.ShoppingListItem{},
 		&models.ShoppingList{},
+		&models.MealSwap{},
 		&models.ScheduleTask{},
 		&models.DailySchedule{},
 		&models.RecurringTask{},

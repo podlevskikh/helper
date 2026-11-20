@@ -230,7 +230,7 @@ func NewRouter(d Deps) *gin.Engine {
 			api.GET("/recipes", adminHandler.GetRecipes)
 			api.GET("/recipes/:id", adminHandler.GetRecipe)
 			api.POST("/recipes", middleware.Require(middleware.CapManageRecipes), adminHandler.CreateRecipe)
-			api.PUT("/recipes/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.UpdateRecipe)
+			api.PUT("/recipes/:id", middleware.Require(middleware.CapEditRecipes), adminHandler.UpdateRecipe)
 			api.DELETE("/recipes/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.DeleteRecipe)
 			// Загрузка фото рецептов убрана: рецепты без фото (решение владелицы), а старый обработчик не проверял размер и содержимое.
 
@@ -264,6 +264,9 @@ func NewRouter(d Deps) *gin.Engine {
 			api.GET("/tasks/:id", adminHandler.GetTask)
 			api.PUT("/tasks/:id", middleware.Require(middleware.CapManageSchedule), adminHandler.UpdateTask)
 			api.POST("/tasks/:id/recipes", middleware.Require(middleware.CapManageSchedule), adminHandler.AddRecipeToTask)
+			api.PUT("/tasks/:id/servings", middleware.Require(middleware.CapManageSchedule), adminHandler.SetTaskServings)
+			api.POST("/tasks/:id/swap", middleware.Require(middleware.CapManageSchedule), adminHandler.SwapTaskRecipe)
+			api.POST("/tasks/:id/swap/undo", middleware.Require(middleware.CapManageSchedule), adminHandler.UndoTaskSwap)
 			api.DELETE("/tasks/:id/recipes/:recipe_id", middleware.Require(middleware.CapManageSchedule), adminHandler.RemoveRecipeFromTask)
 			api.POST("/tasks/:id/zones", middleware.Require(middleware.CapManageSchedule), adminHandler.AddZoneToTask)
 			api.DELETE("/tasks/:id/zones/:zone_id", middleware.Require(middleware.CapManageSchedule), adminHandler.RemoveZoneFromTask)
@@ -370,6 +373,8 @@ func NewRouter(d Deps) *gin.Engine {
 			api.GET("/shopping-lists", viewShop, helperHandler.GetShoppingLists)
 			api.POST("/shopping-lists", manageShop, helperHandler.CreateShoppingList)
 			api.GET("/shopping-lists/suggestions", viewShop, helperHandler.GetShoppingSuggestions)
+			api.GET("/shopping-lists/menu", viewShop, helperHandler.GetShoppingMenu)
+			api.POST("/shopping-lists/from-menu", manageShop, helperHandler.CreateShoppingListFromMenu)
 			api.GET("/shopping-lists/:id", viewShop, helperHandler.GetShoppingListByID)
 			api.DELETE("/shopping-lists/:id", manageShop, helperHandler.DeleteShoppingList)
 			api.POST("/shopping-lists/:id/send", manageShop, helperHandler.SendShoppingList)

@@ -72,6 +72,7 @@ func Initialize(databaseURL string) error {
 		&models.DailySchedule{},
 		&models.TaskCategory{}, // M2: до ScheduleTask (FK)
 		&models.ScheduleTask{},
+		&models.MealSwap{},
 		&models.RecurringTask{},
 		&models.RecurringTaskSkip{},
 		&models.ShoppingList{}, // до ShoppingListItem (list_id)
