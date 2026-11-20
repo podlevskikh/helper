@@ -2,10 +2,12 @@ package server
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 	"time"
 
+	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/scheduler"
@@ -111,7 +113,12 @@ func TestSchedulerIdempotent(t *testing.T) {
 	o := e.owner("sched")
 	e.expect("зона", e.do(req{method: "POST", path: "/admin/api/zones", token: o.Token, org: o.Org,
 		body: map[string]any{"name": "кухня", "frequency_per_week": 7, "priority": "high"}}), 201)
+	// Уборка ставится только в рабочие дни дома: берём ближайший рабочий день не раньше послезавтра,
+	// иначе тест падает, когда послезавтра выпадает на выходной.
 	day := clock.OrgToday(e.db, o.Org).AddDate(0, 0, 2)
+	for !slices.Contains(calendar.OrgWorkdays(e.db, o.Org), calendar.ISOWeekday(day)) {
+		day = day.AddDate(0, 0, 1)
+	}
 	for i := 0; i < 3; i++ {
 		if err := scheduler.NewScheduler(e.db).GenerateScheduleForOrgDate(o.Org, day); err != nil {
 			t.Fatal(err)

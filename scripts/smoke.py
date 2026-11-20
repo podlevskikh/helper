@@ -116,6 +116,9 @@ for path, want in [("/app/", 200), ("/app/login", 200), ("/app/delete-account", 
 for path in ["/", "/admin2/", "/helper2/"]:
     s, _, h = call("GET", path)
     check(f"PUB-02 {path} → /app/", s == 302 and (h.get("Location") or "").endswith("/app/"), f"({s} {h.get('Location')})")
+for path, ctype in [("/app/favicon.ico", "image/"), ("/app/site-icon.png", "image/png")]:
+    s, _, h = call("GET", path)
+    check(f"PUB-07 иконка {path}", s == 200 and (h.get("Content-Type") or "").startswith(ctype), f"({s} {h.get('Content-Type')})")
 s, js, _ = call("GET", "/healthz")
 check("PUB-05 /healthz", s == 200 and (js or {}).get("status") == "ok", f"({s} {js})")
 s, _, _ = call("DELETE", "/auth/me")
