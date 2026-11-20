@@ -9,7 +9,7 @@ import (
 	"podlevskikh/awesomeProject/internal/models"
 )
 
-// MEAL-02, MEAL-03: порции на день и замена блюда с «Вернуть»; открытый список под меню
+// MEALDAY-01, MEALDAY-02: порции на день и замена блюда с «Вернуть»; открытый список под меню
 // пересчитывается сам, закрытый — нет; блюдо планировщика (старое поле recipe_id) тоже меняется.
 func TestMealDayServingsAndSwap(t *testing.T) {
 	e := newEnv(t, 1100)
