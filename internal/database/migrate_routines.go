@@ -48,8 +48,9 @@ func migrateRoutinesFromLegacy(tx *gorm.DB) error {
 	return nil
 }
 
-// orgPeople — основной админ (поставил задачи) и помощник по умолчанию: единственный помощник дома,
-// иначе тот же основной админ («назначьте помощника»).
+// orgPeople — основной админ (поставил задачи) и помощник по умолчанию: тот, кто дольше всех в доме
+// (раньше еда и уборка были «для всех помощников» — теперь у задачи один исполнитель, его можно сменить).
+// Помощников нет — основной админ.
 func orgPeople(tx *gorm.DB, org models.Organization) (owner, helper uint) {
 	owner = org.OwnerUserID
 	if owner == 0 {
@@ -60,9 +61,9 @@ func orgPeople(tx *gorm.DB, org models.Organization) (owner, helper uint) {
 	}
 	var helpers []uint
 	tx.Model(&models.Membership{}).Where("organization_id = ? AND role = ? AND status = ?",
-		org.ID, models.RoleHelper, models.MembershipActive).Pluck("user_id", &helpers)
+		org.ID, models.RoleHelper, models.MembershipActive).Order("id").Pluck("user_id", &helpers)
 	helper = owner
-	if len(helpers) == 1 {
+	if len(helpers) > 0 {
 		helper = helpers[0]
 	}
 	return owner, helper
@@ -295,5 +296,7 @@ func migrateOrgRoutines(tx *gorm.DB, org models.Organization) error {
 			return err
 		}
 	}
+	// Уже собранные дни: у задачи теперь один исполнитель (раньше еда и уборка были «для всех»).
+	routines.Reassign(tx, org.ID, today, today.AddDate(0, 0, 60))
 	return nil
 }

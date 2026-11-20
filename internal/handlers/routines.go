@@ -240,7 +240,7 @@ func saveParts(tx *gorm.DB, id uint, dishes []models.RoutineDish, items []models
 
 // GET /admin/api/routines
 func (h *AdminHandler) GetRoutines(c *gin.Context) {
-	var list []models.Routine
+	list := []models.Routine{}
 	if err := h.orgDB(c).Preload("Dishes", func(q *gorm.DB) *gorm.DB { return q.Order("position") }).
 		Preload("Checklist", func(q *gorm.DB) *gorm.DB { return q.Order("position") }).
 		Order("id").Find(&list).Error; err != nil {
@@ -367,7 +367,7 @@ func (h *AdminHandler) DeleteRoutine(c *gin.Context) {
 
 // GET /admin/api/dish-types
 func (h *AdminHandler) GetDishTypes(c *gin.Context) {
-	var list []models.DishType
+	list := []models.DishType{}
 	if err := h.orgDB(c).Order("position, id").Find(&list).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -526,7 +526,7 @@ func (h *AdminHandler) GetRoutinesDayOff(c *gin.Context) {
 		return
 	}
 	orgID := h.orgID(c)
-	var list []models.Routine
+	list := []models.Routine{}
 	h.db.Where("organization_id = ? AND active = ? AND start_date <= ?", orgID, true, date).Order("id").Find(&list)
 	items := []dayOffItem{}
 	for _, r := range list {

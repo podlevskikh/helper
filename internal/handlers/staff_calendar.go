@@ -11,8 +11,10 @@ import (
 	"gorm.io/gorm"
 
 	"podlevskikh/awesomeProject/internal/calendar"
+	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
+	"podlevskikh/awesomeProject/internal/routines"
 )
 
 // StaffCalendarHandler — выходные дни, страна праздников, отпуска и особые дни сотрудников.
@@ -159,6 +161,10 @@ func (h *StaffCalendarHandler) UpdateSettings(c *gin.Context) {
 	if h.RefreshCleaning != nil {
 		h.RefreshCleaning(m.OrganizationID)
 	}
+	if in.DaysOff != nil || in.HolidayCountry != nil {
+		today := clock.OrgToday(h.db, m.OrganizationID)
+		routines.Reassign(h.db, m.OrganizationID, today, today.AddDate(0, 0, routines.Days))
+	}
 	c.JSON(http.StatusOK, h.settingsView(*m))
 }
 
@@ -262,6 +268,8 @@ func (h *StaffCalendarHandler) CreateOverride(c *gin.Context) {
 	if in.Kind == models.DayOverrideWork && h.EnsureSchedule != nil {
 		h.EnsureSchedule(start)
 	}
+	// Регулярные задачи уже собранных дней — к тому, кто теперь их делает.
+	routines.Reassign(h.db, m.OrganizationID, start, end)
 	c.JSON(http.StatusCreated, o)
 }
 
@@ -271,7 +279,13 @@ func (h *StaffCalendarHandler) DeleteOverride(c *gin.Context) {
 	if !ok {
 		return
 	}
-	res := h.db.Where("id = ? AND organization_id = ? AND user_id = ?", c.Param("id"), m.OrganizationID, m.UserID).
+	var o models.StaffDayOverride
+	if err := h.db.Where("id = ? AND organization_id = ? AND user_id = ?", c.Param("id"), m.OrganizationID, m.UserID).
+		First(&o).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	res := h.db.Where("id = ? AND organization_id = ? AND user_id = ?", o.ID, m.OrganizationID, m.UserID).
 		Delete(&models.StaffDayOverride{})
 	if res.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": res.Error.Error()})
@@ -281,6 +295,7 @@ func (h *StaffCalendarHandler) DeleteOverride(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
+	routines.Reassign(h.db, m.OrganizationID, o.StartDate, o.EndDate)
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
 

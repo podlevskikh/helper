@@ -331,19 +331,30 @@ func PickRecipe(db *gorm.DB, r models.Routine, d models.RoutineDish, date time.T
 		Joins("JOIN daily_schedules ds ON ds.id = st.schedule_id").
 		Where("st.routine_id = ? AND task_dishes.position = ? AND task_dishes.recipe_id IS NOT NULL AND ds.date >= ? AND ds.date < ?",
 			r.ID, d.Position, date.AddDate(0, 0, -lookback), date).
+		Order("ds.date DESC").
 		Pluck("task_dishes.recipe_id", &usedIDs)
-	used := map[uint]bool{}
-	for _, id := range usedIDs {
-		used[id] = true
+	// recency: 0 — было последним, больше — давнее.
+	recency := map[uint]int{}
+	for i, id := range usedIDs {
+		if _, ok := recency[id]; !ok {
+			recency[id] = i
+		}
 	}
 	fresh := pool[:0:0]
 	for _, rec := range pool {
-		if !used[rec.ID] {
+		if _, ok := recency[rec.ID]; !ok {
 			fresh = append(fresh, rec)
 		}
 	}
 	if len(fresh) == 0 {
-		fresh = pool
+		// Все были недавно — по кругу: то, что готовили давнее всех.
+		oldest := pool[0]
+		for _, rec := range pool[1:] {
+			if recency[rec.ID] > recency[oldest.ID] {
+				oldest = rec
+			}
+		}
+		return &oldest
 	}
 	chosen := fresh[rand.Intn(len(fresh))]
 	return &chosen
@@ -438,4 +449,50 @@ func SortedWeekdays(days []int) string {
 		parts[i] = strconv.Itoa(d)
 	}
 	return strings.Join(parts, ",")
+}
+
+// Reassign пересчитывает исполнителя невыполненных регулярных задач дома в днях [from, to]:
+// помощнику дали отгул — задача у того, кто поставил; отгул сняли — снова у помощника.
+// Решения на день (передать, перенести, не делать) учитываются. Порции и замены блюд не трогаем.
+func Reassign(db *gorm.DB, orgID uint, from, to time.Time) {
+	from, to = day(from), day(to)
+	if today := clock.OrgToday(db, orgID); from.Before(today) {
+		from = today
+	}
+	if to.Before(from) {
+		return
+	}
+	type row struct {
+		ID        uint
+		RoutineID uint
+		Date      time.Time
+		Assigned  *uint
+	}
+	var rows []row
+	db.Model(&models.ScheduleTask{}).
+		Select("schedule_tasks.id, schedule_tasks.routine_id, ds.date, schedule_tasks.assigned_to_user_id AS assigned").
+		Joins("JOIN daily_schedules ds ON ds.id = schedule_tasks.schedule_id").
+		Where("ds.organization_id = ? AND schedule_tasks.routine_id IS NOT NULL AND schedule_tasks.completed = false AND ds.date >= ? AND ds.date <= ?",
+			orgID, from, to).
+		Scan(&rows)
+	cache := map[uint]*models.Routine{}
+	for _, t := range rows {
+		r, ok := cache[t.RoutineID]
+		if !ok {
+			var x models.Routine
+			if db.First(&x, t.RoutineID).Error != nil {
+				x.ID = 0
+			}
+			r = &x
+			cache[t.RoutineID] = r
+		}
+		if r.ID == 0 {
+			continue
+		}
+		who, ok := assignee(db, *r, day(t.Date))
+		if !ok || (t.Assigned != nil && *t.Assigned == who) {
+			continue
+		}
+		db.Model(&models.ScheduleTask{}).Where("id = ?", t.ID).Update("assigned_to_user_id", who)
+	}
 }

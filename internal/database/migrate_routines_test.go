@@ -99,6 +99,9 @@ func TestMigrateRoutinesFromLegacy(t *testing.T) {
 	if oldLunch.RoutineID == nil || *oldLunch.RoutineID != byTitle["Обед"].ID || oldLunch.Title != "Обед" {
 		t.Errorf("старый обед не привязан: %+v", oldLunch)
 	}
+	if oldLunch.AssignedToUserID == nil {
+		t.Errorf("у перенесённого обеда нет исполнителя: %+v", oldLunch)
+	}
 	var migrated int64
 	DB.Model(&models.MealTime{}).Where("id = ? AND migrated_routine_id IS NOT NULL", lunch.ID).Count(&migrated)
 	if migrated != 1 {

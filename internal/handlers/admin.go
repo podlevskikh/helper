@@ -1037,6 +1037,14 @@ func (h *AdminHandler) DeleteCustomTask(c *gin.Context) {
 			h.db.Create(&models.RecurringTaskSkip{RecurringTaskID: *task.RecurringTaskID, Date: utcDay(sched.Date)})
 		}
 	}
+	// Из «Ритма дома» — так же: в этот день регулярную задачу больше не ставим.
+	if task.RoutineID != nil {
+		var sched models.DailySchedule
+		if h.db.First(&sched, task.ScheduleID).Error == nil {
+			skip := models.RoutineSkip{RoutineID: *task.RoutineID, Date: utcDay(sched.Date)}
+			h.db.Where(skip).FirstOrCreate(&skip)
+		}
+	}
 	notify.TaskDeleted(h.db, currentUserID(c), &task)
 	if err := h.db.Delete(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

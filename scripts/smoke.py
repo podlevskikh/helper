@@ -259,6 +259,7 @@ try:
     s, js, _ = call("POST", f"/invites/{inv.get('token')}/accept", {"name": "Smoke Помощник", "password": PW, "email": email("h")})
     expect("INV-02 приглашение принято", s, 200)
     tokH = (js or {}).get("access")
+    uidH = ((js or {}).get("user") or {}).get("id")
     if tokH:
         created["h"] = (tokH, PW)
     s, _, _ = call("POST", f"/invites/{inv.get('token')}/accept", {"name": "ещё раз", "password": PW, "email": email("h")})
@@ -280,6 +281,39 @@ try:
     ]:
         s, _, _ = call(method, path, body, tokH, orgA)
         expect(case, s, 403)
+
+    section("Ритм дома")
+    s, js, _ = call("POST", "/admin/api/dish-types", {"name": "Smoke суп"}, tokA, orgA)
+    expect("RT-01 тип блюда", s, 201)
+    soup = (js or {}).get("id")
+    s, _, _ = call("POST", "/admin/api/dish-types", {"name": "smoke СУП"}, tokA, orgA)
+    expect("RT-11 тип-дубль без учёта регистра", s, 409)
+    for name in ("Smoke щи", "Smoke борщ"):
+        s, _, _ = call("POST", "/admin/api/recipes", {"name": name, "ingredients": "Капуста — 100 г", "family_member": "all",
+                                                       "is_active": True, "servings": 1, "dish_type_id": soup}, tokA, orgA)
+        expect(f"RT-01 рецепт с типом «{name}»", s, 201)
+    s, js, _ = call("POST", "/admin/api/routines", {"kind": "food", "title": "Smoke обед", "repeat_kind": "weekdays",
+                                                    "weekdays": [1, 2, 3, 4, 5, 6, 7], "start_date": today, "time_mode": "exact",
+                                                    "times": ["13:30"], "assigned_to_user_id": uidH,
+                                                    "dishes": [{"dish_type_id": soup, "servings": 1}, {"dish_type_id": soup, "servings": 2}]},
+                    tokA, orgA)
+    expect("RT-01 регулярная задача «Еда» из двух блюд", s, 201)
+    rid = (js or {}).get("id")
+    s, js, _ = call("GET", "/helper/api/schedule/today", token=tokA, org=orgA)
+    lunch = next((t for t in (js or {}).get("tasks", []) if t.get("title") == "Smoke обед"), {})
+    dishes = lunch.get("dishes") or []
+    check("RT-01 в дне — обед из двух блюд с порциями и подобранными рецептами",
+          s == 200 and [d.get("servings") for d in dishes] == [1, 2] and all(d.get("recipe_id") for d in dishes)
+          and lunch.get("assigned_to_user_id") is not None, f"({s} {lunch})")
+    s, _, _ = call("POST", "/admin/api/routines", {"kind": "other", "title": "нельзя", "repeat_kind": "every_n", "every_n": 2,
+                                                   "time_mode": "any", "assigned_to_user_id": uidH}, tokH, orgA)
+    expect("RT-08 помощник не меняет «Ритм дома»", s, 403)
+    s, _, _ = call("PATCH", f"/admin/api/routines/{rid}/active", {"active": False}, tokA, orgA)
+    expect("RT-07 пауза", s, 200)
+    s, js, _ = call("GET", "/helper/api/schedule/today", token=tokA, org=orgA)
+    check("RT-07 на паузе — задачи нет в дне", s == 200 and all(t.get("title") != "Smoke обед" for t in (js or {}).get("tasks", [])), f"({s})")
+    s, _, _ = call("DELETE", f"/admin/api/routines/{rid}", None, tokA, orgA)
+    expect("RT-07 удалить регулярную задачу", s, 200)
 
     section("Покупки")
     s, js, _ = call("POST", "/helper/api/shopping-lists", {}, tokH, orgA)
@@ -314,7 +348,7 @@ try:
     expect("SEC-02 чужой дом через X-Org-Id", s, 403)
     s, _, _ = call("GET", f"/orgs/{orgA}/settings", token=tokB, org=orgB)
     expect("SEC-06 чужой дом в адресе", s, 403)
-    # В доме A есть свой приём пищи и зона — им есть куда «протечь». У дома B — только приёмы пищи по умолчанию.
+    # В доме A есть свой приём пищи и зона — им есть куда «протечь». Дом B пустой.
     s, _, _ = call("POST", "/admin/api/regenerate-schedule", {}, tokA, orgA)
     expect("SCHED-04 пересборка дней своего дома", s, 200)
     call("POST", "/admin/api/regenerate-schedule", {}, tokB, orgB)
@@ -329,8 +363,10 @@ try:
           s == 200 and not shared_ids and not any("smoke" in t.lower() for t in titlesB)
           and any("кухня" in t.lower() for t in titlesA) and any("перекус" in t.lower() for t in titlesA),
           f"(B={titlesB}, A={titlesA}, общие id={shared_ids})")
-    s, js, _ = call("GET", "/admin/api/mealtimes", token=tokB, org=orgB)
-    check("MEAL-01 у нового дома завтрак, обед и ужин", s == 200 and len(js or []) == 3, f"({s} {js})")
+    s1, js1, _ = call("GET", "/admin/api/mealtimes", token=tokB, org=orgB)
+    s2, js2, _ = call("GET", "/admin/api/routines", token=tokB, org=orgB)
+    check("MEAL-01 новый дом начинает с пустого «Ритма дома»", s1 == 200 and not js1 and s2 == 200 and js2 == [],
+          f"({s1} {js1} / {s2} {js2})")
 
     # Еда в дне: порции на день и замена блюда с «Вернуть» (дом A, сегодняшний приём пищи; блюдо ставим сами).
     mealA = next((t for t in tasksA if t.get("task_type") == "meal"), None)

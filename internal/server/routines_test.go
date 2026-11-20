@@ -80,8 +80,8 @@ func TestRoutineMealFromDishTypes(t *testing.T) {
 	e.routine(hm.o, map[string]any{"kind": "food", "title": "Обед", "repeat_kind": "weekdays", "weekdays": []int{1, 2, 3, 4, 5},
 		"time_mode": "exact", "times": []string{"13:00"}, "assigned_to_user_id": hm.h.UserID,
 		"dishes": []map[string]any{{"dish_type_id": soup, "servings": 1}, {"dish_type_id": main, "servings": 2}}})
-	seen := map[float64]bool{}
-	for _, d := range []string{"2026-11-16", "2026-11-17", "2026-11-18"} {
+	var soups []float64
+	for _, d := range []string{"2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20", "2026-11-23"} {
 		task := findTask(e.dayTasks(hm.h, d), "Обед")
 		if task == nil {
 			t.Fatalf("%s: нет обеда у помощника", d)
@@ -98,10 +98,14 @@ func TestRoutineMealFromDishTypes(t *testing.T) {
 			t.Errorf("%s: блюда %v", d, dishes)
 		}
 		id, _ := d1["recipe_id"].(float64)
-		if seen[id] {
-			t.Errorf("%s: суп %v повторился раньше, чем прошли все", d, id)
+		soups = append(soups, id)
+	}
+	// По кругу: супов три — в любых трёх обедах подряд каждый по разу.
+	for i := 0; i+3 <= len(soups); i++ {
+		w := map[float64]bool{soups[i]: true, soups[i+1]: true, soups[i+2]: true}
+		if len(w) != 3 {
+			t.Errorf("супы %v: в обедах %d–%d повтор", soups, i+1, i+3)
 		}
-		seen[id] = true
 	}
 	if task := findTask(e.dayTasks(hm.h, "2026-11-22"), "Обед"); task != nil {
 		t.Errorf("в воскресенье обеда нет по правилу, а он есть")
@@ -253,4 +257,57 @@ func TestDishTypes(t *testing.T) {
 	other := e.owner("rttypes-other")
 	e.expect("чужой тип в рецепте", e.do(req{method: "POST", path: "/admin/api/recipes", token: other.Token, org: other.Org,
 		body: map[string]any{"name": "x", "dish_type_id": soup}}), 400)
+}
+
+// RT-12: день уже собран, потом помощнику дали отгул — его регулярная задача переходит к тому,
+// кто её поставил; отгул сняли — задача снова у помощника.
+func TestRoutineDayOffAfterDayBuilt(t *testing.T) {
+	e := newEnv(t, 1000)
+	hm := rtSetup(e, "rtlate")
+	withNow(t, "2026-11-16T06:00:00Z") // понедельник
+	e.routine(hm.o, map[string]any{"kind": "other", "title": "Полить цветы", "repeat_kind": "weekdays",
+		"weekdays": []int{1, 2, 3, 4, 5, 6}, "time_mode": "any", "assigned_to_user_id": hm.h.UserID})
+	who := func() any {
+		task := findTask(e.dayTasks(hm.o, "2026-11-18"), "Полить цветы")
+		if task == nil {
+			t.Fatalf("в среду нет задачи")
+		}
+		return task["assigned_to_user_id"]
+	}
+	if got := who(); got != float64(hm.h.UserID) {
+		t.Fatalf("до отгула исполнитель %v, ждали помощника %d", got, hm.h.UserID)
+	}
+	w := e.do(req{method: "POST", path: fmt.Sprintf("/orgs/%d/members/%d/day-overrides", hm.o.Org, hm.h.UserID),
+		token: hm.o.Token, org: hm.o.Org, body: map[string]any{"kind": "day_off", "start_date": "2026-11-18"}})
+	e.expect("отгул в среду", w, 201)
+	if got := who(); got != float64(hm.o.UserID) {
+		t.Errorf("после отгула исполнитель %v, ждали поставившего %d", got, hm.o.UserID)
+	}
+	id := e.json(w)["id"].(float64)
+	e.expect("снять отгул", e.do(req{method: "DELETE", path: fmt.Sprintf("/orgs/%d/members/%d/day-overrides/%d", hm.o.Org, hm.h.UserID, int(id)),
+		token: hm.o.Token, org: hm.o.Org}), 200)
+	if got := who(); got != float64(hm.h.UserID) {
+		t.Errorf("после снятия отгула исполнитель %v, ждали помощника %d", got, hm.h.UserID)
+	}
+}
+
+// RT-13: задачу из ритма удалили на один день — она не появляется снова, а в другие дни есть.
+func TestRoutineTaskRemovedForDay(t *testing.T) {
+	e := newEnv(t, 1000)
+	hm := rtSetup(e, "rtrm")
+	withNow(t, "2026-11-16T06:00:00Z") // понедельник
+	e.routine(hm.o, map[string]any{"kind": "other", "title": "Полить цветы", "repeat_kind": "weekdays",
+		"weekdays": []int{1, 2, 3, 4, 5, 6}, "time_mode": "any", "assigned_to_user_id": hm.h.UserID})
+	task := findTask(e.dayTasks(hm.o, "2026-11-17"), "Полить цветы")
+	if task == nil {
+		t.Fatalf("во вторник нет задачи")
+	}
+	e.expect("убрать на вторник", e.do(req{method: "DELETE", path: fmt.Sprintf("/admin/api/custom-tasks/%d", int(task["id"].(float64))),
+		token: hm.o.Token, org: hm.o.Org}), 200)
+	if findTask(e.dayTasks(hm.o, "2026-11-17"), "Полить цветы") != nil {
+		t.Errorf("убранная на вторник задача появилась снова")
+	}
+	if findTask(e.dayTasks(hm.o, "2026-11-18"), "Полить цветы") == nil {
+		t.Errorf("в среду задачи нет")
+	}
 }
