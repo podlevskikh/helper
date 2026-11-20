@@ -121,14 +121,19 @@ def page(path):
         return e.code, "", e.headers
 
 
-for path, lang in [("/", "ru"), ("/en/", "en")]:
+for path, lang, hsh in [("/", "ru", ""), ("/en/", "en", "#en")]:
     s, html, h = page(path)
     check(f"PUB-02 лендинг {path}", s == 200 and (h.get("Content-Type") or "").startswith("text/html")
-          and f'lang="{lang}"' in html and 'href="/app/"' in html and "/app/site-icon.png?v=2" in html
-          and all(f'href="/app/{p}"' in html for p in ("privacy", "terms", "support")), f"({s})")
+          and f'lang="{lang}"' in html and f'href="/app/?lang={lang}"' in html and "/app/site-icon.png?v=2" in html
+          and all(f'href="/app/{p}{hsh}"' in html for p in ("privacy", "terms", "support")), f"({s})")
+for path in ["/robots.txt", "/sitemap.xml"]:
+    s, _, _ = call("GET", path)
+    expect(f"PUB-02 {path}", s, 200)
+s, _, h = call("GET", "/favicon.ico")
+check("PUB-02 /favicon.ico → иконка сайта", s == 301 and "site-icon.png" in (h.get("Location") or ""), f"({s} {h.get('Location')})")
 s, _, h = call("GET", "/en")
 check("PUB-02 /en → /en/", s == 301 and h.get("Location") == "/en/", f"({s} {h.get('Location')})")
-for path in ["/site/mascot.png", "/site/illustration.jpg", "/site/og.jpg"]:
+for path in ["/site/mascot.png", "/site/illustration.jpg", "/site/og.jpg", "/site/og-en.jpg"]:
     s, _, h = call("GET", path)
     check(f"PUB-02 картинка {path}", s == 200 and (h.get("Content-Type") or "").startswith("image/"), f"({s} {h.get('Content-Type')})")
 for path in ["/admin2/", "/helper2/"]:

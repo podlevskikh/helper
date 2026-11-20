@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Helper's Day — a helper for whoever runs the home</title>
-<meta name="description" content="Meals, cleaning, the kids’ day and shopping lists in one place. Everyone has a plan, and you see what’s done.">
+<title>Helper's Day — a helping hand for running your home</title>
+<meta name="description" content="Meals, cleaning, your child’s routine and your helpers’ tasks in one daily plan. Fewer small decisions, a calmer home. Works in your browser.">
 <link rel="canonical" href="https://www.helperday.app/en/">
 <link rel="alternate" hreflang="ru" href="https://www.helperday.app/">
 <link rel="alternate" hreflang="en" href="https://www.helperday.app/en/">
@@ -14,16 +14,24 @@
 <meta name="theme-color" content="#65132A">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Helper's Day">
-<meta property="og:title" content="Helper's Day — a helper for whoever runs the home">
-<meta property="og:description" content="Meals, cleaning, the kids’ day and shopping lists in one place. Everyone has a plan, and you see what’s done.">
+<meta property="og:title" content="Helper's Day — a helping hand for running your home">
+<meta property="og:description" content="Meals, cleaning, your child’s routine and your helpers’ tasks in one daily plan. Fewer small decisions, a calmer home. Works in your browser.">
 <meta property="og:url" content="https://www.helperday.app/en/">
-<meta property="og:image" content="https://www.helperday.app/site/og.jpg">
+<meta property="og:image" content="https://www.helperday.app/site/og-en.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Helper's Day — a home where you can breathe easy">
+<meta name="twitter:card" content="summary_large_image">
 <meta property="og:locale" content="en_US">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&amp;display=swap" rel="stylesheet">
 <style>
 body{margin:0;background:#F7F1E5}
 a{color:#65132A}a:hover{color:#3A0E1C}
+a:focus-visible{outline:3px solid #D5B272;outline-offset:3px;border-radius:8px}
+.tap{display:inline-flex;align-items:center;min-height:44px}
+@media (max-width:640px){.wide-only{display:none !important}}
 </style>
 </head>
 <body>
@@ -32,24 +40,24 @@ a{color:#65132A}a:hover{color:#3A0E1C}
 <div style="background: #65132A; color: #FAECD2; overflow: hidden">
   <header style="max-width: 1160px; margin: 0 auto; padding: 18px 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px">
     <a href="#top" style="display: flex; align-items: center; gap: 10px; color: #FAECD2; text-decoration: none">
-      <img src="/app/site-icon.png?v=2" alt="" style="width: 40px; height: 40px; border-radius: 50%">
+      <img src="/app/site-icon.png?v=2" alt="" width="40" height="40" style="width: 40px; height: 40px; border-radius: 50%">
       <span style="font-weight: 900; font-size: 20px; letter-spacing: 0.2px">Helper's Day</span>
     </a>
     <nav aria-label="Sections" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; font-weight: 700; font-size: 15px">
-      <a href="#features" style="color: #FAECD2; text-decoration: none">Features</a>
-      <a href="#start" style="color: #FAECD2; text-decoration: none">How to start</a>
-      <span style="display: inline-flex; border: 1px solid rgba(250,236,210,0.3); border-radius: 999px; padding: 3px"><a href="/" lang="ru" style="color: #FAECD2; text-decoration: none; border-radius: 999px; padding: 3px 10px; font-size: 13px; font-weight: 800">RU</a><span aria-current="true" style="background: #FAECD2; color: #65132A; border-radius: 999px; padding: 3px 10px; font-size: 13px; font-weight: 800">EN</span></span>
-      <a href="/app/" style="background: #D5B272; color: #3A0E1C; text-decoration: none; border-radius: 999px; padding: 10px 18px; font-weight: 800; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">Open the app</a>
+      <a href="#features" class="tap wide-only" style="color: #FAECD2; text-decoration: none">Features</a>
+      <a href="#start" class="tap wide-only" style="color: #FAECD2; text-decoration: none">How to start</a>
+      <span style="display: inline-flex; border: 1px solid rgba(250,236,210,0.3); border-radius: 999px; padding: 3px"><a href="/" lang="ru" style="color: #FAECD2; text-decoration: none; border-radius: 999px; padding: 10px 12px; font-size: 13px; font-weight: 800">RU</a><span aria-current="true" style="background: #FAECD2; color: #65132A; border-radius: 999px; padding: 10px 12px; font-size: 13px; font-weight: 800">EN</span></span>
+      <a href="/app/?lang=en" class="wide-only" style="background: #D5B272; color: #3A0E1C; text-decoration: none; border-radius: 999px; padding: 10px 18px; font-weight: 800; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">Open the app</a>
     </nav>
   </header>
 
   <section id="top" style="max-width: 1160px; margin: 0 auto; padding: 40px 20px 72px; display: flex; flex-wrap: wrap; align-items: center; gap: 48px">
     <div style="flex: 1 1 460px; min-width: 0">
-      <p style="display: inline-block; margin: 0 0 20px; padding: 6px 14px; border-radius: 999px; background: rgba(250,236,210,0.08); border: 1px solid rgba(250,236,210,0.18); font-weight: 700; font-size: 14px; color: #EAD3A6">A helper for whoever runs the home</p>
-      <h1 style="margin: 0 0 20px; font-weight: 900; font-size: clamp(38px, 6vw, 64px); line-height: 1.05; letter-spacing: -0.5px; color: #FAECD2">A home where you can finally breathe&nbsp;out</h1>
-      <p style="margin: 0 0 32px; font-size: clamp(17px, 2vw, 20px); line-height: 1.55; color: rgba(250,236,210,0.85); max-width: 560px">Meals, cleaning, the kids’ day — in one place. Everyone has a plan, and you see what’s done.</p>
+      <p style="display: inline-block; margin: 0 0 20px; padding: 6px 14px; border-radius: 999px; background: rgba(250,236,210,0.08); border: 1px solid rgba(250,236,210,0.18); font-weight: 700; font-size: 14px; color: #EAD3A6">A helping hand for whoever runs the home</p>
+      <h1 style="margin: 0 0 20px; font-weight: 900; font-size: clamp(38px, 6vw, 64px); line-height: 1.05; letter-spacing: -0.5px; color: #FAECD2">A home where you can breathe&nbsp;easy</h1>
+      <p style="margin: 0 0 32px; font-size: clamp(17px, 2vw, 20px); line-height: 1.55; color: rgba(250,236,210,0.85); max-width: 560px">What to cook, what to clean, when to go out — already decided. Everyone has a plan for the day, and you see what’s done.</p>
       <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
-        <a href="/app/" style="background: #D5B272; color: #3A0E1C; text-decoration: none; border-radius: 999px; padding: 16px 28px; font-weight: 900; font-size: 18px; box-shadow: 0 10px 24px rgba(213,178,114,0.35)">Open the app</a>
+        <a href="/app/?lang=en" style="background: #D5B272; color: #3A0E1C; text-decoration: none; border-radius: 999px; padding: 16px 28px; font-weight: 900; font-size: 18px; box-shadow: 0 10px 24px rgba(213,178,114,0.35)">Open the app</a>
         <span style="display: inline-flex; align-items: center; gap: 10px; border: 1px solid rgba(250,236,210,0.32); border-radius: 14px; padding: 9px 16px; color: #FAECD2">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M11 18.5h2"/></svg>
           <span style="display: flex; flex-direction: column; line-height: 1.15"><span style="font-size: 12px; color: #EAD3A6">Coming soon to</span><span style="font-weight: 800; font-size: 16px">App Store</span></span>
@@ -59,21 +67,21 @@ a{color:#65132A}a:hover{color:#3A0E1C}
           <span style="display: flex; flex-direction: column; line-height: 1.15"><span style="font-size: 12px; color: #EAD3A6">Coming soon to</span><span style="font-weight: 800; font-size: 16px">Google Play</span></span>
         </span>
       </div>
-      <p style="margin: 18px 0 0; font-size: 14px; color: #EAD3A6">In the browser on phone and computer. English and Russian.</p>
+      <p style="margin: 18px 0 0; font-size: 14px; color: #EAD3A6">Works in your browser on phone and desktop. English and Russian.</p>
     </div>
 
     <div style="flex: 1 1 360px; min-width: 0; display: flex; justify-content: center; position: relative; padding: 24px 0">
-      <img src="/site/illustration.jpg" alt="" style="position: absolute; width: 420px; height: 420px; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; opacity: 0.55">
+      <img src="/site/illustration.jpg" alt="" width="420" height="420" style="position: absolute; width: 420px; height: 420px; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; opacity: 0.55">
       <div role="img" aria-label="The helper’s Today’s tasks screen: breakfast, a walk, lunch, kitchen cleaning, watering the plants" style="position: relative; width: 289px; height: 607px; border-radius: 46px; background: #1A1316; padding: 8px; box-sizing: border-box; box-shadow: 0 30px 60px rgba(20,4,10,0.45)">
         <div style="width: 273px; height: 591px; border-radius: 38px; overflow: hidden; position: relative">
           <div style="width: 390px; height: 844px; position: absolute; left: 0; top: 0; transform: scale(0.7); transform-origin: 0 0; overflow: hidden; background: #65132A; color: #1A1316">
-            <img src="/site/mascot.png" alt="" style="position: absolute; right: 14px; top: 44px; width: 124px; height: 124px; object-fit: cover; border-radius: 34px">
+            <img src="/site/mascot.png" alt="" width="124" height="124" style="position: absolute; right: 14px; top: 44px; width: 124px; height: 124px; object-fit: cover; border-radius: 34px">
             <div style="position: absolute; left: 24px; top: 58px; display: flex; flex-direction: column; gap: 2px">
               <div style="font-size: 15px; font-weight: 600; color: rgba(250,236,210,0.72)">Good morning,</div>
               <div style="font-size: 30px; font-weight: 800; color: #FAECD2; letter-spacing: -0.3px">Maria</div>
               <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; align-self: flex-start; padding: 7px 12px 7px 10px; border-radius: 999px; background: rgba(250,236,210,0.12); border: 1px solid rgba(250,236,210,0.22); color: #FAECD2; font-size: 13px; font-weight: 700">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D5B272" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
-                <span>Next · lunch, 1:00 pm</span>
+                <span>Next · lunch, 13:00</span>
               </div>
             </div>
             <div style="position: absolute; left: 16px; right: 16px; top: 194px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; text-align: center">
@@ -104,10 +112,10 @@ a{color:#65132A}a:hover{color:#3A0E1C}
                 </div>
               </div>
               <div style="display: flex; gap: 8px">
-                <div style="width: 64px; flex-shrink: 0; padding-top: 13px; text-align: right; font-size: 15px; font-weight: 800">1:00 pm</div>
+                <div style="width: 64px; flex-shrink: 0; padding-top: 13px; text-align: right; font-size: 15px; font-weight: 800">13:00</div>
                 <div style="flex: 1; min-width: 0; border-radius: 20px; display: flex; align-items: center; gap: 12px; padding: 12px; background: #FFF8EE; box-shadow: 0 4px 14px rgba(90,50,20,0.06)">
                   <span style="width: 36px; height: 36px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(213,178,114,0.26); color: #80622A"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5h15v2.5a6 6 0 0 1-6 6h-3a6 6 0 0 1-6-6z"/><path d="M3 10.5h18"/><path d="M9.5 7c0-1 .8-1.4.8-2.4M13.5 7c0-1 .8-1.4.8-2.4"/></svg></span>
-                  <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 700">Lunch</span><span style="font-size: 12px; font-weight: 600; color: #7A6E68; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Vegetable soup · meatballs</span></span>
+                  <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 700">Lunch</span><span style="font-size: 12px; font-weight: 600; color: #7A6E68; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Soup · meatballs</span></span>
                   <span style="width: 25px; height: 25px; border-radius: 999px; border: 2px solid #B39058; flex-shrink: 0; margin-right: 6px"></span>
                 </div>
               </div>
@@ -116,12 +124,12 @@ a{color:#65132A}a:hover{color:#3A0E1C}
                 <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px">
                   <div style="border-radius: 20px; display: flex; align-items: center; gap: 12px; padding: 12px; background: #FFF8EE; box-shadow: 0 4px 14px rgba(90,50,20,0.06)">
                     <span style="width: 36px; height: 36px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(172,187,158,0.34); color: #4F6145"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3.5l1.7 4.8 4.8 1.7-4.8 1.7L11 16.5l-1.7-4.8L4.5 10l4.8-1.7z"/><path d="M18.5 15l.6 1.6 1.6.6-1.6.6-.6 1.7-.6-1.7-1.6-.6 1.6-.6z"/></svg></span>
-                    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 700">Cleaning: kitchen</span><span style="font-size: 12px; font-weight: 600; color: #7A6E68">On schedule</span></span>
+                    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 700">Cleaning: kitchen</span><span style="font-size: 12px; font-weight: 600; color: #7A6E68">Recurring</span></span>
                     <span style="width: 25px; height: 25px; border-radius: 999px; border: 2px solid #B39058; flex-shrink: 0; margin-right: 6px"></span>
                   </div>
                   <div style="border-radius: 20px; display: flex; align-items: center; gap: 12px; padding: 12px; background: #FFF8EE; box-shadow: 0 4px 14px rgba(90,50,20,0.06)">
                     <span style="width: 36px; height: 36px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(122,110,104,0.15); color: #5F534D"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z"/><path d="M5 19l7-7"/></svg></span>
-                    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 700">Water the plants</span><span style="font-size: 12px; font-weight: 600; color: #7A6E68">On schedule</span></span>
+                    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 700">Water the plants</span><span style="font-size: 12px; font-weight: 600; color: #7A6E68">Recurring</span></span>
                     <span style="width: 25px; height: 25px; border-radius: 999px; border: 2px solid #B39058; flex-shrink: 0; margin-right: 6px"></span>
                   </div>
                 </div>
@@ -139,38 +147,39 @@ a{color:#65132A}a:hover{color:#3A0E1C}
   </section>
 </div>
 
+<main id="main">
 <section style="max-width: 1160px; margin: 0 auto; padding: 80px 20px 24px">
   <h2 style="margin: 0 0 28px; font-weight: 900; font-size: clamp(28px, 4vw, 40px); line-height: 1.15; color: #65132A">Sound familiar?</h2>
   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px">
-    <p style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px; font-size: 19px; font-weight: 800; line-height: 1.35; color: #3A0E1C">«Everything rests on me»</p>
-    <p style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px; font-size: 19px; font-weight: 800; line-height: 1.35; color: #3A0E1C">«I explain the same things again and again»</p>
-    <p style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px; font-size: 19px; font-weight: 800; line-height: 1.35; color: #3A0E1C">«Reminding is awkward — irritation builds up»</p>
-    <p style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px; font-size: 19px; font-weight: 800; line-height: 1.35; color: #3A0E1C">«I don’t know it’s done until I check»</p>
+    <p style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px; font-size: 19px; font-weight: 800; line-height: 1.35; color: #3A0E1C">“It all falls on me”</p>
+    <p style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px; font-size: 19px; font-weight: 800; line-height: 1.35; color: #3A0E1C">“Every day I decide what to cook and what to clean”</p>
+    <p style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px; font-size: 19px; font-weight: 800; line-height: 1.35; color: #3A0E1C">“I keep explaining, and reminding feels awkward”</p>
+    <p style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px; font-size: 19px; font-weight: 800; line-height: 1.35; color: #3A0E1C">“I never know it’s done until I check”</p>
   </div>
   <p style="margin: 28px 0 0; font-size: clamp(18px, 2.2vw, 22px); font-weight: 700; color: #5F534D; max-width: 760px">Helper's Day takes most of these off your plate.</p>
 </section>
 
 <section style="max-width: 1160px; margin: 0 auto; padding: 72px 20px 24px">
-  <h2 style="margin: 0 0 12px; font-weight: 900; font-size: clamp(28px, 4vw, 40px); line-height: 1.15; color: #65132A">Agreed — and clear to everyone</h2>
-  <p style="margin: 0 0 36px; font-size: 18px; color: #5F534D; max-width: 760px">How things are done in your home, in one place. Everyone sees it: the nanny, the housekeeper, grandma.</p>
+  <h2 style="margin: 0 0 12px; font-weight: 900; font-size: clamp(28px, 4vw, 40px); line-height: 1.15; color: #65132A">Agreed once, clear to everyone</h2>
+  <p style="margin: 0 0 36px; font-size: 18px; color: #5F534D; max-width: 760px">How things work in your home, in one place — for the nanny, grandma or your teen to see.</p>
   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px">
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 30px; padding: 32px">
       <p style="margin: 0 0 6px; font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #80622A">For you</p>
       <h3 style="margin: 0 0 20px; font-size: 24px; font-weight: 900; line-height: 1.2">Less to keep in your head</h3>
       <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px; font-size: 16px; color: #3A2E2A">
-        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Meals, cleaning and the kids’ day in a daily plan.</span></li>
+        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Meals, cleaning and your child’s routine in one daily plan.</span></li>
         <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>See what’s done and what isn’t.</span></li>
         <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>A one-off request in a couple of taps.</span></li>
-        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Your helper’s days off and holidays are counted.</span></li>
+        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Your helper’s days off and national holidays are built in.</span></li>
       </ul>
     </div>
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 30px; padding: 32px">
       <p style="margin: 0 0 6px; font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #80622A">For your helpers</p>
-      <h3 style="margin: 0 0 20px; font-size: 24px; font-weight: 900; line-height: 1.2">Clear what to do, and how</h3>
+      <h3 style="margin: 0 0 20px; font-size: 24px; font-weight: 900; line-height: 1.2">Clear on what to do, and how</h3>
       <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px; font-size: 16px; color: #3A2E2A">
         <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Tasks by time, important first.</span></li>
-        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>“How we like it” right in the task.</span></li>
-        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>The recipe opens from the task.</span></li>
+        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>“How we like it” notes — no guessing.</span></li>
+        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Recipes with photos and videos, one tap away.</span></li>
         <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Done in one tap.</span></li>
       </ul>
     </div>
@@ -179,37 +188,37 @@ a{color:#65132A}a:hover{color:#3A0E1C}
 
 <section id="features" style="max-width: 1160px; margin: 0 auto; padding: 72px 20px 24px">
   <h2 style="margin: 0 0 12px; font-weight: 900; font-size: clamp(28px, 4vw, 40px); line-height: 1.15; color: #65132A">What’s inside</h2>
-  <p style="margin: 0 0 36px; font-size: 18px; color: #5F534D; max-width: 680px">Everything a day at home is made of.</p>
+  <p style="margin: 0 0 36px; font-size: 18px; color: #5F534D; max-width: 680px">Everything that makes up a day at home.</p>
   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px">
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 28px">
       <span style="width: 48px; height: 48px; border-radius: 16px; background: #65132A; color: #D5B272; display: flex; align-items: center; justify-content: center; margin-bottom: 18px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/></svg></span>
       <h3 style="margin: 0 0 8px; font-size: 21px; font-weight: 900">Today’s tasks</h3>
-      <p style="margin: 0; font-size: 16px; color: #5F534D">By time or any time today. Important first.</p>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">By time or any time today. Important first — and only as much of it as you decide.</p>
     </div>
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 28px">
       <span style="width: 48px; height: 48px; border-radius: 16px; background: #65132A; color: #D5B272; display: flex; align-items: center; justify-content: center; margin-bottom: 18px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0113.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 01-13.7 5.6L4 15.5M4 20v-4.5h4.5"/></svg></span>
       <h3 style="margin: 0 0 8px; font-size: 21px; font-weight: 900">Home rhythm</h3>
-      <p style="margin: 0; font-size: 16px; color: #5F534D">Recurring tasks and cleaning by zones are set once and show up on their own.</p>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Recurring tasks and cleaning zones spread across the week, three zones a day at most.</p>
     </div>
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 28px">
       <span style="width: 48px; height: 48px; border-radius: 16px; background: #65132A; color: #D5B272; display: flex; align-items: center; justify-content: center; margin-bottom: 18px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5h18M5 10.5V17a3 3 0 003 3h8a3 3 0 003-3v-6.5"/><path d="M9 7c0-1.2 1-1.6 1-3M14 7c0-1.2 1-1.6 1-3"/></svg></span>
       <h3 style="margin: 0 0 8px; font-size: 21px; font-weight: 900">Menu and recipes</h3>
-      <p style="margin: 0; font-size: 16px; color: #5F534D">Recipes with “how we like it” notes. Dishes rotate on their own.</p>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Recipes with photos, videos and “how we like it” notes. Dishes rotate across meals.</p>
     </div>
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 28px">
       <span style="width: 48px; height: 48px; border-radius: 16px; background: #65132A; color: #D5B272; display: flex; align-items: center; justify-content: center; margin-bottom: 18px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3.5" width="14" height="17" rx="2.5"/><path d="M9 3.5V5h6V3.5"/><path d="M8.5 11l1.5 1.5 3-3M8.5 16.5h7"/></svg></span>
       <h3 style="margin: 0 0 8px; font-size: 21px; font-weight: 900">Agreements</h3>
-      <p style="margin: 0; font-size: 16px; color: #5F534D">Short notes on how things are done at your place: how to iron shirts, what to clean the floor with.</p>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Quick notes on how you do things, from ironing shirts to washing floors.</p>
     </div>
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 28px">
       <span style="width: 48px; height: 48px; border-radius: 16px; background: #65132A; color: #D5B272; display: flex; align-items: center; justify-content: center; margin-bottom: 18px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8V6.5a3 3 0 016 0V8"/></svg></span>
       <h3 style="margin: 0 0 8px; font-size: 21px; font-weight: 900">Shopping lists</h3>
-      <p style="margin: 0; font-size: 16px; color: #5F534D">Your helper sends a list, and everyone sees when the groceries arrive.</p>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Your helper sends the list. You get a ping when the groceries are in.</p>
     </div>
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 28px">
       <span style="width: 48px; height: 48px; border-radius: 16px; background: #65132A; color: #D5B272; display: flex; align-items: center; justify-content: center; margin-bottom: 18px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 20.5c.8-4 3.6-6 7-6s6.2 2 7 6"/></svg></span>
       <h3 style="margin: 0 0 8px; font-size: 21px; font-weight: 900">Child’s routine</h3>
-      <p style="margin: 0; font-size: 16px; color: #5F534D">Naps, meals, walks — in the plan at the right time.</p>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Naps, meals, walks — built into your helper’s day.</p>
     </div>
   </div>
 </section>
@@ -219,52 +228,75 @@ a{color:#65132A}a:hover{color:#3A0E1C}
   <ol style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px">
     <li style="display: flex; gap: 16px; align-items: flex-start">
       <span style="width: 44px; height: 44px; border-radius: 50%; background: #D5B272; color: #3A0E1C; font-weight: 900; font-size: 20px; display: flex; align-items: center; justify-content: center; flex: none">1</span>
-      <span><span style="display: block; font-size: 20px; font-weight: 900; margin: 6px 0 6px">Describe how things are done</span><span style="font-size: 16px; color: #5F534D">Recipes, cleaning, home rhythm — as much as you have time for.</span></span>
+      <span><span style="display: block; font-size: 20px; font-weight: 900; margin: 6px 0 6px">Write down how you do things</span><span style="font-size: 16px; color: #5F534D">A few recipes, the cleaning, your home rhythm. Start small.</span></span>
     </li>
     <li style="display: flex; gap: 16px; align-items: flex-start">
       <span style="width: 44px; height: 44px; border-radius: 50%; background: #D5B272; color: #3A0E1C; font-weight: 900; font-size: 20px; display: flex; align-items: center; justify-content: center; flex: none">2</span>
-      <span><span style="display: block; font-size: 20px; font-weight: 900; margin: 6px 0 6px">Invite your helpers</span><span style="font-size: 16px; color: #5F534D">The nanny, the housekeeper, grandma — with a link.</span></span>
+      <span><span style="display: block; font-size: 20px; font-weight: 900; margin: 6px 0 6px">Invite your helpers</span><span style="font-size: 16px; color: #5F534D">Send a link to the nanny, grandma or your teen.</span></span>
     </li>
     <li style="display: flex; gap: 16px; align-items: flex-start">
       <span style="width: 44px; height: 44px; border-radius: 50%; background: #D5B272; color: #3A0E1C; font-weight: 900; font-size: 20px; display: flex; align-items: center; justify-content: center; flex: none">3</span>
-      <span><span style="display: block; font-size: 20px; font-weight: 900; margin: 6px 0 6px">Breathe out</span><span style="font-size: 16px; color: #5F534D">Everyone has a plan, and you check what matters.</span></span>
+      <span><span style="display: block; font-size: 20px; font-weight: 900; margin: 6px 0 6px">Breathe easy</span><span style="font-size: 16px; color: #5F534D">Everyone has a plan, and you check what matters.</span></span>
     </li>
   </ol>
 </section>
 
 <section style="max-width: 1160px; margin: 0 auto; padding: 72px 20px 24px">
   <figure style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 30px; padding: clamp(28px, 5vw, 56px); text-align: center">
-    <blockquote style="margin: 0 auto; max-width: 820px; font-size: clamp(22px, 3vw, 30px); font-weight: 800; line-height: 1.35; color: #65132A">A home rests on agreements, not on one person.</blockquote>
-    <figcaption style="margin: 20px auto 0; max-width: 640px; font-size: 16px; color: #5F534D">We’ve thought through how to share tasks so there’s less tension at home.</figcaption>
+    <blockquote style="margin: 0 auto; max-width: 820px; font-size: clamp(22px, 3vw, 30px); font-weight: 800; line-height: 1.35; color: #65132A">A home runs on agreements, not on one person.</blockquote>
+    <figcaption style="margin: 20px auto 0; max-width: 640px; font-size: 16px; color: #5F534D">We’ve thought carefully about sharing tasks so there’s less tension at home.</figcaption>
   </figure>
+</section>
+
+<section id="faq" style="max-width: 1160px; margin: 0 auto; padding: 72px 20px 24px">
+  <h2 style="margin: 0 0 28px; font-weight: 900; font-size: clamp(28px, 4vw, 40px); line-height: 1.15; color: #65132A">Questions</h2>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px">
+    <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px">
+      <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 900; line-height: 1.3">Does my helper need to install anything?</h3>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">No. They open the invite link, and it all works in the browser.</p>
+    </div>
+    <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px">
+      <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 900; line-height: 1.3">Will it all run by itself?</h3>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">No. It takes most questions off your plate and shows what’s done. How well it’s done is still yours to check.</p>
+    </div>
+    <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px">
+      <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 900; line-height: 1.3">Who can change what?</h3>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Those who run the home set the agreements. Those who help run it add tasks and requests. Helpers mark things done.</p>
+    </div>
+    <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px">
+      <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 900; line-height: 1.3">What about pay and expenses?</h3>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Not here, on purpose. Helper's Day is about home, not money.</p>
+    </div>
+  </div>
 </section>
 
 <section style="max-width: 1160px; margin: 0 auto; padding: 72px 20px 80px">
   <div style="background: #65132A; color: #FAECD2; border-radius: 30px; padding: clamp(28px, 5vw, 56px); display: flex; flex-wrap: wrap; align-items: center; gap: 32px">
-    <img src="/site/illustration.jpg" alt="" style="width: 160px; height: 160px; border-radius: 36px; flex: none">
+    <img src="/site/illustration.jpg" alt="" width="160" height="160" loading="lazy" style="width: 160px; height: 160px; border-radius: 36px; flex: none">
     <div style="flex: 1 1 380px; min-width: 0">
-      <h2 style="margin: 0 0 10px; font-weight: 900; font-size: clamp(26px, 3.5vw, 36px); line-height: 1.15; color: #FAECD2">Free your head from small daily decisions</h2>
-      <p style="margin: 0 0 24px; font-size: 18px; color: rgba(250,236,210,0.85)">Decide once how things are done — and change it whenever you need.</p>
+      <h2 style="margin: 0 0 10px; font-weight: 900; font-size: clamp(26px, 3.5vw, 36px); line-height: 1.15; color: #FAECD2">Clear your head of the little daily decisions</h2>
+      <p style="margin: 0 0 24px; font-size: 18px; color: rgba(250,236,210,0.85)">Decide once how things work at home, and adjust whenever you like.</p>
       <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
-        <a href="/app/" style="background: #D5B272; color: #3A0E1C; text-decoration: none; border-radius: 999px; padding: 16px 28px; font-weight: 900; font-size: 18px">Open the app</a>
+        <a href="/app/?lang=en" style="background: #D5B272; color: #3A0E1C; text-decoration: none; border-radius: 999px; padding: 16px 28px; font-weight: 900; font-size: 18px">Open the app</a>
         <span style="font-size: 15px; color: #EAD3A6">App Store and Google Play — coming soon</span>
       </div>
     </div>
   </div>
 </section>
 
+</main>
+
 <footer style="border-top: 1px solid #EADFC4">
   <div style="max-width: 1160px; margin: 0 auto; padding: 28px 20px 40px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px; font-size: 15px; color: #5F534D">
     <div style="display: flex; align-items: center; gap: 10px">
-      <img src="/app/site-icon.png?v=2" alt="" style="width: 32px; height: 32px; border-radius: 50%">
+      <img src="/app/site-icon.png?v=2" alt="" width="32" height="32" loading="lazy" style="width: 32px; height: 32px; border-radius: 50%">
       <span><span style="font-weight: 900; color: #1A1316">Helper's Day</span> · © 2026</span>
     </div>
     <nav aria-label="Documents" style="display: flex; flex-wrap: wrap; gap: 8px 22px; font-weight: 700">
-      <a href="/app/privacy">Privacy</a>
-      <a href="/app/terms">Terms</a>
-      <a href="/app/support">Support</a>
-      <a href="mailto:support@helperday.app">support@helperday.app</a>
-      <a href="/" lang="ru">Русский</a>
+      <a class="tap" href="/app/privacy#en">Privacy</a>
+      <a class="tap" href="/app/terms#en">Terms</a>
+      <a class="tap" href="/app/support#en">Support</a>
+      <a class="tap" href="mailto:support@helperday.app">support@helperday.app</a>
     </nav>
   </div>
 </footer>

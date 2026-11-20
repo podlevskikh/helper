@@ -28,8 +28,16 @@ func RegisterLanding(router *gin.Engine, dir string) bool {
 	router.GET("/en", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/en/") })
 	router.GET("/en/", page(filepath.Join("en", "index.html")))
 
+	for _, f := range []string{"robots.txt", "sitemap.xml"} {
+		router.GET("/"+f, page(f))
+	}
+	// Иконка сайта по старому адресу браузеров и поисковиков — та же, что у страниц сайта.
+	router.GET("/favicon.ico", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, WebAppPrefix+"/site-icon.png?v=2")
+	})
+
 	assets := filepath.Join(root, "site")
-	router.GET("/site/*path", func(c *gin.Context) {
+	serveAsset := func(c *gin.Context) {
 		p := filepath.Join(assets, filepath.Clean("/"+c.Param("path"))) // ../ не выходит за папку
 		if !isRegularFile(p) {
 			c.Status(http.StatusNotFound)
@@ -37,6 +45,8 @@ func RegisterLanding(router *gin.Engine, dir string) bool {
 		}
 		c.Header("Cache-Control", "public, max-age=86400")
 		c.File(p)
-	})
+	}
+	router.GET("/site/*path", serveAsset)
+	router.HEAD("/site/*path", serveAsset)
 	return true
 }

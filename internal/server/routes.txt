@@ -37,6 +37,7 @@ GET /auth/email
 GET /auth/me
 GET /en
 GET /en/
+GET /favicon.ico
 GET /healthz
 GET /helper/
 GET /helper/api/childcare/today
@@ -57,13 +58,16 @@ GET /orgs/:orgId/members/:userId/schedule-settings
 GET /orgs/:orgId/notification-prefs
 GET /orgs/:orgId/settings
 GET /orgs/:orgId/task-categories
+GET /robots.txt
 GET /site/*path
+GET /sitemap.xml
 GET /static/*filepath
 GET /static2/*filepath
 GET /system/sealing-key
 GET /version
 HEAD /
 HEAD /app/*path
+HEAD /site/*path
 HEAD /static/*filepath
 HEAD /static2/*filepath
 PATCH /auth/me

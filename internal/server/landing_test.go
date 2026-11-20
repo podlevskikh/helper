@@ -17,17 +17,17 @@ func TestLandingPages(t *testing.T) {
 		return w
 	}
 
-	for _, c := range []struct{ path, lang string }{{"/", `lang="ru"`}, {"/en/", `lang="en"`}} {
+	for _, c := range []struct{ path, lang, hash string }{{"/", `lang="ru"`, ""}, {"/en/", `lang="en"`, "#en"}} {
 		w := get(c.path)
 		body := w.Body.String()
 		if w.Code != http.StatusOK || !strings.HasPrefix(w.Header().Get("Content-Type"), "text/html") {
 			t.Fatalf("%s: %d %s", c.path, w.Code, w.Header().Get("Content-Type"))
 		}
-		if !strings.Contains(body, c.lang) || !strings.Contains(body, `href="/app/"`) || !strings.Contains(body, "/app/site-icon.png?v=2") {
+		if !strings.Contains(body, c.lang) || !strings.Contains(body, `href="/app/?lang=`) || !strings.Contains(body, "/app/site-icon.png?v=2") {
 			t.Errorf("%s: нет языка, ссылки на приложение или иконки сайта", c.path)
 		}
 		for _, link := range []string{"/app/privacy", "/app/terms", "/app/support"} {
-			if !strings.Contains(body, `href="`+link+`"`) {
+			if !strings.Contains(body, `href="`+link+c.hash+`"`) { // язык сохраняется: на английской — #en
 				t.Errorf("%s: нет ссылки %s", c.path, link)
 			}
 		}
@@ -36,13 +36,21 @@ func TestLandingPages(t *testing.T) {
 	if w := get("/en"); w.Code != http.StatusMovedPermanently || w.Header().Get("Location") != "/en/" {
 		t.Errorf("/en: %d %s", w.Code, w.Header().Get("Location"))
 	}
-	for _, p := range []string{"/site/mascot.png", "/site/illustration.jpg", "/site/og.jpg"} {
+	for _, p := range []string{"/site/mascot.png", "/site/illustration.jpg", "/site/og.jpg", "/site/og-en.jpg"} {
 		if w := get(p); w.Code != http.StatusOK || !strings.HasPrefix(w.Header().Get("Content-Type"), "image/") {
 			t.Errorf("%s: %d %s", p, w.Code, w.Header().Get("Content-Type"))
 		}
 	}
 	if w := get("/site/../index.html"); w.Code == http.StatusOK && strings.Contains(w.Body.String(), "<html") {
 		t.Errorf("/site/ отдаёт файлы вне папки картинок")
+	}
+	for _, p := range []string{"/robots.txt", "/sitemap.xml"} {
+		if w := get(p); w.Code != http.StatusOK {
+			t.Errorf("%s: %d", p, w.Code)
+		}
+	}
+	if w := get("/favicon.ico"); w.Code != http.StatusMovedPermanently || !strings.Contains(w.Header().Get("Location"), "site-icon.png") {
+		t.Errorf("/favicon.ico: %d %s", w.Code, w.Header().Get("Location"))
 	}
 	if w := get("/site/nope.png"); w.Code != http.StatusNotFound {
 		t.Errorf("/site/nope.png: %d", w.Code)

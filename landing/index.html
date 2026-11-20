@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Helper's Day — помощник для тех, кто ведёт дом</title>
-<meta name="description" content="Меню, уборка, дела детей и списки покупок в одном месте. У всех план на день, а вы видите, что сделано.">
+<title>Helper's Day — помощник для того, кто ведёт дом</title>
+<meta name="description" content="Меню, уборка, распорядок ребёнка и задачи помощников — в одном плане на день. Меньше мелких решений, больше спокойствия. В браузере, RU и EN.">
 <link rel="canonical" href="https://www.helperday.app/">
 <link rel="alternate" hreflang="ru" href="https://www.helperday.app/">
 <link rel="alternate" hreflang="en" href="https://www.helperday.app/en/">
@@ -14,16 +14,24 @@
 <meta name="theme-color" content="#65132A">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Helper's Day">
-<meta property="og:title" content="Helper's Day — помощник для тех, кто ведёт дом">
-<meta property="og:description" content="Меню, уборка, дела детей и списки покупок в одном месте. У всех план на день, а вы видите, что сделано.">
+<meta property="og:title" content="Helper's Day — помощник для того, кто ведёт дом">
+<meta property="og:description" content="Меню, уборка, распорядок ребёнка и задачи помощников — в одном плане на день. Меньше мелких решений, больше спокойствия. В браузере, RU и EN.">
 <meta property="og:url" content="https://www.helperday.app/">
 <meta property="og:image" content="https://www.helperday.app/site/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Helper's Day — дом, где можно выдохнуть">
+<meta name="twitter:card" content="summary_large_image">
 <meta property="og:locale" content="ru_RU">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&amp;display=swap" rel="stylesheet">
 <style>
 body{margin:0;background:#F7F1E5}
 a{color:#65132A}a:hover{color:#3A0E1C}
+a:focus-visible{outline:3px solid #D5B272;outline-offset:3px;border-radius:8px}
+.tap{display:inline-flex;align-items:center;min-height:44px}
+@media (max-width:640px){.wide-only{display:none !important}}
 </style>
 </head>
 <body>
@@ -32,14 +40,14 @@ a{color:#65132A}a:hover{color:#3A0E1C}
 <div style="background: #65132A; color: #FAECD2; overflow: hidden">
   <header style="max-width: 1160px; margin: 0 auto; padding: 18px 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px">
     <a href="#top" style="display: flex; align-items: center; gap: 10px; color: #FAECD2; text-decoration: none">
-      <img src="/app/site-icon.png?v=2" alt="" style="width: 40px; height: 40px; border-radius: 50%">
+      <img src="/app/site-icon.png?v=2" alt="" width="40" height="40" style="width: 40px; height: 40px; border-radius: 50%">
       <span style="font-weight: 900; font-size: 20px; letter-spacing: 0.2px">Helper's Day</span>
     </a>
     <nav aria-label="Разделы" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; font-weight: 700; font-size: 15px">
-      <a href="#features" style="color: #FAECD2; text-decoration: none">Возможности</a>
-      <a href="#start" style="color: #FAECD2; text-decoration: none">Как начать</a>
-      <span style="display: inline-flex; border: 1px solid rgba(250,236,210,0.3); border-radius: 999px; padding: 3px"><span aria-current="true" style="background: #FAECD2; color: #65132A; border-radius: 999px; padding: 3px 10px; font-size: 13px; font-weight: 800">RU</span><a href="/en/" lang="en" style="color: #FAECD2; text-decoration: none; border-radius: 999px; padding: 3px 10px; font-size: 13px; font-weight: 800">EN</a></span>
-      <a href="/app/" style="background: #D5B272; color: #3A0E1C; text-decoration: none; border-radius: 999px; padding: 10px 18px; font-weight: 800; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">Открыть приложение</a>
+      <a href="#features" class="tap wide-only" style="color: #FAECD2; text-decoration: none">Возможности</a>
+      <a href="#start" class="tap wide-only" style="color: #FAECD2; text-decoration: none">Как начать</a>
+      <span style="display: inline-flex; border: 1px solid rgba(250,236,210,0.3); border-radius: 999px; padding: 3px"><span aria-current="true" style="background: #FAECD2; color: #65132A; border-radius: 999px; padding: 10px 12px; font-size: 13px; font-weight: 800">RU</span><a href="/en/" lang="en" style="color: #FAECD2; text-decoration: none; border-radius: 999px; padding: 10px 12px; font-size: 13px; font-weight: 800">EN</a></span>
+      <a href="/app/?lang=ru" class="wide-only" style="background: #D5B272; color: #3A0E1C; text-decoration: none; border-radius: 999px; padding: 10px 18px; font-weight: 800; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">Открыть приложение</a>
     </nav>
   </header>
 
@@ -47,9 +55,9 @@ a{color:#65132A}a:hover{color:#3A0E1C}
     <div style="flex: 1 1 460px; min-width: 0">
       <p style="display: inline-block; margin: 0 0 20px; padding: 6px 14px; border-radius: 999px; background: rgba(250,236,210,0.08); border: 1px solid rgba(250,236,210,0.18); font-weight: 700; font-size: 14px; color: #EAD3A6">Помощник для тех, кто ведёт дом</p>
       <h1 style="margin: 0 0 20px; font-weight: 900; font-size: clamp(38px, 6vw, 64px); line-height: 1.05; letter-spacing: -0.5px; color: #FAECD2">Дом, где можно выдохнуть</h1>
-      <p style="margin: 0 0 32px; font-size: clamp(17px, 2vw, 20px); line-height: 1.55; color: rgba(250,236,210,0.85); max-width: 560px">Меню, уборка, дела детей — в одном месте. У всех план на день, а вы видите, что сделано.</p>
+      <p style="margin: 0 0 32px; font-size: clamp(17px, 2vw, 20px); line-height: 1.55; color: rgba(250,236,210,0.85); max-width: 560px">Что приготовить, что убрать, когда гулять — уже решено. У каждого план на день, а вы видите, что сделано.</p>
       <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
-        <a href="/app/" style="background: #D5B272; color: #3A0E1C; text-decoration: none; border-radius: 999px; padding: 16px 28px; font-weight: 900; font-size: 18px; box-shadow: 0 10px 24px rgba(213,178,114,0.35)">Открыть приложение</a>
+        <a href="/app/?lang=ru" style="background: #D5B272; color: #3A0E1C; text-decoration: none; border-radius: 999px; padding: 16px 28px; font-weight: 900; font-size: 18px; box-shadow: 0 10px 24px rgba(213,178,114,0.35)">Открыть приложение</a>
         <span style="display: inline-flex; align-items: center; gap: 10px; border: 1px solid rgba(250,236,210,0.32); border-radius: 14px; padding: 9px 16px; color: #FAECD2">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M11 18.5h2"/></svg>
           <span style="display: flex; flex-direction: column; line-height: 1.15"><span style="font-size: 12px; color: #EAD3A6">Скоро в</span><span style="font-weight: 800; font-size: 16px">App Store</span></span>
@@ -63,11 +71,11 @@ a{color:#65132A}a:hover{color:#3A0E1C}
     </div>
 
     <div style="flex: 1 1 360px; min-width: 0; display: flex; justify-content: center; position: relative; padding: 24px 0">
-      <img src="/site/illustration.jpg" alt="" style="position: absolute; width: 420px; height: 420px; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; opacity: 0.55">
+      <img src="/site/illustration.jpg" alt="" width="420" height="420" style="position: absolute; width: 420px; height: 420px; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; opacity: 0.55">
       <div role="img" aria-label="Экран помощника «Задачи на сегодня»: завтрак, прогулка, обед, уборка кухни, полить цветы" style="position: relative; width: 289px; height: 607px; border-radius: 46px; background: #1A1316; padding: 8px; box-sizing: border-box; box-shadow: 0 30px 60px rgba(20,4,10,0.45)">
         <div style="width: 273px; height: 591px; border-radius: 38px; overflow: hidden; position: relative">
           <div style="width: 390px; height: 844px; position: absolute; left: 0; top: 0; transform: scale(0.7); transform-origin: 0 0; overflow: hidden; background: #65132A; color: #1A1316">
-            <img src="/site/mascot.png" alt="" style="position: absolute; right: 14px; top: 44px; width: 124px; height: 124px; object-fit: cover; border-radius: 34px">
+            <img src="/site/mascot.png" alt="" width="124" height="124" style="position: absolute; right: 14px; top: 44px; width: 124px; height: 124px; object-fit: cover; border-radius: 34px">
             <div style="position: absolute; left: 24px; top: 58px; display: flex; flex-direction: column; gap: 2px">
               <div style="font-size: 15px; font-weight: 600; color: rgba(250,236,210,0.72)">Доброе утро,</div>
               <div style="font-size: 30px; font-weight: 800; color: #FAECD2; letter-spacing: -0.3px">Мария</div>
@@ -107,7 +115,7 @@ a{color:#65132A}a:hover{color:#3A0E1C}
                 <div style="width: 64px; flex-shrink: 0; padding-top: 13px; text-align: right; font-size: 15px; font-weight: 800">13:00</div>
                 <div style="flex: 1; min-width: 0; border-radius: 20px; display: flex; align-items: center; gap: 12px; padding: 12px; background: #FFF8EE; box-shadow: 0 4px 14px rgba(90,50,20,0.06)">
                   <span style="width: 36px; height: 36px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(213,178,114,0.26); color: #80622A"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5h15v2.5a6 6 0 0 1-6 6h-3a6 6 0 0 1-6-6z"/><path d="M3 10.5h18"/><path d="M9.5 7c0-1 .8-1.4.8-2.4M13.5 7c0-1 .8-1.4.8-2.4"/></svg></span>
-                  <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 700">Обед</span><span style="font-size: 12px; font-weight: 600; color: #7A6E68; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Суп-пюре · котлеты с гречкой</span></span>
+                  <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 700">Обед</span><span style="font-size: 12px; font-weight: 600; color: #7A6E68; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Суп · котлеты с гречкой</span></span>
                   <span style="width: 25px; height: 25px; border-radius: 999px; border: 2px solid #B39058; flex-shrink: 0; margin-right: 6px"></span>
                 </div>
               </div>
@@ -139,12 +147,13 @@ a{color:#65132A}a:hover{color:#3A0E1C}
   </section>
 </div>
 
+<main id="main">
 <section style="max-width: 1160px; margin: 0 auto; padding: 80px 20px 24px">
   <h2 style="margin: 0 0 28px; font-weight: 900; font-size: clamp(28px, 4vw, 40px); line-height: 1.15; color: #65132A">Знакомо?</h2>
   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px">
     <p style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px; font-size: 19px; font-weight: 800; line-height: 1.35; color: #3A0E1C">«Всё держится на мне»</p>
-    <p style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px; font-size: 19px; font-weight: 800; line-height: 1.35; color: #3A0E1C">«Объясняю одно и то же по кругу»</p>
-    <p style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px; font-size: 19px; font-weight: 800; line-height: 1.35; color: #3A0E1C">«Неловко напоминать — копится раздражение»</p>
+    <p style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px; font-size: 19px; font-weight: 800; line-height: 1.35; color: #3A0E1C">«Каждый день решаю, что готовить и что убрать»</p>
+    <p style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px; font-size: 19px; font-weight: 800; line-height: 1.35; color: #3A0E1C">«Объясняю по кругу, а напоминать неловко»</p>
     <p style="margin: 0; background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px; font-size: 19px; font-weight: 800; line-height: 1.35; color: #3A0E1C">«Не знаю, сделано ли, пока не проверю»</p>
   </div>
   <p style="margin: 28px 0 0; font-size: clamp(18px, 2.2vw, 22px); font-weight: 700; color: #5F534D; max-width: 760px">Helper's Day снимает большую часть этих вопросов.</p>
@@ -152,16 +161,16 @@ a{color:#65132A}a:hover{color:#3A0E1C}
 
 <section style="max-width: 1160px; margin: 0 auto; padding: 72px 20px 24px">
   <h2 style="margin: 0 0 12px; font-weight: 900; font-size: clamp(28px, 4vw, 40px); line-height: 1.15; color: #65132A">Договорились — и всем понятно</h2>
-  <p style="margin: 0 0 36px; font-size: 18px; color: #5F534D; max-width: 760px">Как у вас заведено — в одном месте. Это видят все: няня, домработница, бабушка.</p>
+  <p style="margin: 0 0 36px; font-size: 18px; color: #5F534D; max-width: 760px">Как у вас заведено — в одном месте. Это видят все: няня, бабушка, подросток.</p>
   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px">
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 30px; padding: 32px">
       <p style="margin: 0 0 6px; font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #80622A">Вам</p>
       <h3 style="margin: 0 0 20px; font-size: 24px; font-weight: 900; line-height: 1.2">Меньше держать в голове</h3>
       <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px; font-size: 16px; color: #3A2E2A">
-        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Меню, уборка и дела детей — в плане на каждый день.</span></li>
+        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Меню, уборка и распорядок ребёнка — в плане на каждый день.</span></li>
         <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Видно, что сделано и что нет.</span></li>
         <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Разовая просьба — в пару касаний.</span></li>
-        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Выходные и праздники помощника учтены.</span></li>
+        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Выходные помощника и праздники его страны учтены.</span></li>
       </ul>
     </div>
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 30px; padding: 32px">
@@ -169,8 +178,8 @@ a{color:#65132A}a:hover{color:#3A0E1C}
       <h3 style="margin: 0 0 20px; font-size: 24px; font-weight: 900; line-height: 1.2">Понятно, что и как</h3>
       <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px; font-size: 16px; color: #3A2E2A">
         <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Задачи по времени, важное — первым.</span></li>
-        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>«Как мы любим» — прямо в задаче.</span></li>
-        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Рецепт открывается из задачи.</span></li>
+        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Пометка «как мы любим» — без лишних вопросов.</span></li>
+        <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Рецепт с фото и видео — в одно касание.</span></li>
         <li style="display: flex; gap: 12px"><span style="color: #65132A; flex: none; margin-top: 1px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>«Сделано» — одним касанием.</span></li>
       </ul>
     </div>
@@ -184,17 +193,17 @@ a{color:#65132A}a:hover{color:#3A0E1C}
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 28px">
       <span style="width: 48px; height: 48px; border-radius: 16px; background: #65132A; color: #D5B272; display: flex; align-items: center; justify-content: center; margin-bottom: 18px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/></svg></span>
       <h3 style="margin: 0 0 8px; font-size: 21px; font-weight: 900">Задачи на сегодня</h3>
-      <p style="margin: 0; font-size: 16px; color: #5F534D">По времени или в течение дня. Важное — первым.</p>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">По времени или в течение дня. Важное — первым, и его не больше, чем вы решили.</p>
     </div>
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 28px">
       <span style="width: 48px; height: 48px; border-radius: 16px; background: #65132A; color: #D5B272; display: flex; align-items: center; justify-content: center; margin-bottom: 18px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0113.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 01-13.7 5.6L4 15.5M4 20v-4.5h4.5"/></svg></span>
       <h3 style="margin: 0 0 8px; font-size: 21px; font-weight: 900">Ритм дома</h3>
-      <p style="margin: 0; font-size: 16px; color: #5F534D">Регулярные задачи и уборка по зонам задаются один раз и появляются сами.</p>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Регулярные задачи и зоны уборки — по дням недели, не больше трёх зон в день.</p>
     </div>
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 28px">
       <span style="width: 48px; height: 48px; border-radius: 16px; background: #65132A; color: #D5B272; display: flex; align-items: center; justify-content: center; margin-bottom: 18px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5h18M5 10.5V17a3 3 0 003 3h8a3 3 0 003-3v-6.5"/><path d="M9 7c0-1.2 1-1.6 1-3M14 7c0-1.2 1-1.6 1-3"/></svg></span>
       <h3 style="margin: 0 0 8px; font-size: 21px; font-weight: 900">Меню и рецепты</h3>
-      <p style="margin: 0; font-size: 16px; color: #5F534D">Рецепты с пометками «как мы любим». Блюда сами чередуются.</p>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Рецепты с фото, видео и пометками «как мы любим». Блюда чередуются по приёмам пищи.</p>
     </div>
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 28px">
       <span style="width: 48px; height: 48px; border-radius: 16px; background: #65132A; color: #D5B272; display: flex; align-items: center; justify-content: center; margin-bottom: 18px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3.5" width="14" height="17" rx="2.5"/><path d="M9 3.5V5h6V3.5"/><path d="M8.5 11l1.5 1.5 3-3M8.5 16.5h7"/></svg></span>
@@ -204,12 +213,12 @@ a{color:#65132A}a:hover{color:#3A0E1C}
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 28px">
       <span style="width: 48px; height: 48px; border-radius: 16px; background: #65132A; color: #D5B272; display: flex; align-items: center; justify-content: center; margin-bottom: 18px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8V6.5a3 3 0 016 0V8"/></svg></span>
       <h3 style="margin: 0 0 8px; font-size: 21px; font-weight: 900">Списки покупок</h3>
-      <p style="margin: 0; font-size: 16px; color: #5F534D">Помощник присылает список, а все видят, когда покупки привезли.</p>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Помощник присылает список. Когда продукты дома — придёт уведомление.</p>
     </div>
     <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 28px">
       <span style="width: 48px; height: 48px; border-radius: 16px; background: #65132A; color: #D5B272; display: flex; align-items: center; justify-content: center; margin-bottom: 18px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 20.5c.8-4 3.6-6 7-6s6.2 2 7 6"/></svg></span>
       <h3 style="margin: 0 0 8px; font-size: 21px; font-weight: 900">Распорядок ребёнка</h3>
-      <p style="margin: 0; font-size: 16px; color: #5F534D">Сон, еда, прогулки — в плане в нужное время.</p>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Сон, еда, прогулки — в дне помощника в нужное время.</p>
     </div>
   </div>
 </section>
@@ -219,15 +228,15 @@ a{color:#65132A}a:hover{color:#3A0E1C}
   <ol style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px">
     <li style="display: flex; gap: 16px; align-items: flex-start">
       <span style="width: 44px; height: 44px; border-radius: 50%; background: #D5B272; color: #3A0E1C; font-weight: 900; font-size: 20px; display: flex; align-items: center; justify-content: center; flex: none">1</span>
-      <span><span style="display: block; font-size: 20px; font-weight: 900; margin: 6px 0 6px">Опишите, как у вас заведено</span><span style="font-size: 16px; color: #5F534D">Рецепты, уборка, ритм дома — сколько успеете.</span></span>
+      <span><span style="display: block; font-size: 20px; font-weight: 900; margin: 6px 0 6px">Запишите, как у вас заведено</span><span style="font-size: 16px; color: #5F534D">Пара рецептов, уборка, ритм дома — начните с малого.</span></span>
     </li>
     <li style="display: flex; gap: 16px; align-items: flex-start">
       <span style="width: 44px; height: 44px; border-radius: 50%; background: #D5B272; color: #3A0E1C; font-weight: 900; font-size: 20px; display: flex; align-items: center; justify-content: center; flex: none">2</span>
-      <span><span style="display: block; font-size: 20px; font-weight: 900; margin: 6px 0 6px">Пригласите помощников</span><span style="font-size: 16px; color: #5F534D">Няню, домработницу, бабушку — по ссылке.</span></span>
+      <span><span style="display: block; font-size: 20px; font-weight: 900; margin: 6px 0 6px">Пригласите помощников</span><span style="font-size: 16px; color: #5F534D">Отправьте ссылку няне, бабушке или подростку.</span></span>
     </li>
     <li style="display: flex; gap: 16px; align-items: flex-start">
       <span style="width: 44px; height: 44px; border-radius: 50%; background: #D5B272; color: #3A0E1C; font-weight: 900; font-size: 20px; display: flex; align-items: center; justify-content: center; flex: none">3</span>
-      <span><span style="display: block; font-size: 20px; font-weight: 900; margin: 6px 0 6px">Выдохните</span><span style="font-size: 16px; color: #5F534D">У всех план на день, а вы проверяете главное.</span></span>
+      <span><span style="display: block; font-size: 20px; font-weight: 900; margin: 6px 0 6px">Выдохните</span><span style="font-size: 16px; color: #5F534D">У каждого план на день, а вы проверяете главное.</span></span>
     </li>
   </ol>
 </section>
@@ -239,32 +248,55 @@ a{color:#65132A}a:hover{color:#3A0E1C}
   </figure>
 </section>
 
+<section id="faq" style="max-width: 1160px; margin: 0 auto; padding: 72px 20px 24px">
+  <h2 style="margin: 0 0 28px; font-weight: 900; font-size: clamp(28px, 4vw, 40px); line-height: 1.15; color: #65132A">Частые вопросы</h2>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px">
+    <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px">
+      <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 900; line-height: 1.3">Помощнику нужно что-то устанавливать?</h3>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Нет. Он открывает приглашение по ссылке — всё работает в браузере.</p>
+    </div>
+    <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px">
+      <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 900; line-height: 1.3">Всё будет работать само?</h3>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Нет. Приложение снимет большую часть вопросов и покажет, что сделано. Как сделано — смотрите вы.</p>
+    </div>
+    <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px">
+      <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 900; line-height: 1.3">Кто что может менять?</h3>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Договорённости — те, кто ведёт дом. Кто помогает вести — ставит задачи и просьбы. Помощники отмечают сделанное.</p>
+    </div>
+    <div style="background: #FFF8EE; border: 1px solid #EADFC4; border-radius: 22px; padding: 24px">
+      <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 900; line-height: 1.3">А зарплаты и расходы?</h3>
+      <p style="margin: 0; font-size: 16px; color: #5F534D">Этого нет — и это намеренно: Helper's Day про дом, а не про деньги.</p>
+    </div>
+  </div>
+</section>
+
 <section style="max-width: 1160px; margin: 0 auto; padding: 72px 20px 80px">
   <div style="background: #65132A; color: #FAECD2; border-radius: 30px; padding: clamp(28px, 5vw, 56px); display: flex; flex-wrap: wrap; align-items: center; gap: 32px">
-    <img src="/site/illustration.jpg" alt="" style="width: 160px; height: 160px; border-radius: 36px; flex: none">
+    <img src="/site/illustration.jpg" alt="" width="160" height="160" loading="lazy" style="width: 160px; height: 160px; border-radius: 36px; flex: none">
     <div style="flex: 1 1 380px; min-width: 0">
       <h2 style="margin: 0 0 10px; font-weight: 900; font-size: clamp(26px, 3.5vw, 36px); line-height: 1.15; color: #FAECD2">Голова свободна от мелких решений</h2>
-      <p style="margin: 0 0 24px; font-size: 18px; color: rgba(250,236,210,0.85)">Решите один раз, что и как у вас заведено, — и меняйте, когда нужно.</p>
+      <p style="margin: 0 0 24px; font-size: 18px; color: rgba(250,236,210,0.85)">Решите один раз, как у вас заведено, и меняйте, когда нужно.</p>
       <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
-        <a href="/app/" style="background: #D5B272; color: #3A0E1C; text-decoration: none; border-radius: 999px; padding: 16px 28px; font-weight: 900; font-size: 18px">Открыть приложение</a>
+        <a href="/app/?lang=ru" style="background: #D5B272; color: #3A0E1C; text-decoration: none; border-radius: 999px; padding: 16px 28px; font-weight: 900; font-size: 18px">Открыть приложение</a>
         <span style="font-size: 15px; color: #EAD3A6">App Store и Google Play — скоро</span>
       </div>
     </div>
   </div>
 </section>
 
+</main>
+
 <footer style="border-top: 1px solid #EADFC4">
   <div style="max-width: 1160px; margin: 0 auto; padding: 28px 20px 40px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px; font-size: 15px; color: #5F534D">
     <div style="display: flex; align-items: center; gap: 10px">
-      <img src="/app/site-icon.png?v=2" alt="" style="width: 32px; height: 32px; border-radius: 50%">
+      <img src="/app/site-icon.png?v=2" alt="" width="32" height="32" loading="lazy" style="width: 32px; height: 32px; border-radius: 50%">
       <span><span style="font-weight: 900; color: #1A1316">Helper's Day</span> · © 2026</span>
     </div>
     <nav aria-label="Документы" style="display: flex; flex-wrap: wrap; gap: 8px 22px; font-weight: 700">
-      <a href="/app/privacy">Конфиденциальность</a>
-      <a href="/app/terms">Условия</a>
-      <a href="/app/support">Поддержка</a>
-      <a href="mailto:support@helperday.app">support@helperday.app</a>
-      <a href="/en/" lang="en">English</a>
+      <a class="tap" href="/app/privacy">Конфиденциальность</a>
+      <a class="tap" href="/app/terms">Условия</a>
+      <a class="tap" href="/app/support">Поддержка</a>
+      <a class="tap" href="mailto:support@helperday.app">support@helperday.app</a>
     </nav>
   </div>
 </footer>

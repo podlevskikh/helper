@@ -41,7 +41,8 @@ var routePolicy = map[string]policy{
 	"GET /system/sealing-key": pub(), "GET /invites/:token": pub(), "POST /invites/:token/accept": pub(),
 	"GET /healthz": pub(), "GET /version": pub(),
 	"GET /app": pub(), "GET /app/*path": pub(), "HEAD /app/*path": pub(),
-	"GET /": pub(), "HEAD /": pub(), "GET /en": pub(), "GET /en/": pub(), "GET /site/*path": pub(), // лендинг
+	"GET /": pub(), "HEAD /": pub(), "GET /en": pub(), "GET /en/": pub(), "GET /site/*path": pub(), "HEAD /site/*path": pub(),
+	"GET /robots.txt": pub(), "GET /sitemap.xml": pub(), "GET /favicon.ico": pub(), // лендинг
 	"GET /admin2/": pub(), "GET /helper2/": pub(), "GET /admin/": pub(), "GET /helper/": pub(),
 	"GET /static/*filepath": pub(), "HEAD /static/*filepath": pub(), "GET /static2/*filepath": pub(), "HEAD /static2/*filepath": pub(),
 	// вошедший, без дома
