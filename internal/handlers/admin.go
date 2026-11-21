@@ -14,6 +14,7 @@ import (
 	"podlevskikh/awesomeProject/internal/models"
 	"podlevskikh/awesomeProject/internal/notify"
 	"podlevskikh/awesomeProject/internal/recipeimport"
+	"podlevskikh/awesomeProject/internal/recipestore"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -219,37 +220,11 @@ func (h *AdminHandler) DeleteRecipe(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Recipe not found"})
 		return
 	}
-	if err := h.db.Transaction(func(tx *gorm.DB) error { return deleteRecipe(tx, recipe) }); err != nil {
+	if err := h.db.Transaction(func(tx *gorm.DB) error { return recipestore.Delete(tx, recipe) }); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Recipe deleted"})
-}
-
-// deleteRecipe удаляет рецепт и всё, что на него ссылается: ротации приёмов пищи, блюда задач (meal_recipes),
-// замены на день, старое поле schedule_tasks.recipe_id, блюда «Ритма дома» на день, заметки.
-// Общая для «Удалить рецепт» и «Отменить загрузку».
-func deleteRecipe(tx *gorm.DB, recipe models.Recipe) error {
-	if err := tx.Model(&recipe).Association("MealTimes").Clear(); err != nil {
-		return err
-	}
-	for _, q := range []string{
-		"DELETE FROM meal_recipes WHERE recipe_id = ?",
-		"UPDATE schedule_tasks SET recipe_id = NULL WHERE recipe_id = ?",
-		"UPDATE task_dishes SET recipe_id = NULL WHERE recipe_id = ?",
-	} {
-		if err := tx.Exec(q, recipe.ID).Error; err != nil {
-			return err
-		}
-	}
-	// Замены блюд на день, где участвовал рецепт («Вернуть» к удалённому рецепту невозможно).
-	if err := tx.Exec("DELETE FROM meal_swaps WHERE original_recipe_id = ? OR current_recipe_id = ?", recipe.ID, recipe.ID).Error; err != nil {
-		return err
-	}
-	if err := tx.Where("recipe_id = ?", recipe.ID).Delete(&models.RecipeComment{}).Error; err != nil {
-		return err
-	}
-	return tx.Delete(&recipe).Error
 }
 
 // MealTime handlers

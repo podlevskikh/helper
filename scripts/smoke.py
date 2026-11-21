@@ -175,6 +175,18 @@ s, _, _ = call("DELETE", "/auth/me")
 expect("PUB-03 DELETE /auth/me без входа", s, 401)
 s, _, _ = call("GET", "/admin/api/recipes")
 expect("PUB-03 /admin/api без входа", s, 401)
+# MCP-01/02: коннектор для Claude — discovery, 401 с адресом метаданных, регистрация только для адреса Claude.
+s, js, _ = call("GET", "/.well-known/oauth-protected-resource/mcp")
+check("MCP-01 метаданные ресурса /mcp", s == 200 and (js or {}).get("resource", "").endswith("/mcp")
+      and (js or {}).get("authorization_servers"), f"({s} {js})")
+s, js, _ = call("GET", "/.well-known/oauth-authorization-server")
+check("MCP-01 метаданные OAuth: регистрация, PKCE S256", s == 200 and (js or {}).get("registration_endpoint", "").endswith("/oauth/register")
+      and (js or {}).get("code_challenge_methods_supported") == ["S256"], f"({s} {js})")
+s, _, h = call("POST", "/mcp", {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, headers={"Accept": "application/json, text/event-stream"})
+check("MCP-01 /mcp без токена → 401 с resource_metadata", s == 401 and "resource_metadata=" in (h.get("WWW-Authenticate") or ""),
+      f"({s} {h.get('WWW-Authenticate')})")
+s, _, _ = call("POST", "/oauth/register", {"redirect_uris": ["https://evil.example/cb"]})
+expect("MCP-02 регистрация клиента с чужим адресом возврата", s, 400)
 s, _, h = call("GET", "/app/login")
 check("SEC-16 заголовки безопасности", h.get("X-Frame-Options") == "DENY" and h.get("X-Content-Type-Options") == "nosniff",
       f"({h.get('X-Frame-Options')}, {h.get('X-Content-Type-Options')})")
