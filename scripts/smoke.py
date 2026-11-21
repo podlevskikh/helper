@@ -452,7 +452,7 @@ try:
         s, js, _ = call("PATCH", "/auth/me", {"locale": code}, tokA)
         check(f"LANG-03 язык {code} сохраняется", s == 200, f"({s} {js})")
     s, js, _ = call("GET", "/auth/me", token=tokA)
-    check("LANG-03 /auth/me отдаёт выбранный язык", ((js or {}).get("user") or {}).get("locale") == "si", f"({js})")
+    check("LANG-03 /auth/me отдаёт выбранный язык", ((js or {}).get("user") or {}).get("locale") == "ar", f"({js})")
     s, _, _ = call("PATCH", "/auth/me", {"locale": "de"}, tokA)
     expect("LANG-03 незнакомый язык", s, 400)
     s, _, _ = call("PATCH", "/auth/me", {"locale": "ru"}, tokA)
