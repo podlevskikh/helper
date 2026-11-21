@@ -135,6 +135,13 @@ func TestCatalogsComplete(t *testing.T) {
 	}
 }
 
+func TestArabicListSeparator(t *testing.T) {
+	_, body := Render(KindListSent, "ar", Params{Actor: "Maria", Count: 2, Items: []string{"milk", "eggs"}})
+	if !strings.Contains(body, "milk، eggs") {
+		t.Errorf("арабская запятая: %q", body)
+	}
+}
+
 func TestLang(t *testing.T) {
 	for in, want := range map[string]string{"ru": "ru", "uk-UA": "uk", "tl": "fil", "in_ID": "id", "fil": "fil", "de": "en", "": "en", "be": "ru"} {
 		if got := Lang(in); got != want {

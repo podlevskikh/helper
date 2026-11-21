@@ -60,14 +60,22 @@ func quoteList(items []string, max int, lang string) string {
 		covered++
 		parts = append(parts, quote(lang, clip(it, 30)))
 	}
-	s := strings.Join(parts, ", ")
+	s := strings.Join(parts, listSep(lang))
 	if rest := len(items) - covered; rest > 0 {
 		s += tr(lang, "and_more", "n", rest)
 	}
 	return s
 }
 
-func plainList(items []string, max int) string {
+// listSep — запятая перечисления: в арабском «، ».
+func listSep(lang string) string {
+	if lang == "ar" {
+		return "، "
+	}
+	return ", "
+}
+
+func plainList(items []string, max int, lang string) string {
 	var parts []string
 	for i, it := range items {
 		if i == max {
@@ -75,7 +83,7 @@ func plainList(items []string, max int) string {
 		}
 		parts = append(parts, clip(it, 30))
 	}
-	s := strings.Join(parts, ", ")
+	s := strings.Join(parts, listSep(lang))
 	if len(items) > max {
 		s += "…"
 	}
@@ -161,11 +169,11 @@ func Render(kind Kind, locale string, p Params) (title, body string) {
 		title = tr(l, "list_sent.title", "actor", p.Actor)
 		body = trN(l, "list_sent.count", p.Count)
 		if len(p.Items) > 0 {
-			body += ": " + plainList(p.Items, 4)
+			body += ": " + plainList(p.Items, 4, l)
 		}
 	case KindListAdded:
 		title = tr(l, "list_added.title", "actor", p.Actor)
-		body = fmt.Sprintf("+%d: %s", len(p.Items), plainList(p.Items, 5))
+		body = fmt.Sprintf("+%d: %s", len(p.Items), plainList(p.Items, 5, l))
 	case KindDigest:
 		if p.Done >= p.Total {
 			title = tr(l, "digest.all_title", "name", p.Name)
@@ -192,7 +200,7 @@ func Render(kind Kind, locale string, p Params) (title, body string) {
 			reason = p.Reason
 		}
 		title = tr(l, "day_off.title", "name", p.Name, "reason", tr(l, "reason."+reason))
-		body = trN(l, "day_off.body", p.Count, "list", plainList(p.Items, 3))
+		body = trN(l, "day_off.body", p.Count, "list", plainList(p.Items, 3, l))
 	case KindMemberJoined:
 		title = tr(l, "member_joined.title", "name", p.Name)
 		body = tr(l, "member_joined.body")
