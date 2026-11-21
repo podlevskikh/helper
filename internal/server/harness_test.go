@@ -62,6 +62,13 @@ func newEnv(t *testing.T, scale int) *env {
 	if err := database.Initialize(url); err != nil {
 		t.Fatal(err)
 	}
+	// Каждый тест открывает свой пул — закрываем его, иначе сотня тестов упирается в max_connections Postgres.
+	db := database.DB
+	t.Cleanup(func() {
+		if sqlDB, err := db.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	})
 	gin.SetMode(gin.TestMode)
 	return &env{t: t, db: database.DB, r: NewRouter(Deps{DB: database.DB, Sched: scheduler.NewScheduler(database.DB)})}
 }
