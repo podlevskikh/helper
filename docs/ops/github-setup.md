@@ -28,7 +28,7 @@ GitHub пускает коммит в `main`, только если у этог�
 
 ## 2. Бэкап базы (5 минут) — подробно в [backup.md](backup.md)
 
-1. В Railway → Postgres → **Data → Query** выполнить SQL из `backup.md` (роль только для чтения).
+1. В Neon → **SQL Editor** выполнить SQL из `backup.md` (роль только для чтения; база — на Neon, не в Railway).
 2. GitHub → **Settings → Secrets and variables → Actions → New repository secret**:
    - `PROD_DATABASE_URL_READONLY` — адрес базы с этой ролью;
    - `BACKUP_AGE_RECIPIENT` — публичный ключ `age1…` (его даст Татьяна, см. `backup.md`).
