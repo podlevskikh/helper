@@ -6,6 +6,7 @@ package recipestore
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -36,6 +37,21 @@ type Error struct {
 func (e *Error) Error() string { return e.Msg }
 
 func fail(status int, code, msg string) *Error { return &Error{Status: status, Code: code, Msg: msg} }
+
+// dbFail — ошибка базы: подробности — в журнал, наружу (приложению и Claude) — только «server error».
+func dbFail(err error) *Error {
+	log.Printf("recipestore: %v", err)
+	return fail(http.StatusInternalServerError, "server_error", "server error")
+}
+
+// Лимиты правки — как у загрузки текстом.
+const (
+	maxDescription  = 2000
+	maxInstructions = 20000
+	maxIngredients  = 100
+	maxLine         = 300
+	maxTags         = 30
+)
 
 // Actor — кто делает: человек и как его показывать в «Изменено: …».
 type Actor struct {
@@ -121,7 +137,7 @@ func load(db *gorm.DB, orgID uint, in ImportInput) (*house, *Error) {
 	byName := map[string]models.Recipe{}
 	var recipes []models.Recipe
 	if err := db.Where("organization_id = ?", orgID).Select("id", "name").Order("id").Find(&recipes).Error; err != nil {
-		return nil, fail(http.StatusInternalServerError, "db", err.Error())
+		return nil, dbFail(err)
 	}
 	for _, r := range recipes {
 		k := recipeimport.NormalizeName(r.Name)
@@ -131,7 +147,7 @@ func load(db *gorm.DB, orgID uint, in ImportInput) (*house, *Error) {
 	}
 	var types []models.DishType
 	if err := db.Where("organization_id = ?", orgID).Order("position, id").Find(&types).Error; err != nil {
-		return nil, fail(http.StatusInternalServerError, "db", err.Error())
+		return nil, dbFail(err)
 	}
 	for _, t := range types {
 		h.types[recipeimport.NormalizeName(t.Name)] = t
@@ -322,7 +338,7 @@ func SaveImport(db *gorm.DB, orgID uint, who Actor, in ImportInput, source strin
 		return nil, fail(http.StatusBadRequest, "nothing_to_save", "nothing to save")
 	}
 	if err != nil {
-		return nil, fail(http.StatusInternalServerError, "db", err.Error())
+		return nil, dbFail(err)
 	}
 	return &Result{ImportID: imp.ID, Created: imp.Created, Replaced: imp.Replaced, Skipped: imp.Skipped,
 		Recipes: saved, UndoUntil: imp.CreatedAt.Add(UndoWindow), Source: source}, nil
@@ -355,7 +371,7 @@ func UndoImport(db *gorm.DB, orgID, importID uint) (deleted int, replaced int, e
 		return tx.Model(&imp).Update("undone_at", &now).Error
 	})
 	if err != nil {
-		return 0, 0, fail(http.StatusInternalServerError, "db", err.Error())
+		return 0, 0, dbFail(err)
 	}
 	return deleted, imp.Replaced, nil
 }
@@ -430,6 +446,9 @@ func Update(db *gorm.DB, orgID, recipeID uint, who Actor, p Patch) (*models.Reci
 		r.Name = n
 	}
 	if p.Description != nil {
+		if len([]rune(*p.Description)) > maxDescription {
+			return nil, fail(http.StatusBadRequest, "too_long", "description is too long")
+		}
 		r.Description = strings.TrimSpace(*p.Description)
 	}
 	if p.Ingredients != nil {
@@ -437,9 +456,20 @@ func Update(db *gorm.DB, orgID, recipeID uint, who Actor, p Patch) (*models.Reci
 		if len(lines) == 0 {
 			return nil, fail(http.StatusBadRequest, "no_ingredients", "ingredients can't be empty")
 		}
+		if len(lines) > maxIngredients {
+			return nil, fail(http.StatusBadRequest, "too_long", "too many ingredients")
+		}
+		for _, l := range lines {
+			if len([]rune(l)) > maxLine {
+				return nil, fail(http.StatusBadRequest, "too_long", "an ingredient line is too long")
+			}
+		}
 		r.Ingredients = strings.Join(lines, "\n")
 	}
 	if p.Instructions != nil {
+		if len([]rune(*p.Instructions)) > maxInstructions {
+			return nil, fail(http.StatusBadRequest, "too_long", "instructions are too long")
+		}
 		r.Instructions = strings.TrimSpace(*p.Instructions)
 	}
 	minutes := func(v *int, field string, dst *int) *Error {
@@ -465,9 +495,15 @@ func Update(db *gorm.DB, orgID, recipeID uint, who Actor, p Patch) (*models.Reci
 		r.Servings = *p.Servings
 	}
 	if p.Tags != nil {
+		if len(*p.Tags) > maxTags {
+			return nil, fail(http.StatusBadRequest, "too_long", "too many tags")
+		}
 		var tags []string
 		for _, t := range *p.Tags {
 			if t = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(t), "#")); t != "" {
+				if len([]rune(t)) > 60 {
+					return nil, fail(http.StatusBadRequest, "too_long", "a tag is too long")
+				}
 				tags = append(tags, t)
 			}
 		}
@@ -512,7 +548,7 @@ func Update(db *gorm.DB, orgID, recipeID uint, who Actor, p Patch) (*models.Reci
 	}
 	r.UpdatedByID, r.UpdatedByName = &who.UserID, who.Name
 	if err := db.Omit("MealTimes").Save(&r).Error; err != nil {
-		return nil, fail(http.StatusInternalServerError, "db", err.Error())
+		return nil, dbFail(err)
 	}
 	return &r, nil
 }

@@ -119,6 +119,10 @@ func (h *TeamHandler) UpdateMember(c *gin.Context) {
 		}
 	}
 	h.db.First(t, t.ID)
+	if _, changed := updates["role"]; changed && !middleware.Can(t, middleware.CapManageRecipes) {
+		// Без права вести рецепты подключение к Claude не работает; отзываем, чтобы не ожило при новом повышении.
+		_ = models.RevokeOAuthGrants(h.db, t.UserID, t.OrganizationID)
+	}
 	var u models.User
 	h.db.First(&u, t.UserID)
 	c.JSON(http.StatusOK, memberView(*t, u))
@@ -184,6 +188,10 @@ func deactivateMember(tx *gorm.DB, m *models.Membership) error {
 		Update("status", models.MembershipDisabled)
 	if res.Error != nil {
 		return res.Error
+	}
+	// Подключения (Claude) к этому дому больше не нужны.
+	if err := models.RevokeOAuthGrants(tx, m.UserID, m.OrganizationID); err != nil {
+		return err
 	}
 	if res.RowsAffected != 1 {
 		return errTeamChanged

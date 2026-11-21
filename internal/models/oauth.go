@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // OAuth для коннектора Helper's Day в Claude (docs/work/recipes-mcp/PRD.md во фронте).
 // Секреты (коды, токены) хранятся только хэшем SHA-256.
@@ -75,4 +79,21 @@ type OAuthToken struct {
 	UsedAt    *time.Time // refresh: когда обменян на новый (повтор — отзыв подключения)
 	RevokedAt *time.Time
 	CreatedAt time.Time
+}
+
+// RevokeOAuthGrants — отозвать подключения человека к дому (ушёл, убрали, отняли права):
+// если права потом вернут, старый токен не заработает снова — нужно новое согласие.
+func RevokeOAuthGrants(tx *gorm.DB, userID, orgID uint) error {
+	var ids []uint
+	if err := tx.Model(&OAuthGrant{}).Where("user_id = ? AND org_id = ? AND revoked_at IS NULL", userID, orgID).Pluck("id", &ids).Error; err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	now := time.Now()
+	if err := tx.Model(&OAuthGrant{}).Where("id IN ?", ids).Update("revoked_at", now).Error; err != nil {
+		return err
+	}
+	return tx.Model(&OAuthToken{}).Where("grant_id IN ? AND revoked_at IS NULL", ids).Update("revoked_at", now).Error
 }

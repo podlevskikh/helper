@@ -259,8 +259,12 @@ func TestMCPConnector(t *testing.T) {
 	if _, isErr := e.tool(access2, "list_dish_types", nil); isErr {
 		t.Fatalf("новый токен не работает")
 	}
+	// Повтор сразу после обмена (ответ потерялся) — ещё одна пара, один раз.
+	if code, m3 := e.form("/oauth/token", url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh}}); code != 200 {
+		t.Fatalf("повтор refresh в первые секунды: %d %v", code, m3)
+	}
 	if code, m3 := e.form("/oauth/token", url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh}}); code != 400 || m3["error"] != "invalid_grant" {
-		t.Fatalf("повтор старого refresh: %d %v", code, m3)
+		t.Fatalf("второй повтор старого refresh: %d %v", code, m3)
 	}
 	if code, _, _ := e.mcpCall(access2, "tools/list", map[string]any{}); code != 401 {
 		t.Fatalf("после повтора refresh подключение должно быть отозвано: %d", code)
@@ -286,5 +290,27 @@ func TestMCPConnector(t *testing.T) {
 		body: map[string]any{"role": "helper"}}), 200)
 	if code, _, _ := e.mcpCall(accessAdm, "tools/list", map[string]any{}); code != 401 {
 		t.Fatalf("без manage_recipes токен работает: %d", code)
+	}
+	// Права вернули — старое подключение не оживает, нужно новое согласие.
+	e.expect("помощник → админ", e.do(req{method: "PATCH", path: fmt.Sprintf("/orgs/%d/members/%d", o.Org, adm.UserID), token: o.Token, org: o.Org,
+		body: map[string]any{"role": "admin"}}), 200)
+	if code, _, _ := e.mcpCall(accessAdm, "tools/list", map[string]any{}); code != 401 {
+		t.Fatalf("после возврата прав старый токен снова работает: %d", code)
+	}
+	// Убрали из команды — подключение отозвано.
+	accessAdm2, _ := e.connect(adm, o.Org)
+	e.expect("убрать из команды", e.do(req{method: "DELETE", path: fmt.Sprintf("/orgs/%d/members/%d", o.Org, adm.UserID), token: o.Token, org: o.Org}), 204)
+	if code, _, _ := e.mcpCall(accessAdm2, "tools/list", map[string]any{}); code != 401 {
+		t.Fatalf("после «убрать из команды» токен работает: %d", code)
+	}
+	var live int64
+	e.db.Model(&models.OAuthGrant{}).Where("user_id = ? AND org_id = ? AND revoked_at IS NULL", adm.UserID, o.Org).Count(&live)
+	if live != 0 {
+		t.Fatalf("подключения убранного не отозваны: %d", live)
+	}
+	// Поиск: «%» — просто символ.
+	access4, _ := e.connect(o, o.Org)
+	if txt, _ := e.tool(access4, "find_recipes", map[string]any{"query": "%"}); strings.Contains(txt, "Борщ") {
+		t.Fatalf("«%%» в поиске нашёл всё: %s", txt)
 	}
 }

@@ -199,8 +199,9 @@ func (s *srv) addTools(server *mcp.Server) {
 				q = q.Where("dish_type_id = ?", in.DishTypeID)
 			}
 			if t := strings.TrimSpace(in.Query); t != "" {
-				like := "%" + strings.ToLower(t) + "%"
-				q = q.Where("LOWER(name) LIKE ? OR LOWER(ingredients) LIKE ?", like, like)
+				esc := strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(strings.ToLower(t))
+				like := "%" + esc + "%"
+				q = q.Where(`(LOWER(name) LIKE ? ESCAPE '\' OR LOWER(ingredients) LIKE ? ESCAPE '\')`, like, like)
 			}
 			var rs []models.Recipe
 			q.Order("name").Limit(200).Find(&rs)

@@ -21,6 +21,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"podlevskikh/awesomeProject/internal/middleware"
@@ -41,8 +42,13 @@ const (
 	ClaudeRedirect = "https://claude.ai/api/mcp/auth_callback"
 	// DefaultIssuer — адрес сервера на проде.
 	DefaultIssuer = "https://www.helperday.app"
-	// ClientName — как подключение называется в «Подключениях», если клиент не назвался.
+	// ClientName — клиент с адресом возврата claude.ai.
 	ClientName = "Claude"
+	// LocalClientName — клиент на этом компьютере (Claude Code, MCP Inspector).
+	LocalClientName = "Claude Code (localhost)"
+	// RefreshGrace — повтор того же токена обновления в эти секунды (потерянный ответ, повтор запроса)
+	// не считаем утечкой: выдаём новую пару, но не чаще одного раза.
+	RefreshGrace = 30 * time.Second
 )
 
 // Server — обработчики OAuth.
@@ -90,12 +96,12 @@ func isLoopbackHost(hostport string) bool {
 }
 
 // Register вешает маршруты OAuth на роутер. authMw — вход в приложение (для экрана согласия и «Подключений»).
-func (s *Server) Register(router *gin.Engine, authMw gin.HandlerFunc, registerLimit, tokenLimit gin.HandlerFunc) {
+func (s *Server) Register(router *gin.Engine, authMw gin.HandlerFunc, registerLimit, authorizeLimit, tokenLimit gin.HandlerFunc) {
 	router.GET("/.well-known/oauth-protected-resource", s.protectedResource)
 	router.GET("/.well-known/oauth-protected-resource/mcp", s.protectedResource)
 	router.GET("/.well-known/oauth-authorization-server", s.serverMetadata)
 	router.POST("/oauth/register", registerLimit, s.register)
-	router.GET("/oauth/authorize", s.authorize)
+	router.GET("/oauth/authorize", authorizeLimit, s.authorize)
 	router.POST("/oauth/token", tokenLimit, s.token)
 	router.GET("/oauth/requests/:id", authMw, s.getRequest)
 	router.POST("/oauth/requests/:id/decision", authMw, s.decide)
@@ -144,6 +150,15 @@ func allowedRedirect(raw string) bool {
 	return isLoopbackHost(u.Host)
 }
 
+// displayName — как назвать клиента на экране согласия и в «Подключениях». Имя, которое клиент прислал сам,
+// не показываем: его выбирает кто угодно («Helper's Day официальный»). Называем по адресу возврата.
+func displayName(redirect string) string {
+	if redirect == ClaudeRedirect {
+		return ClientName
+	}
+	return LocalClientName
+}
+
 // sameRedirect — адрес из запроса совпадает с зарегистрированным; у локальных адресов порт не важен (RFC 8252).
 func sameRedirect(registered, got string) bool {
 	if registered == got {
@@ -188,6 +203,7 @@ func (s *Server) register(c *gin.Context) {
 	if name == "" {
 		name = ClientName
 	}
+	s.cleanup(time.Now())
 	uris, _ := json.Marshal(in.RedirectURIs)
 	cl := models.OAuthClient{ClientID: "hd_" + randomHex(16), Name: name, RedirectURIs: string(uris)}
 	if err := s.DB.Create(&cl).Error; err != nil {
@@ -308,7 +324,7 @@ func (s *Server) authorize(c *gin.Context) {
 		return
 	}
 	now := time.Now()
-	s.DB.Where("expires_at < ?", now.Add(-time.Hour)).Delete(&models.OAuthRequest{})
+	s.cleanup(now)
 	req := models.OAuthRequest{ID: randomToken(24), ClientID: cl.ClientID, RedirectURI: redirect, State: state,
 		CodeChallenge: q.Get("code_challenge"), Scope: scope, Resource: MCPURL(c.Request), ExpiresAt: now.Add(RequestTTL)}
 	if err := s.DB.Create(&req).Error; err != nil {
@@ -317,6 +333,38 @@ func (s *Server) authorize(c *gin.Context) {
 	}
 	c.Redirect(http.StatusFound, consentURL(c.Request)+"?req="+url.QueryEscape(req.ID))
 }
+
+// cleanup — убрать отработавшее, чтобы таблицы не росли: истёкшие запросы и коды, истёкшие и отозванные токены,
+// давно отозванные подключения, клиентов без подключений старше недели. Не чаще раза в 10 минут.
+func (s *Server) cleanup(now time.Time) {
+	if !cleanupGate.allow(now) {
+		return
+	}
+	day := now.Add(-24 * time.Hour)
+	s.DB.Where("expires_at < ?", now).Delete(&models.OAuthRequest{})
+	s.DB.Where("expires_at < ?", day).Delete(&models.OAuthCode{})
+	s.DB.Where("expires_at < ? OR revoked_at < ?", day, day).Delete(&models.OAuthToken{})
+	s.DB.Where("revoked_at < ?", now.Add(-30*24*time.Hour)).Delete(&models.OAuthGrant{})
+	s.DB.Where("created_at < ? AND client_id NOT IN (?)", now.Add(-7*24*time.Hour),
+		s.DB.Model(&models.OAuthGrant{}).Select("client_id")).Delete(&models.OAuthClient{})
+}
+
+type gate struct {
+	mu   sync.Mutex
+	last time.Time
+}
+
+func (g *gate) allow(now time.Time) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if now.Sub(g.last) < 10*time.Minute {
+		return false
+	}
+	g.last = now
+	return true
+}
+
+var cleanupGate = &gate{}
 
 // pending — запрос на доступ, который открыл этот человек (или ещё никто).
 func (s *Server) pending(c *gin.Context) (*models.OAuthRequest, uint, bool) {
@@ -368,12 +416,8 @@ func (s *Server) getRequest(c *gin.Context) {
 	if !ok {
 		return
 	}
-	cl, _ := s.client(req.ClientID)
-	name := ClientName
-	if cl != nil {
-		name = cl.Name
-	}
-	c.JSON(http.StatusOK, gin.H{"id": req.ID, "client_name": name, "scope": req.Scope, "homes": s.homes(uid),
+	name := displayName(req.RedirectURI)
+	c.JSON(http.StatusOK, gin.H{"id": req.ID, "client_name": name, "local": name != ClientName, "scope": req.Scope, "homes": s.homes(uid),
 		"expires_at": req.ExpiresAt})
 }
 
@@ -404,11 +448,7 @@ func (s *Server) decide(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "only those who run the home can connect Claude", "code": "forbidden"})
 		return
 	}
-	cl, _ := s.client(req.ClientID)
-	name := ClientName
-	if cl != nil {
-		name = cl.Name
-	}
+	name := displayName(req.RedirectURI)
 	code := randomToken(32)
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		// Запрос одноразовый: удалили — значит решение принято один раз.
@@ -516,13 +556,21 @@ func (s *Server) refresh(c *gin.Context, f url.Values) {
 		tokenErr(c, "invalid_grant", "unknown refresh token")
 		return
 	}
+	now := time.Now()
 	if t.UsedAt != nil {
-		// Старый токен обновления пришёл ещё раз — утечка: отзываем всё подключение.
+		// Повтор сразу после обмена (ответ потерялся) — ещё одна пара, один раз; позже — утечка: отзываем подключение.
+		if now.Sub(*t.UsedAt) <= RefreshGrace && t.RevokedAt == nil {
+			if res := s.DB.Model(&models.OAuthToken{}).Where("id = ? AND revoked_at IS NULL", t.ID).Update("revoked_at", now); res.RowsAffected == 1 {
+				if g, ok := s.activeGrant(t.GrantID); ok {
+					s.issue(c, g)
+					return
+				}
+			}
+		}
 		s.revokeGrant(t.GrantID)
 		tokenErr(c, "invalid_grant", "refresh token already used")
 		return
 	}
-	now := time.Now()
 	if t.RevokedAt != nil || now.After(t.ExpiresAt) {
 		tokenErr(c, "invalid_grant", "refresh token expired")
 		return
@@ -643,16 +691,6 @@ func (s *Server) revokeConnection(c *gin.Context) {
 	}
 	s.revokeGrant(g.ID)
 	c.JSON(http.StatusOK, gin.H{"revoked": true})
-}
-
-// RevokeUserOrg — человек ушёл из дома или потерял права: его подключения к этому дому больше не нужны.
-// (Verify и так их не пропустит; здесь — чтобы не висели в «Подключениях».)
-func (s *Server) RevokeUserOrg(userID, orgID uint) {
-	var ids []uint
-	s.DB.Model(&models.OAuthGrant{}).Where("user_id = ? AND org_id = ? AND revoked_at IS NULL", userID, orgID).Pluck("id", &ids)
-	for _, id := range ids {
-		s.revokeGrant(id)
-	}
 }
 
 // ── Криптография ────────────────────────────────────────────────────────────

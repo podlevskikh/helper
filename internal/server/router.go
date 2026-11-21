@@ -127,7 +127,8 @@ func NewRouter(d Deps) *gin.Engine {
 	// Коннектор Helper's Day для Claude: OAuth (вход и согласие) и MCP-сервер /mcp (docs/work/recipes-mcp/PRD.md).
 	oauthServer := oauth.New(db)
 	oauthServer.Register(router, authMw,
-		middleware.RateLimit(middleware.RateLimitOptions{Max: 20, Per: time.Hour}),
+		middleware.RateLimit(middleware.RateLimitOptions{Max: 20, Per: time.Hour}),        // регистрация клиента
+		middleware.RateLimit(middleware.RateLimitOptions{Max: 60, Per: 15 * time.Minute}), // начало входа
 		middleware.RateLimit(middleware.RateLimitOptions{Max: 60, Per: 15 * time.Minute, OnlyFailures: true}))
 	mcpHandler := gin.WrapH(mcpserver.Handler(db, oauthServer))
 	router.POST("/mcp", mcpHandler)
