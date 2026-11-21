@@ -234,6 +234,9 @@ func NewRouter(d Deps) *gin.Engine {
 			api.POST("/recipes", middleware.Require(middleware.CapManageRecipes), adminHandler.CreateRecipe)
 			api.PUT("/recipes/:id", middleware.Require(middleware.CapEditRecipes), adminHandler.UpdateRecipe)
 			api.DELETE("/recipes/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.DeleteRecipe)
+			// Загрузка рецептов списком: предпросмотр (dry_run) и сохранение; отмена — сутки.
+			api.POST("/recipe-imports", middleware.Require(middleware.CapManageRecipes), adminHandler.ImportRecipes)
+			api.DELETE("/recipe-imports/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.UndoRecipeImport)
 			// Загрузка фото рецептов убрана: рецепты без фото (решение владелицы), а старый обработчик не проверял размер и содержимое.
 
 			// Recipe Comments

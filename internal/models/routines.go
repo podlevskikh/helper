@@ -228,3 +228,18 @@ func fillRoutineDishes(db *gorm.DB, tasks []ScheduleTask, ids []uint, idx map[ui
 		t.Dishes = append(t.Dishes, v)
 	}
 }
+
+// RecipeImport — одна загрузка рецептов списком (docs/work/recipes-import/PRD.md во фронте).
+// Рецепты, созданные ею, помечены recipes.import_id; «Отменить загрузку» — в течение суток.
+type RecipeImport struct {
+	ID             uint       `gorm:"primaryKey" json:"id"`
+	OrganizationID uint       `gorm:"index;not null" json:"organization_id"`
+	UserID         uint       `json:"user_id"`
+	UserName       string     `json:"user_name"`
+	Source         string     `gorm:"default:text" json:"source"` // text; потом mcp, base
+	Created        int        `json:"created"`
+	Replaced       int        `json:"replaced"`
+	Skipped        int        `json:"skipped"`
+	UndoneAt       *time.Time `json:"undone_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+}

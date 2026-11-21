@@ -67,6 +67,7 @@ var routePolicy = map[string]policy{
 
 	"GET /admin/api/recipes": org(all), "GET /admin/api/recipes/:id": org(all),
 	"POST /admin/api/recipes": org(recipes), "PUT /admin/api/recipes/:id": org(all), "DELETE /admin/api/recipes/:id": org(recipes),
+	"POST /admin/api/recipe-imports": org(recipes), "DELETE /admin/api/recipe-imports/:id": org(recipes),
 	"GET /admin/api/recipes/:id/comments": org(all), "POST /admin/api/recipes/:id/comments": org(all),
 	"DELETE /admin/api/comments/:id": org(recipes),
 	"GET /admin/api/mealtimes":       org(all), "GET /admin/api/mealtimes/:id": org(all),
