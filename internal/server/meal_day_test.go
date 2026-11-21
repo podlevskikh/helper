@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/models"
@@ -27,6 +28,9 @@ func TestMealDayServingsAndSwap(t *testing.T) {
 
 	// Обед завтра, как его ставит планировщик: блюдо только в recipe_id, meal_recipes пуст.
 	day := clock.OrgToday(e.db, o.Org).AddDate(0, 0, 1)
+	if day.Weekday() == time.Sunday {
+		day = day.AddDate(0, 0, 1) // в воскресенье у помощника выходной — его день пуст (тест падал по субботам)
+	}
 	s, err := models.EnsureDailySchedule(e.db, o.Org, day, false)
 	if err != nil {
 		t.Fatal(err)
