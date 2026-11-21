@@ -50,7 +50,7 @@ var routePolicy = map[string]policy{
 	"POST /auth/email/resend": authOnly(), "POST /auth/email/check": pub(), "POST /auth/email/confirm": pub(), "POST /auth/email/cancel": pub(), "POST /auth/email/revert": pub(),
 	"POST /me/devices": authOnly(), "DELETE /me/devices/:token": authOnly(), "POST /me/client-errors": authOnly(),
 	// дом
-	"POST /orgs/:orgId/invites": org(team), "GET /orgs/:orgId/members": org(team),
+	"POST /orgs/:orgId/invites": org(team), "GET /orgs/:orgId/members": org(schedule),
 	"PATCH /orgs/:orgId/members/:userId": org(team), "DELETE /orgs/:orgId/members/:userId": org(team),
 	"POST /orgs/:orgId/leave": org(all), "POST /orgs/:orgId/transfer-ownership": org(ownerOnly),
 	"GET /orgs/:orgId/invites": org(team), "DELETE /orgs/:orgId/invites/:id": org(team),

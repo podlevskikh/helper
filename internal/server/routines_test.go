@@ -160,6 +160,9 @@ func TestRoutineDayOff(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("в отгул две задачи помощника: %v", off)
 	}
+	if it0, _ := items[0].(map[string]any); it0["owner_id"] != float64(hm.o.UserID) || it0["owner"] == "" {
+		t.Errorf("в отгул у задачи нет того, кто поставил: %v", it0)
+	}
 	working, _ := off["working"].([]any)
 	if len(working) != 1 || working[0].(map[string]any)["id"] != float64(hm.h2.UserID) {
 		t.Errorf("работает второй помощник: %v", working)
@@ -309,6 +312,34 @@ func TestRoutineTaskRemovedForDay(t *testing.T) {
 	}
 	if findTask(e.dayTasks(hm.o, "2026-11-18"), "Полить цветы") == nil {
 		t.Errorf("в среду задачи нет")
+	}
+
+	// Еду из «Ритма дома» тоже убирают на один день (решение 21.11.2026).
+	soup := e.dishType(hm.o, "Суп")
+	e.recipe(hm.o, "Борщ", soup)
+	e.routine(hm.o, map[string]any{"kind": "food", "title": "Ужин", "repeat_kind": "weekdays", "weekdays": []int{1, 2, 3, 4, 5, 6},
+		"time_mode": "exact", "times": []string{"19:00"}, "assigned_to_user_id": hm.h.UserID,
+		"dishes": []map[string]any{{"dish_type_id": soup, "servings": 2}}})
+	var dinner map[string]any
+	for _, m := range e.dayTasks(hm.o, "2026-11-19") {
+		if m["task_type"] == "meal" && m["time"] == "19:00" {
+			dinner = m
+		}
+	}
+	if dinner == nil {
+		t.Fatalf("в четверг нет ужина")
+	}
+	e.expect("убрать ужин на четверг", e.do(req{method: "DELETE", path: fmt.Sprintf("/admin/api/custom-tasks/%.0f", dinner["id"]),
+		token: hm.o.Token, org: hm.o.Org}), 200)
+	for _, m := range e.dayTasks(hm.o, "2026-11-19") {
+		if m["task_type"] == "meal" && m["time"] == "19:00" {
+			t.Errorf("убранный на четверг ужин появился снова")
+		}
+	}
+	var orphans int64
+	e.db.Raw(`SELECT count(*) FROM meal_recipes WHERE schedule_task_id = ?`, dinner["id"]).Scan(&orphans)
+	if orphans != 0 {
+		t.Errorf("у убранного ужина остались блюда: %d", orphans)
 	}
 }
 

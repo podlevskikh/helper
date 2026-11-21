@@ -1033,7 +1033,9 @@ func (h *AdminHandler) DeleteCustomTask(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
-	if task.TaskType != "custom" {
+	// Свою разовую задачу — удалить; задачу из «Ритма дома» любого вида (еда, уборка, ребёнок…) —
+	// убрать на этот день (решение владелицы 21.11.2026: еду отменяют так же, как остальное).
+	if task.TaskType != "custom" && task.RoutineID == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "only custom tasks can be deleted this way"})
 		return
 	}
@@ -1053,6 +1055,10 @@ func (h *AdminHandler) DeleteCustomTask(c *gin.Context) {
 		}
 	}
 	notify.TaskDeleted(h.db, currentUserID(c), &task)
+	// Связи задачи: блюда, зоны, замены блюд — иначе останутся строки без задачи.
+	_ = h.db.Model(&task).Association("Recipes").Clear()
+	_ = h.db.Model(&task).Association("Zones").Clear()
+	h.db.Where("task_id = ?", task.ID).Delete(&models.MealSwap{})
 	if err := h.db.Delete(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
