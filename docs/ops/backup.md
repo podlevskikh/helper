@@ -1,6 +1,9 @@
 # Бэкап базы прода и учебное восстановление
 
-Railway хранит базу, но собственного бэкапа у нас не было. Теперь каждую ночь (01:30 UTC) GitHub Actions (`.github/workflows/backup.yml`):
+База — **Neon** (не Railway: в Railway только сервер). У Neon есть своё восстановление на момент времени
+(Restore / history retention: окно зависит от тарифа — на бесплатном часы, на платных дни); посмотреть —
+Neon → проект → **Settings → Storage / Instant restore**. Это защита от «испортили данные час назад», но не от
+удаления проекта или аккаунта Neon. Поэтому и нужен свой ночной дамп вне Neon. Теперь каждую ночь (01:30 UTC) GitHub Actions (`.github/workflows/backup.yml`):
 1. делает `pg_dump` под ролью **только для чтения** (изменить базу этой ролью нельзя);
 2. шифрует дамп ключом [age](https://age-encryption.org) — **публичным**; расшифровать может только владелица закрытого ключа;
 3. хранит файл 30 дней как артефакт прогона.
@@ -17,12 +20,12 @@ age-keygen -o ~/helper-backup-key.txt
 Команда напечатает `Public key: age1…` — эту строку отдать мужу для секрета `BACKUP_AGE_RECIPIENT`.
 Файл `~/helper-backup-key.txt` — закрытый ключ: сохранить в менеджер паролей (как заметку) и не пересылать.
 
-### Владелец Railway: роль только для чтения (3 минуты)
-Railway → проект → **Postgres → Data → Query** (или `psql` по `DATABASE_PUBLIC_URL`). Пароль придумать длинный, случайный (например, `openssl rand -hex 24`):
+### Владелец Neon: роль только для чтения (3 минуты)
+Neon → проект → **SQL Editor** (под владельцем базы — тем же пользователем, что в `DATABASE_URL` сервера в Railway). Пароль придумать длинный, случайный (например, `openssl rand -hex 24`):
 ```sql
 CREATE ROLE helper_backup LOGIN PASSWORD '<случайный пароль>';
 ALTER ROLE helper_backup SET default_transaction_read_only = on;
-GRANT CONNECT ON DATABASE railway TO helper_backup;
+GRANT CONNECT ON DATABASE neondb TO helper_backup;
 GRANT USAGE ON SCHEMA public TO helper_backup;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO helper_backup;
 GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO helper_backup;
@@ -30,10 +33,11 @@ GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO helper_backup;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO helper_backup;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON SEQUENCES TO helper_backup;
 ```
-Если база называется не `railway` — подставить имя из `DATABASE_URL` (часть после последнего `/`). `ALTER DEFAULT PRIVILEGES` выполнять под тем же пользователем, что в `DATABASE_URL` сервиса.
+Если база называется не `neondb` — подставить имя из `DATABASE_URL` (часть после последнего `/`, до `?`). `ALTER DEFAULT PRIVILEGES` выполнять под тем же пользователем, что в `DATABASE_URL` сервиса.
+(В Neon роль можно создать и в интерфейсе: **Roles → New role**, но права выше всё равно выдаются SQL.)
 
-Адрес для секрета: взять `DATABASE_PUBLIC_URL` из переменных Postgres в Railway и заменить в нём пользователя и пароль:
-`postgresql://helper_backup:<пароль>@<host>.proxy.rlwy.net:<port>/railway`
+Адрес для секрета: Neon → **Connect** → роль `helper_backup`, **без** «Connection pooling» (для `pg_dump` нужен прямой адрес, без `-pooler` в имени хоста):
+`postgresql://helper_backup:<пароль>@ep-….neon.tech/neondb?sslmode=require`
 
 GitHub → Settings → Secrets and variables → Actions:
 - `PROD_DATABASE_URL_READONLY` = этот адрес;
@@ -57,5 +61,5 @@ psql -d helper_restore_check -c "SELECT (SELECT count(*) FROM organizations) AS 
 
 ## Восстановление прода (авария)
 
-1. Railway → Postgres → **Backups** (если включены) — быстрее всего.
-2. Иначе — из нашего дампа: расшифровать как выше и `pg_restore --clean --if-exists --no-owner -d "$DATABASE_PUBLIC_URL" helper.dump` (делает владелец Railway; перед этим остановить сервис, после — `smoke.py` на прод).
+1. Neon → проект → **Restore** (восстановить ветку на момент до сбоя, в пределах окна тарифа) — быстрее всего.
+2. Иначе — из нашего дампа: расшифровать как выше и `pg_restore --clean --if-exists --no-owner -d "<прямой адрес Neon владельца базы>" helper.dump` (перед этим остановить сервис в Railway, после — `smoke.py` на прод).

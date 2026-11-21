@@ -95,7 +95,7 @@ func main() {
 	jobsDone := make(chan struct{})
 	go func() {
 		defer close(jobsDone)
-		leader.Run(ctx, sqlDB, leader.Key, func(jobCtx context.Context) {
+		leader.Run(ctx, sqlDB, leader.Name, func(jobCtx context.Context) {
 			pushDone := make(chan struct{})
 			go func() { defer close(pushDone); pushWorker.Run(jobCtx) }()
 			defer func() { <-pushDone }() // ведущим перестаём, только когда очередь пушей остановилась

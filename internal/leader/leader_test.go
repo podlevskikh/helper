@@ -3,6 +3,7 @@ package leader
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"sync/atomic"
 	"testing"
@@ -26,8 +27,8 @@ func TestOnlyOneLeader(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	RetryEvery, CheckEvery = 20*time.Millisecond, 20*time.Millisecond
-	key := time.Now().UnixNano() % 1_000_000_000
+	TTL, RenewEvery = 300*time.Millisecond, 50*time.Millisecond
+	key := fmt.Sprintf("test-%d", time.Now().UnixNano())
 
 	var running, maxRunning, startedA, startedB int32
 	work := func(started *int32) func(ctx context.Context) {
@@ -63,5 +64,42 @@ func TestOnlyOneLeader(t *testing.T) {
 	}
 	if atomic.LoadInt32(&startedB) != 1 || atomic.LoadInt32(&maxRunning) != 1 {
 		t.Fatalf("после остановки A: B=%d, одновременно максимум %d", startedB, maxRunning)
+	}
+}
+
+// OPS-07: ведущий упал, не отдав аренду, — после её срока задачи подхватывает другой сервер.
+func TestLeaseTakenAfterCrash(t *testing.T) {
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		if os.Getenv("REQUIRE_DB") == "1" {
+			t.Fatal("TEST_DATABASE_URL не задан, а REQUIRE_DB=1")
+		}
+		t.Skip("TEST_DATABASE_URL не задан")
+	}
+	db, err := sql.Open("pgx", url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	TTL, RenewEvery = 300*time.Millisecond, 50*time.Millisecond
+	name := fmt.Sprintf("crash-%d", time.Now().UnixNano())
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	if err := EnsureTable(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO leader_leases VALUES ($1, 'упавший сервер', now() + interval '400 milliseconds')`, name); err != nil {
+		t.Fatal(err)
+	}
+	started := make(chan time.Time, 1)
+	t0 := time.Now()
+	go Run(ctx, db, name, func(c context.Context) { started <- time.Now(); <-c.Done() })
+	select {
+	case at := <-started:
+		if at.Sub(t0) < 300*time.Millisecond {
+			t.Fatalf("аренду забрали раньше срока: через %v", at.Sub(t0))
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("после срока аренду никто не забрал")
 	}
 }
