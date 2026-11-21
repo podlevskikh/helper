@@ -259,7 +259,12 @@ func (h *OrgHandler) GetOrgSettings(c *gin.Context) {
 	if tz == "" {
 		tz = "Europe/Nicosia"
 	}
-	c.JSON(http.StatusOK, gin.H{"name": org.Name, "high_priority_limit": limit, "timezone": tz})
+	week := org.WeekStart
+	if week == 0 {
+		week = calendar.WeekStartFor(tz)
+	}
+	c.JSON(http.StatusOK, gin.H{"name": org.Name, "high_priority_limit": limit, "timezone": tz,
+		"week_start": week, "week_start_auto": org.WeekStart == 0})
 }
 
 // UpdateOrgSettings — изменить настройки организации.
@@ -269,6 +274,7 @@ func (h *OrgHandler) UpdateOrgSettings(c *gin.Context) {
 	var input struct {
 		HighPriorityLimit *int    `json:"high_priority_limit"`
 		Timezone          *string `json:"timezone"`
+		WeekStart         *int    `json:"week_start"` // 1, 6, 7 или 0 — по часовому поясу
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -288,6 +294,15 @@ func (h *OrgHandler) UpdateOrgSettings(c *gin.Context) {
 			return
 		}
 		h.db.Model(&models.Organization{}).Where("id = ?", m.OrganizationID).Update("timezone", *input.Timezone)
+	}
+	if input.WeekStart != nil {
+		switch *input.WeekStart {
+		case 0, calendar.Monday, calendar.Saturday, calendar.Sunday:
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "week_start must be 0, 1, 6 or 7"})
+			return
+		}
+		h.db.Model(&models.Organization{}).Where("id = ?", m.OrganizationID).Update("week_start", *input.WeekStart)
 	}
 	h.GetOrgSettings(c)
 }

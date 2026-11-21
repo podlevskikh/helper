@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"podlevskikh/awesomeProject/internal/auth"
+	"podlevskikh/awesomeProject/internal/calendar"
 	"podlevskikh/awesomeProject/internal/mail"
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
@@ -278,6 +279,9 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 				}
 			}
 		} else {
+			// Выходной и страна праздников по умолчанию — по часовому поясу дома (Залив: пятница и праздники страны).
+			var org models.Organization
+			tx.Select("timezone").First(&org, invite.OrganizationID)
 			membership := models.Membership{
 				UserID:         user.ID,
 				OrganizationID: invite.OrganizationID,
@@ -285,6 +289,8 @@ func (h *InviteHandler) AcceptInvite(c *gin.Context) {
 				Status:         models.MembershipActive,
 				InvitedBy:      &invite.InvitedBy,
 				DisplayName:    invite.Name,
+				DaysOff:        calendar.DefaultDaysOff(org.Timezone),
+				HolidayCountry: calendar.DefaultCountryFor(org.Timezone),
 			}
 			if txErr := tx.Create(&membership).Error; txErr != nil {
 				return txErr

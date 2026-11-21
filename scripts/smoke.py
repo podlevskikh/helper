@@ -448,7 +448,7 @@ try:
     s, _, _ = call("PATCH", f"/orgs/{orgA}/members/{helperId}", {"role": "owner"}, tokAdm, orgA)
     expect("ROLE-11 роль owner не выдаётся", s, 400)
     # LANG-03: сервер принимает все языки приложения и отвергает незнакомые
-    for code in ("es", "fil", "id", "el", "uk", "ne", "si"):
+    for code in ("es", "fil", "id", "el", "uk", "ne", "si", "ar"):
         s, js, _ = call("PATCH", "/auth/me", {"locale": code}, tokA)
         check(f"LANG-03 язык {code} сохраняется", s == 200, f"({s} {js})")
     s, js, _ = call("GET", "/auth/me", token=tokA)
@@ -457,6 +457,14 @@ try:
     expect("LANG-03 незнакомый язык", s, 400)
     s, _, _ = call("PATCH", "/auth/me", {"locale": "ru"}, tokA)
     expect("LANG-03 язык вернули", s, 200)
+    # LANG-11: часовой пояс устройства → пояс дома, неделя с воскресенья в Заливе
+    s, js, _ = call("POST", "/auth/register", {"email": email("gulf"), "password": PW, "org_name": "Smoke gulf", "locale": "ar", "timezone": "Asia/Riyadh"})
+    tokG = (js or {}).get("access")
+    orgG = next((m["organization_id"] for m in (js or {}).get("memberships", []) if m.get("status") == "active"), None)
+    if tokG:
+        created["gulf"] = (tokG, PW)
+    s, js, _ = call("GET", f"/orgs/{orgG}/settings", token=tokG, org=orgG)
+    check("LANG-11 дом в Эр-Рияде: пояс и неделя с воскресенья", s == 200 and (js or {}).get("timezone") == "Asia/Riyadh" and (js or {}).get("week_start") == 7, f"({s} {js})")
     s, js, _ = call("GET", "/auth/me", token=tokA)
     ownerId = ((js or {}).get("user") or {}).get("id")
     s, _, _ = call("PATCH", f"/orgs/{orgA}/members/{ownerId}", {"role": "helper"}, tokAdm, orgA)

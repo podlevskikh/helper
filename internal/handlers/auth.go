@@ -33,6 +33,7 @@ type registerRequest struct {
 	OrgName  string `json:"org_name" binding:"required"`
 	Name     string `json:"name"` // как к нанимателю обращаться; не задано — часть почты до @
 	Locale   string `json:"locale"`
+	Timezone string `json:"timezone"` // часовой пояс устройства (IANA) — станет часовым поясом дома
 }
 
 type loginRequest struct {
@@ -155,6 +156,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 	user := models.User{Email: req.Email, PasswordHash: hash, Name: name, Locale: pickLocale(req.Locale)}
 	org := models.Organization{Name: strings.TrimSpace(req.OrgName)}
+	if tz := strings.TrimSpace(req.Timezone); tz != "" && len(tz) <= 64 {
+		if _, err := time.LoadLocation(tz); err == nil {
+			org.Timezone = tz
+		}
+	}
 
 	// Транзакция: user + org + membership
 	err = h.db.Transaction(func(tx *gorm.DB) error {

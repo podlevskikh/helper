@@ -53,7 +53,10 @@ type Organization struct {
 	// Сколько задач высокой важности можно поставить на один день
 	HighPriorityLimit int `gorm:"default:3" json:"high_priority_limit"`
 	// Часовой пояс дома (IANA): по нему считаются «сегодня», план дня, напоминания и тихие часы
-	Timezone  string    `gorm:"default:'Europe/Nicosia'" json:"timezone"`
+	Timezone string `gorm:"default:'Europe/Nicosia'" json:"timezone"`
+	// С какого дня начинается неделя в ленте дней (ISO: 1 = Пн, 6 = Сб, 7 = Вс); 0 — по часовому поясу
+	// (calendar.WeekStartFor: Залив и Иордания — с воскресенья).
+	WeekStart int       `gorm:"default:0" json:"week_start"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

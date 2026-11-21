@@ -18,7 +18,7 @@ import (
 
 // Языки интерфейса, которые есть в приложении (LOCALES в src/i18n/index.ts фронта).
 var supportedLocales = map[string]bool{
-	"en": true, "ru": true, "es": true, "fil": true, "id": true, "el": true, "uk": true, "ne": true, "si": true,
+	"en": true, "ru": true, "es": true, "fil": true, "id": true, "el": true, "uk": true, "ne": true, "si": true, "ar": true,
 }
 
 // defaultLocale — язык интерфейса по умолчанию: английский.

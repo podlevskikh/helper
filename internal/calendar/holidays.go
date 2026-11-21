@@ -34,6 +34,8 @@ var googleIDs = map[string]string{
 	"KZ": "kz", "LK": "lk", "MD": "md", "NP": "np", "PH": "philippines", "PL": "polish",
 	"PT": "portuguese", "RO": "romanian", "RS": "rs", "RU": "russian", "TH": "th", "TR": "turkish",
 	"UA": "ukrainian", "US": "usa", "UZ": "uz", "VN": "vietnamese",
+	// Залив, Иордания, Ливан (21.11.2026; «sa» у Google — ЮАР, Саудовская Аравия — «saudiarabian»)
+	"SA": "saudiarabian", "AE": "ae", "KW": "kw", "QA": "qa", "OM": "om", "BH": "bh", "JO": "jo", "LB": "lb",
 }
 
 // Supported — можно ли выбрать эту страну праздников ("-" — без праздников).

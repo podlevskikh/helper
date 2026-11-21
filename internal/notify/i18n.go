@@ -31,7 +31,7 @@ func Lang(locale string) string {
 }
 
 // pluralIndex — номер формы по числу, как в приложении (src/i18n/index.ts):
-// ru, uk — 1 / 2–4 / 5+; id — одна форма; si — 0 и 1 / остальное; остальные — 1 / остальное.
+// ru, uk — 1 / 2–4 / 5+; id — одна форма; si — 0 и 1 / остальное; ar — 6 форм; остальные — 1 / остальное.
 func pluralIndex(lang string, n int) int {
 	if n < 0 {
 		n = -n
@@ -54,6 +54,22 @@ func pluralIndex(lang string, n int) int {
 			return 0
 		}
 		return 1
+	case "ar":
+		// CLDR: 0 | 1 | 2 | 3–10 | 11–99 | 100, 101, 102…
+		m100 := n % 100
+		switch {
+		case n == 0:
+			return 0
+		case n == 1:
+			return 1
+		case n == 2:
+			return 2
+		case m100 >= 3 && m100 <= 10:
+			return 3
+		case m100 >= 11:
+			return 4
+		}
+		return 5
 	}
 	if n == 1 {
 		return 0

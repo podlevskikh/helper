@@ -78,6 +78,11 @@ func TestPluralIndex(t *testing.T) {
 			t.Errorf("ru %d: got %d want %d", n, got, want)
 		}
 	}
+	for n, want := range map[int]int{0: 0, 1: 1, 2: 2, 3: 3, 10: 3, 11: 4, 99: 4, 100: 5, 102: 5, 103: 3} {
+		if got := pluralIndex("ar", n); got != want {
+			t.Errorf("ar %d: got %d want %d", n, got, want)
+		}
+	}
 	if pluralIndex("id", 5) != 0 || pluralIndex("si", 0) != 0 || pluralIndex("es", 0) != 1 || pluralIndex("en", 1) != 0 {
 		t.Error("правила числа для id/si/es/en")
 	}
@@ -95,7 +100,7 @@ func TestCatalogsComplete(t *testing.T) {
 		}
 		return m
 	}
-	forms := map[string]int{"ru": 3, "uk": 3, "id": 1}
+	forms := map[string]int{"ru": 3, "uk": 3, "id": 1, "ar": 6}
 	for lang, cat := range catalogs {
 		if lang == "en" {
 			continue
