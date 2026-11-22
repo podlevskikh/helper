@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"podlevskikh/awesomeProject/internal/models"
 )
 
 // Версионированные миграции данных. Схема (новые таблицы и колонки) — через AutoMigrate,
@@ -60,6 +62,11 @@ func dataMigrations(st migrationsState) []dataMigration {
 		{id: "2026-11-routines-from-legacy", run: migrateRoutinesFromLegacy},
 		// Гонка сборки дня (до блокировки LockDay) ставила задачу регулярной задачи несколько раз.
 		{id: "2026-11-dedupe-routine-tasks", run: dedupeRoutineTasks},
+		// Регулярные задачи тех, кто уже покинул команду, висели на них, и их никто не видел:
+		// отдаём тому, кто поставил (если он в команде), иначе основному админу (решение 22.11.2026).
+		{id: "2026-11-routines-of-left-members", run: func(tx *gorm.DB) error {
+			return tx.Exec(models.ReassignOrphanRoutinesSQL).Error
+		}},
 	}
 }
 

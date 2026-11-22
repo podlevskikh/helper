@@ -381,3 +381,45 @@ func TestRoutineConcurrentDayBuild(t *testing.T) {
 		t.Fatalf("задач «Проветрить» в дне: %d, ждали 2 (09:00 и 18:00)", got)
 	}
 }
+
+// RT-22: помощник покинул команду — его регулярные задачи и уже собранные задачи дня переходят к тому,
+// кто их поставил; поставивший тоже не в команде — к основному админу (решение 22.11.2026).
+func TestRoutinesGoToCreatorWhenHelperLeaves(t *testing.T) {
+	e := newEnv(t, 1000)
+	hm := rtSetup(e, "rtleave")
+	withNow(t, "2026-11-16T06:00:00Z") // понедельник
+	adm := e.member(hm.o, "admin", "rtleave")
+	byOwner := e.routine(hm.o, map[string]any{"kind": "other", "title": "Полить цветы", "repeat_kind": "weekdays",
+		"weekdays": []int{1, 2, 3, 4, 5, 6}, "time_mode": "any", "assigned_to_user_id": hm.h.UserID})
+	byAdmin := e.routine(adm, map[string]any{"kind": "other", "title": "Вынести мусор", "repeat_kind": "weekdays",
+		"weekdays": []int{1, 2, 3, 4, 5, 6}, "time_mode": "any", "assigned_to_user_id": hm.h.UserID})
+	if findTask(e.dayTasks(hm.h, "2026-11-17"), "Полить цветы") == nil {
+		t.Fatalf("у помощника во вторник нет задачи")
+	}
+	e.expect("помощник уходит", e.do(req{method: "POST", path: fmt.Sprintf("/orgs/%d/leave", hm.o.Org), token: hm.h.Token, org: hm.o.Org}), 204)
+
+	assignee := func(id float64) uint {
+		var v uint
+		e.db.Raw(`SELECT assigned_to_user_id FROM routines WHERE id = ?`, uint(id)).Scan(&v)
+		return v
+	}
+	if got := assignee(byOwner); got != hm.o.UserID {
+		t.Errorf("цветы (поставил владелец) — у %d, ждали владельца %d", got, hm.o.UserID)
+	}
+	if got := assignee(byAdmin); got != adm.UserID {
+		t.Errorf("мусор (поставил админ) — у %d, ждали админа %d", got, adm.UserID)
+	}
+	if tk := findTask(e.dayTasks(hm.o, "2026-11-17"), "Полить цветы"); tk == nil || tk["assigned_to_user_id"] != float64(hm.o.UserID) {
+		t.Errorf("собранная задача вторника не перешла к владельцу: %v", tk)
+	}
+
+	// Админ, поставивший задачу, тоже ушёл — она у основного админа.
+	h2 := hm.h2
+	again := e.routine(adm, map[string]any{"kind": "other", "title": "Проветрить", "repeat_kind": "weekdays",
+		"weekdays": []int{1, 2, 3, 4, 5, 6}, "time_mode": "any", "assigned_to_user_id": h2.UserID})
+	e.expect("админ уходит", e.do(req{method: "POST", path: fmt.Sprintf("/orgs/%d/leave", hm.o.Org), token: adm.Token, org: hm.o.Org}), 204)
+	e.expect("второй помощник уходит", e.do(req{method: "POST", path: fmt.Sprintf("/orgs/%d/leave", hm.o.Org), token: h2.Token, org: hm.o.Org}), 204)
+	if got := assignee(again); got != hm.o.UserID {
+		t.Errorf("задача ушедшего админа — у %d, ждали основного админа %d", got, hm.o.UserID)
+	}
+}

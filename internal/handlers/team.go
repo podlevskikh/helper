@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -13,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"podlevskikh/awesomeProject/internal/auth"
+	"podlevskikh/awesomeProject/internal/clock"
 	"podlevskikh/awesomeProject/internal/middleware"
 	"podlevskikh/awesomeProject/internal/models"
 )
@@ -208,8 +208,30 @@ func deactivateMember(tx *gorm.DB, m *models.Membership) error {
 		return err
 	}
 	// Даты дней хранятся то с UTC-, то с местной полуночью — берём со вчерашнего дня с запасом.
-	since := time.Now().AddDate(0, 0, -1)
+	since := clock.Now().AddDate(0, 0, -1)
 	days := tx.Model(&models.DailySchedule{}).Select("id").Where("organization_id = ? AND date >= ?", m.OrganizationID, since)
+	// «Ритм дома»: его регулярные задачи — тому, кто их поставил, или основному админу (решение 22.11.2026).
+	// Уже собранные несделанные задачи этих рутин с сегодняшнего дня — туда же, а не «без исполнителя».
+	var rs []models.Routine
+	if err := tx.Where("organization_id = ? AND assigned_to_user_id = ?", m.OrganizationID, m.UserID).Find(&rs).Error; err != nil {
+		return err
+	}
+	if len(rs) > 0 {
+		if err := tx.Exec(models.ReassignOrphanRoutinesSQL).Error; err != nil {
+			return err
+		}
+		for _, r := range rs {
+			var now models.Routine
+			if err := tx.First(&now, r.ID).Error; err != nil || now.AssignedToUserID == m.UserID {
+				continue
+			}
+			if err := tx.Model(&models.ScheduleTask{}).
+				Where("routine_id = ? AND assigned_to_user_id = ? AND completed = ? AND schedule_id IN (?)", r.ID, m.UserID, false, days).
+				Update("assigned_to_user_id", now.AssignedToUserID).Error; err != nil {
+				return err
+			}
+		}
+	}
 	return tx.Model(&models.ScheduleTask{}).
 		Where("organization_id = ? AND assigned_to_user_id = ? AND completed = ? AND schedule_id IN (?)", m.OrganizationID, m.UserID, false, days).
 		Update("assigned_to_user_id", nil).Error

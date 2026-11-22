@@ -42,15 +42,15 @@ func plain(title string, paragraphs []string, link, footnote string) string {
 	return strings.Join(parts, "\n")
 }
 
-// Welcome — после регистрации нанимателя или входа помощника по приглашению.
+// Welcome — после регистрации дома или входа помощника по приглашению.
 func Welcome(to, locale, name, orgName, appURL string, helper bool) Message {
 	var title, button, foot string
 	var ps []string
 	if isRu(locale) {
 		title = "Добро пожаловать!"
 		if helper {
-			ps = []string{fmt.Sprintf("Здравствуйте, %s! Вы присоединились к дому «%s».", name, orgName),
-				"Здесь видно, что сделать сегодня: готовка, уборка, ребёнок и поручения. Отмечайте сделанное — наниматель это увидит."}
+			ps = []string{fmt.Sprintf("Здравствуйте, %s! Вы в команде дома «%s».", name, orgName),
+				"Здесь видно, что сделать сегодня: готовка, уборка, ребёнок и другие задачи. Отмечайте сделанное — тот, кто ведёт дом, это увидит."}
 		} else {
 			ps = []string{fmt.Sprintf("Аккаунт для %s создан, дом «%s» готов.", to, orgName),
 				"Добавьте помощника из «Настроек», и расписание дня будет у вас обоих."}
@@ -60,8 +60,8 @@ func Welcome(to, locale, name, orgName, appURL string, helper bool) Message {
 	} else {
 		title = "Welcome!"
 		if helper {
-			ps = []string{fmt.Sprintf("Hi %s! You've joined “%s”.", name, orgName),
-				"Here you'll see what to do today: cooking, cleaning, childcare and errands. Tick off what's done — your employer will see it."}
+			ps = []string{fmt.Sprintf("Hi %s! You're now on the home team of “%s”.", name, orgName),
+				"Here you'll see today's tasks: cooking, cleaning, childcare and more. Tick off what's done — whoever runs the home will see it."}
 		} else {
 			ps = []string{fmt.Sprintf("Your account for %s is ready, and so is “%s”.", to, orgName),
 				"Invite your helper from Settings and you'll both share the day's plan."}
@@ -106,13 +106,13 @@ func PasswordChanged(to, locale, appURL string) Message {
 func EmailChangeConfirm(to, locale, link string) Message {
 	if isRu(locale) {
 		title := "Подтвердите новую почту"
-		ps := []string{fmt.Sprintf("В Helper Day попросили сделать %s почтой для входа. Нажмите на кнопку, чтобы подтвердить.", to),
+		ps := []string{fmt.Sprintf("В Helper's Day попросили сделать %s почтой для входа. Нажмите на кнопку, чтобы подтвердить.", to),
 			"Ссылка действует 24 часа и срабатывает один раз. До подтверждения входить нужно со старой почтой."}
 		foot := "Если вы ничего не просили — просто проигнорируйте письмо, ничего не изменится."
 		return Message{To: to, Subject: title, Text: plain(title, ps, link, foot), HTML: layout(title, ps, "Подтвердить почту", link, foot)}
 	}
 	title := "Confirm your new email"
-	ps := []string{fmt.Sprintf("Someone asked to make %s the sign-in email for a Helper Day account. Tap the button to confirm.", to),
+	ps := []string{fmt.Sprintf("Someone asked to make %s the sign-in email for a Helper's Day account. Tap the button to confirm.", to),
 		"The link works once and expires in 24 hours. Until then, keep signing in with the old email."}
 	foot := "If you didn't ask for this, just ignore this email — nothing will change."
 	return Message{To: to, Subject: title, Text: plain(title, ps, link, foot), HTML: layout(title, ps, "Confirm email", link, foot)}
@@ -123,13 +123,13 @@ func EmailChangeConfirm(to, locale, link string) Message {
 func EmailChangeTaken(to, locale, appURL string) Message {
 	if isRu(locale) {
 		title := "Эта почта уже используется"
-		ps := []string{fmt.Sprintf("В Helper Day попросили сделать %s почтой для входа в другой аккаунт, но с этой почтой уже есть аккаунт.", to),
+		ps := []string{fmt.Sprintf("В Helper's Day попросили сделать %s почтой для входа в другой аккаунт, но с этой почтой уже есть аккаунт.", to),
 			"Если это были вы — войдите с этой почтой или укажите в профиле другой адрес."}
 		foot := "Если вы ничего не просили — просто проигнорируйте письмо."
 		return Message{To: to, Subject: title, Text: plain(title, ps, appURL, foot), HTML: layout(title, ps, "Открыть приложение", appURL, foot)}
 	}
 	title := "This email is already in use"
-	ps := []string{fmt.Sprintf("Someone asked to use %s as the sign-in email for a Helper Day account, but there's already an account with this email.", to),
+	ps := []string{fmt.Sprintf("Someone asked to use %s as the sign-in email for a Helper's Day account, but there's already an account with this email.", to),
 		"If it was you, sign in with this email or choose another address in your profile."}
 	foot := "If you didn't ask for this, just ignore this email."
 	return Message{To: to, Subject: title, Text: plain(title, ps, appURL, foot), HTML: layout(title, ps, "Open the app", appURL, foot)}
@@ -139,14 +139,14 @@ func EmailChangeTaken(to, locale, appURL string) Message {
 func EmailChangeRequested(to, locale, maskedNew, cancelLink string) Message {
 	if isRu(locale) {
 		title := "Запрошена смена почты"
-		ps := []string{fmt.Sprintf("В вашем аккаунте Helper Day запросили смену почты для входа на %s.", maskedNew),
+		ps := []string{fmt.Sprintf("В вашем аккаунте Helper's Day запросили смену почты для входа на %s.", maskedNew),
 			"Почта изменится, только когда по ссылке из письма на новый адрес перейдут в течение 24 часов."}
 		foot := "Если это были вы — ничего делать не нужно."
 		return Message{To: to, Subject: title, Text: plain(title, append(ps, "Это не вы? Отмените смену и смените пароль:"), cancelLink, foot),
 			HTML: layout(title, append(ps, "Это не вы? Отмените смену — все входы в аккаунт будут завершены, затем смените пароль."), "Это не я — отменить", cancelLink, foot)}
 	}
 	title := "Email change requested"
-	ps := []string{fmt.Sprintf("Someone asked to change the sign-in email of your Helper Day account to %s.", maskedNew),
+	ps := []string{fmt.Sprintf("Someone asked to change the sign-in email of your Helper's Day account to %s.", maskedNew),
 		"It will only change once the link sent to the new address is opened within 24 hours."}
 	foot := "If it was you, there's nothing to do."
 	return Message{To: to, Subject: title, Text: plain(title, append(ps, "Not you? Cancel the change and change your password:"), cancelLink, foot),
@@ -157,13 +157,13 @@ func EmailChangeRequested(to, locale, maskedNew, cancelLink string) Message {
 func EmailChanged(to, locale, maskedNew, revertLink string) Message {
 	if isRu(locale) {
 		title := "Почта для входа изменена"
-		ps := []string{fmt.Sprintf("Почта для входа в ваш аккаунт Helper Day изменена на %s. На всех устройствах нужно войти заново.", maskedNew),
+		ps := []string{fmt.Sprintf("Почта для входа в ваш аккаунт Helper's Day изменена на %s. На всех устройствах нужно войти заново.", maskedNew),
 			"Это не вы? Верните почту по кнопке ниже в течение 14 дней — все входы будут завершены, а новый пароль вы зададите через «Забыли пароль?»."}
 		foot := "Если это были вы — ничего делать не нужно."
 		return Message{To: to, Subject: title, Text: plain(title, ps, revertLink, foot), HTML: layout(title, ps, "Это не я — вернуть почту", revertLink, foot)}
 	}
 	title := "Your sign-in email was changed"
-	ps := []string{fmt.Sprintf("The sign-in email of your Helper Day account was changed to %s. Every device will need to sign in again.", maskedNew),
+	ps := []string{fmt.Sprintf("The sign-in email of your Helper's Day account was changed to %s. Every device will need to sign in again.", maskedNew),
 		"Not you? Use the button below within 14 days to get your email back — every session will be signed out, and you'll set a new password via “Forgot password?”."}
 	foot := "If it was you, there's nothing to do."
 	return Message{To: to, Subject: title, Text: plain(title, ps, revertLink, foot), HTML: layout(title, ps, "Not me — restore my email", revertLink, foot)}

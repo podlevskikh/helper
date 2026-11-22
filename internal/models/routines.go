@@ -243,3 +243,19 @@ type RecipeImport struct {
 	UndoneAt       *time.Time `json:"undone_at,omitempty"`
 	CreatedAt      time.Time  `json:"created_at"`
 }
+
+// ReassignOrphanRoutinesSQL — регулярные задачи, чей исполнитель не в команде, — тому, кто поставил,
+// или основному админу. Идемпотентно: трогает только задачи с исполнителем вне команды.
+const ReassignOrphanRoutinesSQL = `
+UPDATE routines r SET assigned_to_user_id = n.to_id
+FROM (
+  SELECT r2.id, COALESCE(
+    (SELECT m.user_id FROM memberships m WHERE m.organization_id = r2.organization_id
+       AND m.user_id = r2.created_by AND m.status = 'active'),
+    (SELECT m.user_id FROM memberships m WHERE m.organization_id = r2.organization_id
+       AND m.role = 'owner' AND m.status = 'active' ORDER BY m.id LIMIT 1)) AS to_id
+  FROM routines r2
+  WHERE NOT EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = r2.organization_id
+       AND m.user_id = r2.assigned_to_user_id AND m.status = 'active')
+) n
+WHERE r.id = n.id AND n.to_id IS NOT NULL`
