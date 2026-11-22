@@ -79,8 +79,15 @@ func (h *OrgHandler) GetMembers(c *gin.Context) {
 
 	// Формируем ответ
 	result := make([]MemberView, 0, len(memberships))
+	full := middleware.Can(m, middleware.CapManageTeam)
 	for _, mb := range memberships {
-		result = append(result, memberView(mb, userMap[mb.UserID]))
+		v := memberView(mb, userMap[mb.UserID])
+		if !full { // модератор: только кто есть кто — без почты, приглашений и настроек выходных
+			v = MemberView{ID: v.ID, UserID: v.UserID, OrganizationID: v.OrganizationID, Role: v.Role, Status: v.Status,
+				Name: v.Name, DisplayName: v.DisplayName, AccountName: v.AccountName, AvatarURL: v.AvatarURL, CreatedAt: v.CreatedAt,
+				DaysOff: []int{}}
+		}
+		result = append(result, v)
 	}
 
 	c.JSON(http.StatusOK, result)

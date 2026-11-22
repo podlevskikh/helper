@@ -48,9 +48,15 @@ var routePolicy = map[string]policy{
 	// вошедший, без дома
 	"GET /auth/me": authOnly(), "PATCH /auth/me": authOnly(), "DELETE /auth/me": authOnly(), "POST /auth/password": authOnly(), "POST /auth/email": authOnly(), "GET /auth/email": authOnly(), "DELETE /auth/email": authOnly(),
 	"POST /auth/email/resend": authOnly(), "POST /auth/email/check": pub(), "POST /auth/email/confirm": pub(), "POST /auth/email/cancel": pub(), "POST /auth/email/revert": pub(),
-	"POST /me/devices": authOnly(), "DELETE /me/devices/:token": authOnly(), "POST /me/client-errors": authOnly(),
+	"POST /me/devices": authOnly(), "DELETE /me/devices/:token": authOnly(),
+	// Коннектор для Claude: OAuth (публичные точки — по стандарту), согласие и «Подключения» — после входа; /mcp — по OAuth-токену.
+	"GET /.well-known/oauth-protected-resource": pub(), "GET /.well-known/oauth-protected-resource/mcp": pub(),
+	"GET /.well-known/oauth-authorization-server": pub(), "POST /oauth/register": pub(), "GET /oauth/authorize": pub(),
+	"POST /oauth/token": pub(), "GET /oauth/requests/:id": authOnly(), "POST /oauth/requests/:id/decision": authOnly(),
+	"GET /me/connections": authOnly(), "DELETE /me/connections/:id": authOnly(),
+	"POST /mcp": authOnly(), "GET /mcp": authOnly(), "DELETE /mcp": authOnly(), "POST /me/client-errors": authOnly(),
 	// дом
-	"POST /orgs/:orgId/invites": org(team), "GET /orgs/:orgId/members": org(team),
+	"POST /orgs/:orgId/invites": org(team), "GET /orgs/:orgId/members": org(schedule),
 	"PATCH /orgs/:orgId/members/:userId": org(team), "DELETE /orgs/:orgId/members/:userId": org(team),
 	"POST /orgs/:orgId/leave": org(all), "POST /orgs/:orgId/transfer-ownership": org(ownerOnly),
 	"GET /orgs/:orgId/invites": org(team), "DELETE /orgs/:orgId/invites/:id": org(team),
@@ -67,7 +73,7 @@ var routePolicy = map[string]policy{
 
 	"GET /admin/api/recipes": org(all), "GET /admin/api/recipes/:id": org(all),
 	"POST /admin/api/recipes": org(recipes), "PUT /admin/api/recipes/:id": org(all), "DELETE /admin/api/recipes/:id": org(recipes),
-	"POST /admin/api/recipe-imports": org(recipes), "DELETE /admin/api/recipe-imports/:id": org(recipes),
+	"GET /admin/api/recipe-imports": org(recipes), "POST /admin/api/recipe-imports": org(recipes), "DELETE /admin/api/recipe-imports/:id": org(recipes),
 	"GET /admin/api/recipes/:id/comments": org(all), "POST /admin/api/recipes/:id/comments": org(all),
 	"DELETE /admin/api/comments/:id": org(recipes),
 	"GET /admin/api/mealtimes":       org(all), "GET /admin/api/mealtimes/:id": org(all),

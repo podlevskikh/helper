@@ -93,6 +93,12 @@ func Initialize(databaseURL string) error {
 		&models.RoutineDayDecision{},
 		&models.TaskDish{},
 		&models.RecipeImport{}, // загрузка рецептов списком
+		// Коннектор для Claude (OAuth)
+		&models.OAuthClient{},
+		&models.OAuthRequest{},
+		&models.OAuthCode{},
+		&models.OAuthGrant{},
+		&models.OAuthToken{},
 		// Пуш-уведомления
 		&models.PushDevice{},
 		&models.NotificationPref{},

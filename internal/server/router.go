@@ -9,7 +9,9 @@ import (
 
 	"podlevskikh/awesomeProject/internal/database"
 	"podlevskikh/awesomeProject/internal/handlers"
+	"podlevskikh/awesomeProject/internal/mcpserver"
 	"podlevskikh/awesomeProject/internal/middleware"
+	"podlevskikh/awesomeProject/internal/oauth"
 	"podlevskikh/awesomeProject/internal/scheduler"
 
 	"github.com/gin-contrib/cors"
@@ -122,6 +124,17 @@ func NewRouter(d Deps) *gin.Engine {
 	// или повторный клик не съедают попытки входа у всех за тем же адресом.
 	linkLimit := middleware.RateLimit(middleware.RateLimitOptions{Max: 20, Per: 15 * time.Minute, OnlyFailures: true})
 
+	// Коннектор Helper's Day для Claude: OAuth (вход и согласие) и MCP-сервер /mcp (docs/work/recipes-mcp/PRD.md).
+	oauthServer := oauth.New(db)
+	oauthServer.Register(router, authMw,
+		middleware.RateLimit(middleware.RateLimitOptions{Max: 20, Per: time.Hour}),        // регистрация клиента
+		middleware.RateLimit(middleware.RateLimitOptions{Max: 60, Per: 15 * time.Minute}), // начало входа
+		middleware.RateLimit(middleware.RateLimitOptions{Max: 60, Per: 15 * time.Minute, OnlyFailures: true}))
+	mcpHandler := gin.WrapH(mcpserver.Handler(db, oauthServer))
+	router.POST("/mcp", mcpHandler)
+	router.GET("/mcp", mcpHandler)
+	router.DELETE("/mcp", mcpHandler)
+
 	authGroup := router.Group("/auth")
 	{
 		authGroup.POST("/register", registerLimit, authHandler.Register)
@@ -168,7 +181,8 @@ func NewRouter(d Deps) *gin.Engine {
 	orgsGroup := router.Group("/orgs", authMw, orgMw)
 	{
 		orgsGroup.POST("/:orgId/invites", middleware.Require(middleware.CapManageTeam), inviteHandler.CreateInvite)
-		orgsGroup.GET("/:orgId/members", middleware.Require(middleware.CapManageTeam), orgHandler.GetMembers)
+		// Список команды видят и модераторы — имена и роли, чтобы ставить задачи людям (решение 21.11.2026).
+		orgsGroup.GET("/:orgId/members", middleware.Require(middleware.CapManageSchedule), orgHandler.GetMembers)
 		orgsGroup.PATCH("/:orgId/members/:userId", middleware.Require(middleware.CapManageTeam), teamHandler.UpdateMember)
 		orgsGroup.DELETE("/:orgId/members/:userId", middleware.Require(middleware.CapManageTeam), teamHandler.RemoveMember)
 		orgsGroup.POST("/:orgId/leave", teamHandler.Leave)
@@ -235,6 +249,7 @@ func NewRouter(d Deps) *gin.Engine {
 			api.PUT("/recipes/:id", middleware.Require(middleware.CapEditRecipes), adminHandler.UpdateRecipe)
 			api.DELETE("/recipes/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.DeleteRecipe)
 			// Загрузка рецептов списком: предпросмотр (dry_run) и сохранение; отмена — сутки.
+			api.GET("/recipe-imports", middleware.Require(middleware.CapManageRecipes), adminHandler.RecentRecipeImports)
 			api.POST("/recipe-imports", middleware.Require(middleware.CapManageRecipes), adminHandler.ImportRecipes)
 			api.DELETE("/recipe-imports/:id", middleware.Require(middleware.CapManageRecipes), adminHandler.UndoRecipeImport)
 			// Загрузка фото рецептов убрана: рецепты без фото (решение владелицы), а старый обработчик не проверял размер и содержимое.

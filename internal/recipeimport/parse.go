@@ -354,10 +354,32 @@ func (b *block) item(idx int) Item {
 	}
 
 	// Ингредиенты → «Продукт — количество» по строке.
-	var lines []string
-	var noQty []string
-	var parsed []menu.Ingredient
-	for _, l := range b.ings {
+	lines, parsed, noQty := ingredients(b.ings)
+	it.Ingredients = strings.Join(lines, "\n")
+	it.IngCount = len(lines)
+	if it.IngCount == 0 {
+		it.Errors = append(it.Errors, Issue{Code: ErrNoIngredients})
+	} else {
+		if len(noQty) > 0 {
+			it.Warnings = append(it.Warnings, Issue{Code: WarnNoQty, Names: noQty})
+		}
+		if i := menu.Main(it.Name, parsed); i >= 0 {
+			it.MainProduct = parsed[i].Name
+		} else {
+			it.Warnings = append(it.Warnings, Issue{Code: WarnNoMain})
+		}
+	}
+
+	it.Instructions = strings.TrimSpace(trimBlank(b.steps))
+	if it.Instructions == "" {
+		it.Warnings = append(it.Warnings, Issue{Code: WarnNoInstructions})
+	}
+	return it
+}
+
+// ingredients — строки списка → «Продукт — количество», разобранные продукты и те, у которых нет количества.
+func ingredients(raw []string) (lines []string, parsed []menu.Ingredient, noQty []string) {
+	for _, l := range raw {
 		l = strings.TrimSpace(bulletRe.ReplaceAllString(strings.TrimSpace(l), ""))
 		if l == "" {
 			continue
@@ -385,26 +407,17 @@ func (b *block) item(idx int) Item {
 			lines = append(lines, in.Name+" — "+in.Raw)
 		}
 	}
-	it.Ingredients = strings.Join(lines, "\n")
-	it.IngCount = len(lines)
-	if it.IngCount == 0 {
-		it.Errors = append(it.Errors, Issue{Code: ErrNoIngredients})
-	} else {
-		if len(noQty) > 0 {
-			it.Warnings = append(it.Warnings, Issue{Code: WarnNoQty, Names: noQty})
-		}
-		if i := menu.Main(it.Name, parsed); i >= 0 {
-			it.MainProduct = parsed[i].Name
-		} else {
-			it.Warnings = append(it.Warnings, Issue{Code: WarnNoMain})
-		}
-	}
+	return lines, parsed, noQty
+}
 
-	it.Instructions = strings.TrimSpace(trimBlank(b.steps))
-	if it.Instructions == "" {
-		it.Warnings = append(it.Warnings, Issue{Code: WarnNoInstructions})
+// NormalizeIngredients — список продуктов (как пишут люди или Claude) → строки «Продукт — 170 г» для рецепта.
+func NormalizeIngredients(raw []string) []string {
+	var all []string
+	for _, r := range raw {
+		all = append(all, strings.Split(strings.ReplaceAll(r, "\r", ""), "\n")...)
 	}
-	return it
+	lines, _, _ := ingredients(all)
+	return lines
 }
 
 // trimBlank — строки шагов без хвостовых пустых, отступы как в исходнике.
