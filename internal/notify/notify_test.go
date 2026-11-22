@@ -50,7 +50,10 @@ func TestRenderRuEn(t *testing.T) {
 			"Maria: all done", "8 of 8"},
 		{KindImportantDone, "ru", Params{Actor: "Мария", Title: "Забрать Соню из школы", At: "15:40"},
 			"Готово · Забрать Соню из школы", "Мария · отмечено в 15:40"},
-		{KindMemberJoined, "en", Params{Name: "Maria"}, "Maria joined your home", "You can now assign tasks"},
+		{KindMemberJoined, "en", Params{Name: "Maria"}, "Maria joined your home team", "You can now assign tasks"},
+		{KindMemberJoined, "ru", Params{Name: "Мария"}, "Мария теперь в команде", "Можно ставить задачи"},
+		// Имя не склоняем: «Мария: завтра выходной», не «Завтра у Мария».
+		{KindDayOff, "ru", Params{Name: "Мария", Reason: "weekly", Count: 1, Items: []string{"Полить цветы"}}, "Мария: завтра выходной", "1 регулярная задача перейдёт к вам: Полить цветы"},
 	}
 	for _, c := range cases {
 		title, body := Render(c.kind, c.locale, c.p)
