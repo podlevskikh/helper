@@ -181,7 +181,8 @@ func NewRouter(d Deps) *gin.Engine {
 	orgsGroup := router.Group("/orgs", authMw, orgMw)
 	{
 		orgsGroup.POST("/:orgId/invites", middleware.Require(middleware.CapManageTeam), inviteHandler.CreateInvite)
-		orgsGroup.GET("/:orgId/members", middleware.Require(middleware.CapManageTeam), orgHandler.GetMembers)
+		// Список команды видят и модераторы — имена и роли, чтобы ставить задачи людям (решение 21.11.2026).
+		orgsGroup.GET("/:orgId/members", middleware.Require(middleware.CapManageSchedule), orgHandler.GetMembers)
 		orgsGroup.PATCH("/:orgId/members/:userId", middleware.Require(middleware.CapManageTeam), teamHandler.UpdateMember)
 		orgsGroup.DELETE("/:orgId/members/:userId", middleware.Require(middleware.CapManageTeam), teamHandler.RemoveMember)
 		orgsGroup.POST("/:orgId/leave", teamHandler.Leave)

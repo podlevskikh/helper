@@ -471,6 +471,8 @@ type dayOffItem struct {
 	Times      []string `json:"times"`
 	AssigneeID uint     `json:"assignee_id"`
 	Assignee   string   `json:"assignee"`
+	OwnerID    uint     `json:"owner_id"` // кто поставил: «Мне» в выходной исполнителя — это он
+	Owner      string   `json:"owner"`
 	Reason     string   `json:"reason"`
 	Holiday    string   `json:"holiday,omitempty"`
 	Action     string   `json:"action"` // me | user | move | skip
@@ -539,6 +541,7 @@ func (h *AdminHandler) GetRoutinesDayOff(c *gin.Context) {
 		}
 		it := dayOffItem{RoutineID: r.ID, Title: r.Title, Kind: r.Kind, TimeMode: r.TimeMode, Times: r.TimeList(),
 			AssigneeID: r.AssignedToUserID, Assignee: memberName(h.db, r.AssignedToUserID), Reason: st.Reason,
+			OwnerID: r.CreatedBy, Owner: memberName(h.db, r.CreatedBy),
 			Holiday: st.Holiday, Action: models.DecisionMe, CanMove: r.Kind != models.RoutineFood}
 		if it.Times == nil {
 			it.Times = []string{}

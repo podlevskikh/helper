@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"testing"
@@ -222,4 +223,39 @@ func TestWorkdaysAndAdminSettings(t *testing.T) {
 		t.Errorf("рабочие дни %v, ждали Пн–Пт (админ без выходных не в счёт)", got)
 	}
 	e.expect("админ меняет настройки дома", e.do(req{method: "PUT", path: fmt.Sprintf("/orgs/%d/settings", o.Org), token: a.Token, org: o.Org, body: map[string]any{}}), 200)
+}
+
+// ROLE-17: модератор видит команду — имена и роли, без почты (ставить задачи людям, «Передать»).
+func TestModeratorSeesTeamNamesOnly(t *testing.T) {
+	e := newEnv(t, 1000)
+	o := e.owner("modteam")
+	h := e.member(o, "helper", "modteam")
+	mgr := e.member(o, "manager", "modteam")
+	w := e.do(req{method: "GET", path: fmt.Sprintf("/orgs/%d/members", o.Org), token: mgr.Token, org: o.Org})
+	e.expect("модератор: список команды", w, 200)
+	var list []map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &list); err != nil {
+		t.Fatalf("ответ: %v", err)
+	}
+	seen := false
+	for _, m := range list {
+		if m["email"] != "" {
+			t.Errorf("модератор видит почту: %v", m)
+		}
+		if m["user_id"] == float64(h.UserID) && m["role"] == "helper" && m["name"] != "" {
+			seen = true
+		}
+	}
+	if !seen {
+		t.Errorf("модератор не видит помощника с именем и ролью: %v", list)
+	}
+	// Владелец по-прежнему видит почту.
+	var full []map[string]any
+	_ = json.Unmarshal(e.do(req{method: "GET", path: fmt.Sprintf("/orgs/%d/members", o.Org), token: o.Token, org: o.Org}).Body.Bytes(), &full)
+	if len(full) == 0 || full[0]["email"] == "" {
+		t.Errorf("владелец не видит почту: %v", full)
+	}
+	// Менять команду модератор по-прежнему не может.
+	e.expect("модератор: смена роли", e.do(req{method: "PATCH", path: fmt.Sprintf("/orgs/%d/members/%d", o.Org, h.UserID),
+		token: mgr.Token, org: o.Org, body: map[string]string{"role": "manager"}}), 403)
 }

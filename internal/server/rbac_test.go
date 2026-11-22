@@ -56,7 +56,7 @@ var routePolicy = map[string]policy{
 	"GET /me/connections": authOnly(), "DELETE /me/connections/:id": authOnly(),
 	"POST /mcp": authOnly(), "GET /mcp": authOnly(), "DELETE /mcp": authOnly(), "POST /me/client-errors": authOnly(),
 	// дом
-	"POST /orgs/:orgId/invites": org(team), "GET /orgs/:orgId/members": org(team),
+	"POST /orgs/:orgId/invites": org(team), "GET /orgs/:orgId/members": org(schedule),
 	"PATCH /orgs/:orgId/members/:userId": org(team), "DELETE /orgs/:orgId/members/:userId": org(team),
 	"POST /orgs/:orgId/leave": org(all), "POST /orgs/:orgId/transfer-ownership": org(ownerOnly),
 	"GET /orgs/:orgId/invites": org(team), "DELETE /orgs/:orgId/invites/:id": org(team),
