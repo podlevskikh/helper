@@ -283,6 +283,10 @@ try:
     uidH = ((js or {}).get("user") or {}).get("id")
     if tokH:
         created["h"] = (tokH, PW)
+    # По умолчанию у помощника выходной в воскресенье и праздники Кипра — в такой день его список и еда дома пусты.
+    # Смоук не должен зависеть от дня недели: снимаем выходные (CAL-кейсы проверяют их отдельно).
+    s, _, _ = call("PATCH", f"/orgs/{orgA}/members/{uidH}/schedule-settings", {"days_off": [], "holiday_country": "-"}, tokA, orgA)
+    expect("CAL-04 помощник без выходных (смоук в любой день)", s, 200)
     s, _, _ = call("POST", f"/invites/{inv.get('token')}/accept", {"name": "ещё раз", "password": PW, "email": email("h")})
     expect("INV-05 повторное принятие", s, 410)
     s, js, _ = call("GET", "/helper/api/schedule/today", token=tokH, org=orgA)
